@@ -1,0 +1,15 @@
+# Satır sonlarını depoda LF olarak normalize et.
+#
+# Geliştirme Windows'ta, robot Raspberry Pi OS'ta (Linux). CRLF ile
+# commit'lenen bir betiğin shebang satırı Linux'ta "#!/usr/bin/env python3\r"
+# olarak okunur ve "bad interpreter" hatası verir. Bu, araçları Pi'de
+# doğrudan çalıştırmayı imkânsız kılar.
+* text=auto eol=lf
+
+# Binary dosyalar (depoya alınmasa da, yerelde durduklarında dokunulmasın)
+*.stl   binary
+*.step  binary
+*.3mf   binary
+*.f3z   binary
+*.pdf   binary
+*.png   binary
