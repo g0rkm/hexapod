@@ -1,0 +1,72 @@
+# =============================================================================
+# Faturalar ve ekran görüntüleri — KİŞİSEL VERİ, DEPOYA ALINMAZ
+# =============================================================================
+# yavuz selim/ altındaki fatura PDF'leri TCKN, ev adresi, telefon numarası ve
+# e-posta içeriyor. Bunlar üçüncü kişilerin kimlik bilgileri; herkese açık bir
+# depoya konulamaz ve GitHub'a bir kez gidince geri alınması pratikte mümkün
+# değildir (fork, cache, indeks).
+#
+# Faturalardan çıkan donanım envanteri bilgisi CLAUDE.md ve config/robot.yaml
+# içinde zaten özetlendi; ham belgelere ihtiyaç yok.
+yavuz selim/*
+!yavuz selim/gömülü malzemeler listesi.txt
+
+# =============================================================================
+# CAD dosyaları — boyut nedeniyle depoya alınmaz
+# =============================================================================
+# Toplam ~345 MB (tek başına hexapod-v8.step 82 MB). Git'te tutmak depoyu
+# klonlanamaz hale getirir ve GitHub'ın dosya başına uyarı sınırını aşar.
+#
+# Kaynağı zaten üçüncü taraf bir tasarım: Sir Kuhnhero, "3D Printed Hexapod",
+# Printables model 606030, CC BY-SA 4.0 — oradan indirilebilir.
+#
+# tools/cad_extract.py çalıştırılacaksa CAD'i yerel olarak "Kerem Baltacı/"
+# altına yerleştirmek yeterli; araç dosyaları orada arar.
+*.step
+*.f3z
+*.3mf
+*.stl
+
+# =============================================================================
+# Üretilen dosyalar
+# =============================================================================
+# calibration.yaml robota özeldir ve tools/calibrate.py üretir. Yine de
+# SÜRÜM KONTROLÜNDE TUTULMALIDIR (brifteki risk maddesi: kalibrasyon kayıt
+# altına alınmazsa her oturumda sıfırdan başlanır). Bu yüzden burada
+# yoksayılmıyor — sadece geçici hali dışarıda bırakılıyor.
+config/calibration.yaml.tmp
+
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+env/
+
+# =============================================================================
+# ROS 2 / colcon
+# =============================================================================
+install/
+log/
+
+# =============================================================================
+# Editör ve işletim sistemi
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store
