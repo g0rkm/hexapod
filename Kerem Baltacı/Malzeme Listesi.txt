@@ -1,0 +1,40 @@
+Bir Bacak İçin(6 ile çarp)
+3x MR148ZZ
+3x MG996R Servo Horn
+2x Cub Head Screw Hex(M3,14 mm)
+2x Cub Head Screw Hex(M3,10 mm)
+1x Cub Head Screw Hex(M3,20 mm)
+2x Cub Head Screw Hex(M3,30 mm)
+8x Square-Nut(M3)
+2x Heat Set İnsert(M5,5 mm,7 mm)
+3x Led Strip 
+1x Counter Screw Hex(M3,10 mm)
+
+Bir Gövde İçin
+18x Heat Set İnsert(M5,5 mm,7 mm)
+4x Countersunk Screw Hex(M3,6 mm)
+4x Cub Head Screw Hex(M2,6 mm)
+53x Heat Set İnsert(M3,5.5 mm,4.5 mm)
+4x Countersunk Screw Hex(M3,8 mm)
+4x Cub Head Screw Hex(M3, 6 mm)
+24x Countersunk Screw Hex(M5 , 10 mm)
+6x Hex Countersunk Head(M5, 10 mm)
+
+Total
+18x MR138ZZ
+18x MG996R Servo Horn
+12x Cub Head Screw Hex(M3,14 mm)
+12x Cub Head Screw Hex(M3,10 mm)
+6x Cub Head Screw Hex(M3,20 mm)
+12x Cub Head Screw Hex(M3,30 mm)
+24x Square-Nut(M3)
+30x Heat Set İnsert(M5,5 mm,7 mm)
+18x Led Strip 
+6x Counter Screw Hex(M3,10 mm)
+4x Countersunk Screw Hex(M3,6 mm)
+4x Cub Head Screw Hex(M2,6 mm)
+53x Heat Set İnsert(M3,5.5 mm,4.5 mm)
+4x Countersunk Screw Hex(M3,8 mm)
+4x Cub Head Screw Hex(M3, 6 mm)
+24x Countersunk Screw Hex(M5 , 10 mm)
+6x Hex Countersunk Head(M5, 10 mm)

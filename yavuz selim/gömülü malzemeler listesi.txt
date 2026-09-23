@@ -1,0 +1,26 @@
+gömülü malzemeler listesi:
+
+Raspberry Pi 4 - 4GB -> 6100₺
+
+Raspberry Pi Camera Modul V2 - New Model -> 1050₺
+
+MG996R High Torque Servo (20 adet) -> 4500₺
+
+PCA9685 16 Channel I2C PWM/Servo Driver Board -> 200₺
+
+Gravity: BNO055 + BMP280 Akıllı 10DOF Oryantasyon Sensörü (AHRS) -> 1550₺
+
+Benewake TF-Luna LiDAR -> 1500₺
+
+Tinylab 7.4V 2S Lipo Batarya 2200mAh 40C (3 adet) -> 3900₺
+
+Double USB output 9V/12V/24V/36VTO 5VDC-DC -> 80₺
+
+Adjustable 3A Step-Down Voltage Regulator LM2596 With 7 Segment Displays (3 adet) -> 555₺
+
+Silicone Wire 12 Gauge 1 Meter Red/ 1 Meter Black  (bolca alınabilir, eğer mahalledeki adamdan           bulursan fatura almayı unutma) -> Ort. 300₺   
+
+JST Lipo Battery Female/Male (2 adet)  ->  20₺ 
+
+35A Standart Oto Bıçak Sigorta  (5 adet)  20 ₺
+Toplam : 19.785₺ 
