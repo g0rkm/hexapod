@@ -92,7 +92,7 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | G2 | Ters/düz kinematik + gövde pozu | Görkem | — | G3, S2 | ✅ |
 | G3 | URDF modeli | Görkem | G2 (son kontrol: G4) | G5 | 🔄 |
 | G4 | ROS 2 Lyrical + Gazebo kurulumu (Görkem'in PC'si) | Görkem | — | G3, G5 | 🔄 |
-| G5 | Gazebo dünyası + eklem komut arayüzü + sanal sensörler | Görkem | G3, G4 | S3, S4, S5, G6 | ⏸ |
+| G5 | Gazebo dünyası + eklem komut arayüzü + sanal sensörler | Görkem | G3, G4 | S3, S4, S5, G6 | 🔄 |
 | G6 | RL ortamı (Gymnasium) | Görkem | G5, S3 | G7 | ⏸ |
 | G7 | PPO eğitimi + alan rastgeleleştirme | Görkem | G6, S5, S6 | G8 | ⏸ |
 | G8 | Politika çalıştırma düğümü (ROS 2) | Görkem | G7, S4 | (vardiya) | ⏸ |
@@ -107,6 +107,7 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 **Şu an başlanabilecekler:**
 - **Görkem:** G4 (kurulum betiğini çalıştırmak), ardından G3'ün son kontrolü ve G5.
 - **Samet:** S1, S2, S7. Üçü de Görkem'i beklemiyor. S2 ile S7 ROS bile gerektirmiyor.
+- **Eklem komut arayüzü hazır:** [docs/ARAYUZ.md](docs/ARAYUZ.md). Samet S3 ve S4'ün kodunu şimdiden bu arayüze göre yazabilir; yalnızca simülasyonda denemesi G5'in bitmesini bekler.
 
 **İki kişinin birbirini beklediği yerler:**
 1. **G5 → S3, S4, S5:** Samet'in simülasyon işleri Görkem'in Gazebo dünyasını ve eklem komut arayüzünü bekler. Samet o sırada S2 (tripod çekirdeği) ve S7 (sensör sürücüleri) ile meşgul olur, boşta kalmaz.
@@ -138,8 +139,14 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 - WSL2 Ubuntu 26.04'e ROS 2 Lyrical + Gazebo. Hepsini tek betik yapar: WSL terminalinde depo klasöründen `bash tools/wsl/ros_kurulum.sh`. `sudo` şifresini betik bir kez sorar, Görkem kendisi girer.
 - **Bitti sayılır:** betik "KURULUM TAMAM" diyor; `gz sim shapes.sdf` pencere açıyor.
 
-#### G5 — Gazebo dünyası + eklem komut arayüzü ⏸
+#### G5 — Gazebo dünyası + eklem komut arayüzü 🔄
 - **Bekler:** G3, G4 · **Açar:** S3, S4, S5, G6
+- Bitenler (ROS'suz yazılabilen her şey, 15 test):
+  - Arayüz: `hexapod_description.interface` + [docs/ARAYUZ.md](docs/ARAYUZ.md). `/leg_controller/commands` (Float64MultiArray, 18 değer, radyan), `/joint_states`, `/imu`, `/leg{i}/foot_contact` (yalnız sim).
+  - URDF'e Gazebo ekleri: ros2_control (konum komutu), gz_ros2_control eklentisi (kazanç servo tepki süresinden), IMU ve altı ayak temas sensörü.
+  - Kontrolcü ayarı üretici (`hexapod_description.control`; ForwardCommandController).
+  - `hexapod_gazebo` paketi: `worlds/flat.sdf`, `launch/sim.launch.py`, `ros2 run hexapod_gazebo stand` (ayağa kalkma duruşu).
+- Kalan: ROS kurulunca (G4) derleyip Gazebo'da denemek. Launch ve düğüm dosyaları **henüz hiç çalıştırılmadı**.
 - Robot düz zeminde doğar; 18 eklem pozisyon kontrollü (`gz_ros2_control`); IMU ve ayak temas sensörleri ROS 2 konularına yayınlanır.
 - **Eklem komut arayüzünü bu görev tanımlar:** hangi konu, hangi mesaj, hangi sıra, hangi birim. Samet'in tripod'u (S3), gerçek sürücüsü (S4) ve Görkem'in politika düğümü (G8) aynı arayüzü konuşur; simülasyondan robota geçişte yalnızca karşı taraf değişir. Arayüz bir belge olarak yazılır ve Samet'le birlikte gözden geçirilir.
 - **Bitti sayılır:** tek komutla robot simülasyonda doğup duruyor; eklemler arayüzden komut alıyor; IMU ve temas verisi `ros2 topic echo` ile görülüyor; arayüz belgesi depoda.

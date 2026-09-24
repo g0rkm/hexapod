@@ -16,7 +16,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Kalibrasyon aracı | ✅ yazıldı, çalışıyor |
 | Ters kinematik (IK) + gövde pozu | ✅ yazıldı, testli |
 | URDF modeli | ✅ üretiliyor, testli (RViz kontrolü ROS kurulumunu bekliyor) |
-| Gazebo simülasyonu | ⛔ |
+| Gazebo simülasyonu | 🔄 dosyalar ve eklem arayüzü yazıldı, ROS kurulunca denenecek |
 | Gait motoru (tripod) | ⛔ |
 | RL (PPO) | ⛔ |
 | Pi 4'e aktarma | ⛔ |
@@ -159,6 +159,21 @@ python tools/preview_urdf.py
 URDF elle yazılmaz; her seferinde `robot.yaml`'dan üretilir. Eklem zinciri IK
 ile birebir aynı (test). `preview_urdf.py` ROS olmadan robotun bir resmini
 `onizleme.png`'ye çizer. ROS kurulunca: `ros2 launch hexapod_description display.launch.py`.
+
+## Eklem komut arayüzü
+
+Simülasyon, gerçek robot, yürüyüş ve RL politikası aynı konuları konuşur:
+[docs/ARAYUZ.md](docs/ARAYUZ.md). Kod: `hexapod_description.interface`.
+
+## Gazebo (ROS kurulduktan sonra)
+
+```bash
+ros2 launch hexapod_gazebo sim.launch.py
+```
+
+```bash
+ros2 run hexapod_gazebo stand
+```
 
 ## ROS 2 kurulumu (WSL)
 

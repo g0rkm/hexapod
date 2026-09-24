@@ -97,7 +97,8 @@ config/robot.yaml         robotun fiziksel tanımı (+ simulation: tahminler)
 config/calibration.yaml   servo merkez/yön/limit — calibrate.py üretir
 src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
 src/hexapod_kinematics/   ters/düz kinematik + gövde pozu, saf Python
-src/hexapod_description/  simülasyon modeli (URDF'in girdisi), saf Python
+src/hexapod_description/  simülasyon modeli, URDF, eklem arayüzü (interface.py)
+src/hexapod_gazebo/       Gazebo dünyaları, sim.launch.py, stand komutu
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma
@@ -108,7 +109,7 @@ tools/preview_urdf.py     URDF'i PNG'ye çizer (ROS'suz önizleme)
 tools/wsl/ros_kurulum.sh  WSL'e ROS 2 Lyrical + Gazebo kurulumu
 tools/cadlib/             CAD araçlarının ortak kütüphanesi
 tests/
-docs/                     PROJE_DEVIR.md, brif, malzeme/ (listeler)
+docs/                     PROJE_DEVIR.md, ARAYUZ.md (eklem arayüzü), brif, malzeme/
 cad/                      CAD + baskı dosyaları (depoda)
 ```
 

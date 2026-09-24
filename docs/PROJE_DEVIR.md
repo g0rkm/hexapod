@@ -6,7 +6,7 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa
 > özetidir; çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-24** (2. oturum) · Testler: **73/73**
+> Son güncelleme: **2026-09-24** (2. oturum) · Testler: **88/88**
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -124,7 +124,7 @@ artık geçersiz ya da güncellendi:
 | 1b | Kalibrasyon, kanal haritası, donanım kontrolü, CAD çıkarım araçları | ✅ bitti |
 | 2 | Ters/düz kinematik + gövde pozu (`hexapod_kinematics`) | ✅ bitti, testli |
 | 3 | **URDF modeli** (robot.yaml'dan, STL'ler görsel mesh) | 🔄 URDF üretiliyor ve testli; yalnız RViz kontrolü ROS kurulumunu bekliyor (§14) |
-| 4 | Gazebo dünyası + ROS 2 kontrol arayüzü | ⛔ |
+| 4 | Gazebo dünyası + ROS 2 kontrol arayüzü | 🔄 arayüz ve dosyalar yazıldı, ROS kurulunca denenecek (G5) |
 | 5 | Klasik yürüyüş (tripod) — RL için referans ve yedek | ⛔ |
 | 6 | RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminler | ⛔ |
 | 7 | Pi 4'e aktarma: politika + ROS 2 düğümleri + gerçek sürücü | ⛔ |
@@ -481,7 +481,7 @@ Git'e GİRMEYENLER: faturalar, ekran görüntüleri (kişisel veri), Python
 ### 7.6 Testler
 
 ```bash
-python -m pytest -q          # depo kökünden; 73 test, ~2.5 sn, donanım gerekmez
+python -m pytest -q          # depo kökünden; 88 test, ~2.5 sn, donanım gerekmez
 ```
 
 Öne çıkan testler: eksik değerde `MissingValue`; PCA9685 prescale (50 Hz
@@ -699,6 +699,10 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-24 | Görev dağılımı GOREVLER.md'de, bağımlılıklarla (ilk hâli: Görkem yazılım, Samet donanım) | Kullanıcı istedi |
 | 09-24 | **Donanım durduruldu, ayrı vardiyaya (D1–D12) taşındı; yazılım Görkem (G) ve Samet (S) arasında bölüşüldü** | Kullanıcı istedi. Vardiya için önerilen başlama şartı: S3 (tripod sim) + S4 (sürücü düğümü) |
 | 09-24 | CAD (~345 MB) ve mesh'ler depoya alındı; faturalar hâlâ dışarıda | Depo gizli, iki kişi aynı dosyalarla çalışacak; kullanıcı istedi |
+| 09-24 | **Eklem komut arayüzü:** `/leg_controller/commands`, Float64MultiArray, 18 değer, radyan, bacak bacak coxa-femur-tibia (docs/ARAYUZ.md) | ros2_control'ün standart ForwardCommandController'ı; gerçek sürücü (S4) aynı konuyu dinlerse sim → robot geçişinde yayınlayan kod değişmez |
+| 09-24 | Ayak temas sensörü yalnız simülasyonda; politika gözlemine girmez | Gerçek robotta yok; sim-to-real'de olmayan bilgiye dayanmasın |
+| 09-24 | `/joint_states` gerçek robotta ölçüm değil son komut | MG996R geri bildirim vermiyor; politika da simde komut edilen açıyı görmeli |
+| 09-24 | Simde servo = birinci derece sistem, T = 0.05 s (TAHMİN) | gz_ros2_control konum komutunu hız kontrolüyle uyguluyor; kazanç = 1/(T x 100 Hz) = 0.2 |
 
 ---
 
@@ -749,6 +753,15 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
     kutusunun beklenen yerde olduğunu kontrol et.
 12. **Uzun heredoc'lar Bash aracında bozuluyor** ("unexpected EOF").
     Uzun dosyaları Write aracıyla yaz; kısa betikler için heredoc olur.
+13. **ROS paket adlarını ezbere yazma, Lyrical'da doğrula.** `position_controllers`
+    Lyrical'da YOK (ForwardCommandController + interface_name: position kullan).
+    Doğrulama yolu: ROS apt deposunun paket listesi
+    (packages.ros.org/ros2/ubuntu/dists/resolute/main/binary-amd64/Packages.gz)
+    ve ilgili GitHub deposunun `lyrical` dalı. docs.ros.org bot korumalı.
+14. **sdformat çarpışma adları:** URDF → SDF'te çarpışma `<ad>_collision` (sırası 0
+    değilse `_<sıra>` eki) olur. Temas sensörü bu adı ister; ayak küresi bu yüzden
+    tibia'nın ilk çarpışması. gz-sim temas sensörünün konusu `<contact><topic>`
+    içinde (sensör düzeyinde değil).
 
 ---
 
@@ -791,10 +804,14 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 
 ## 14. Sıradaki iş için hazır plan: URDF + Gazebo
 
-**Durum (2. oturum sonu):** 1–6 bitti (§7.7). URDF üretiliyor, FK = IK
-testi geçiyor, mesh'ler önizlemede doğru. Kalan: ROS kurulunca (G4)
-paketi derleyip RViz'de açmak (`display.launch.py`, denenmedi) ve
-`check_urdf`. **Sonra 7 (Gazebo, G5).**
+**Durum (2. oturum sonu):** 1–6 bitti (§7.7). 7'nin ROS'suz her şeyi yazıldı:
+eklem arayüzü (`interface.py`, docs/ARAYUZ.md), URDF Gazebo ekleri, kontrolcü
+ayarı, `hexapod_gazebo` (dünya, `sim.launch.py`, `stand`). **Hiçbiri henüz
+çalıştırılmadı** — ROS kurulunca (G4) sırayla: `colcon build`, RViz
+(`display.launch.py`), `check_urdf`, Gazebo (`sim.launch.py` + `stand`).
+Özellikle doğrulanacaklar: mesh'lerin package:// ile bulunması (package.xml
+`gazebo_ros` dışa aktarımı), temas sensörünün çarpışma adıyla eşleşmesi,
+IMU `gz_frame_id`, spawner'ların kontrolcüleri açması.
 
 Asıl plan:
 
