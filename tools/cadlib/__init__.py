@@ -9,8 +9,8 @@ araçlarıdır; asıl iş buradadır:
     mesh.py       STL okuma, Box, MassProps (hacim/ağırlık merkezi/atalet)
     frames.py     CAD çerçeveleri <-> IK/gövde çerçeveleri
 
-CAD dosyaları git'te değil (344 MB); yerelde cad/ altında durur. Yoksa
-Printables 606030'dan (Sir Kuhnhero, CC BY-SA 4.0) indirilebilir.
+CAD dosyaları cad/ altında, depoda. Kaynak: Printables 606030 (Sir
+Kuhnhero, CC BY-SA 4.0).
 """
 
 from __future__ import annotations

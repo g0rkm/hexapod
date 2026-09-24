@@ -17,7 +17,7 @@ tools/cadlib/ altında.
 2. src/hexapod_description/hexapod_description/meshes.yaml: her linkin görsel
    mesh'lerinin link çerçevesindeki yerleşimi (dosyaya yazılır).
 3. --copy-meshes ile STL'leri src/hexapod_description/meshes/ altına kopyalar
-   (git'e girmez; URDF'te package:// ile kullanılır).
+   (URDF'te package:// ile kullanılır).
 
 Hangi parça hangi linkte
 ------------------------
@@ -369,7 +369,7 @@ def write_meshes_yaml(meshes: dict[str, list]) -> None:
         "#",
         "# Görsel mesh'lerin link çerçevesindeki yerleşimi (URDF <visual><origin>).",
         "# xyz metre, rpy radyan (URDF sırası). Mesh'ler mm cinsinden, URDF'te",
-        "# 0.001 ölçekle kullanılır. STL'ler git'te değil (boyut); pakete",
+        "# 0.001 ölçekle kullanılır. STL'ler pakete",
         "# `python tools/cad_sim_model.py --copy-meshes` ile kopyalanır.",
         "#",
         "# Aynalı bacaklar da normal bacağın mesh'lerini kullanır: URDF bir mesh'i",

@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 package_name = "hexapod_description"
 
-# STL'ler git'te değil (boyut); tools/cad_sim_model.py --copy-meshes ile
+# STL'ler tools/cad_sim_model.py --copy-meshes ile
 # meshes/ altına kopyalanır. Varsa kurulur, yoksa model mesh'siz çalışır.
 meshes = sorted(str(p) for p in Path("meshes").glob("*.stl"))
 

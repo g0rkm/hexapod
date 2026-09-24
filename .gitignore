@@ -23,20 +23,17 @@ Screenshot*
 yavuz selim/
 
 # =============================================================================
-# CAD dosyaları — boyut nedeniyle depoya alınmaz
+# CAD dosyaları — 2026-09-24'ten beri DEPODA
 # =============================================================================
-# Toplam ~345 MB (tek başına hexapod-v8.step 82 MB). Git'te tutmak depoyu
-# klonlanamaz hale getirir ve GitHub'ın dosya başına uyarı sınırını aşar.
+# Önceden boyut yüzünden (~345 MB) dışarıdaydı. Depo gizli olduğu ve iki
+# kişi (Görkem, Samet) aynı dosyalarla simülasyon üzerinde çalışacağı için
+# kullanıcının kararıyla depoya alındı; cad/ ve src/hexapod_description/meshes/
+# artık izleniyor. Lisans: Sir Kuhnhero, "3D Printed Hexapod", Printables
+# 606030, CC BY-SA 4.0 (atıf belgesi cad/Hexapod/606030-*.pdf).
 #
-# Kaynağı zaten üçüncü taraf bir tasarım: Sir Kuhnhero, "3D Printed Hexapod",
-# Printables model 606030, CC BY-SA 4.0 — oradan indirilebilir.
-#
-# tools/cad_extract.py çalıştırılacaksa CAD'i yerel olarak depo kökündeki
-# "cad/Hexapod/" klasörüne yerleştirmek yeterli; araç dosyaları orada arar.
-*.step
-*.f3z
-*.3mf
-*.stl
+# Depo herkese açılacaksa (TÜBİTAK başvurusunda kodun açık kaynak
+# paylaşılması var): lisans paylaşıma izin veriyor, ama en büyük iki STEP
+# (85 MB, 67 MB) GitHub'ın 50 MB uyarı sınırının üstünde; Git LFS düşünülmeli.
 
 # =============================================================================
 # Üretilen dosyalar
@@ -46,6 +43,9 @@ yavuz selim/
 # altına alınmazsa her oturumda sıfırdan başlanır). Bu yüzden burada
 # yoksayılmıyor — sadece geçici hali dışarıda bırakılıyor.
 config/calibration.yaml.tmp
+
+# tools/preview_urdf.py çıktısı
+onizleme*.png
 
 # =============================================================================
 # Python

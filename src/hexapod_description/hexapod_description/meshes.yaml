@@ -2,7 +2,7 @@
 #
 # Görsel mesh'lerin link çerçevesindeki yerleşimi (URDF <visual><origin>).
 # xyz metre, rpy radyan (URDF sırası). Mesh'ler mm cinsinden, URDF'te
-# 0.001 ölçekle kullanılır. STL'ler git'te değil (boyut); pakete
+# 0.001 ölçekle kullanılır. STL'ler pakete
 # `python tools/cad_sim_model.py --copy-meshes` ile kopyalanır.
 #
 # Aynalı bacaklar da normal bacağın mesh'lerini kullanır: URDF bir mesh'i
