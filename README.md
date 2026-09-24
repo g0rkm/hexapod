@@ -2,6 +2,7 @@
 
 Altı bacaklı robotun yazılımı. Projenin tüm bağlamı, kararları ve durumu:
 [docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md). İlk brif: [docs/hexapod-proje-brifi.md](docs/hexapod-proje-brifi.md).
+Görev dağılımı ve takibi: [GOREVLER.md](GOREVLER.md).
 
 Hedef mimari, TÜBİTAK Kulüp Geliştirme Desteği başvurusunda tanımlanan yön:
 **ROS 2 + Gazebo**, üzerine pekiştirmeli öğrenme (Stable-Baselines3 / PPO) ile
@@ -14,7 +15,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Servo sürücü katmanı | ✅ yazıldı, testli |
 | Kalibrasyon aracı | ✅ yazıldı, çalışıyor |
 | Ters kinematik (IK) + gövde pozu | ✅ yazıldı, testli |
-| URDF modeli | ⏭ sıradaki |
+| URDF modeli | 🔄 veri katmanı bitti, XML üretimi sürüyor |
 | Gazebo simülasyonu | ⛔ |
 | Gait motoru (tripod) | ⛔ |
 | RL (PPO) | ⛔ |
@@ -129,6 +130,18 @@ STEP assembly'si ve basılan STL'lerden türetilmesini yeniden çalıştırır.
 CAD dosyaları depoda yok (344 MB); yerelde `cad/Hexapod/` klasörüne konmalı. Kendi tutarlılık
 kontrolünü yapar (altı bacak da aynı yarıçapta çıkmalı).
 
+## Simülasyon verisi
+
+```bash
+python tools/cad_sim_model.py --copy-meshes
+```
+
+Basılan parçaların STL'lerinden link başına kütle, ağırlık merkezi, atalet ve
+çarpışma kutularını hesaplar (`robot.yaml` → `simulation`), görsel mesh
+yerleşimini yazar. Robot tartılmadığı için bunlar **tahmin**: PETG yoğunluğu ×
+doluluk oranı + katalog servo kütlesi. Tartım yapılınca girdiler düzeltilip araç
+yeniden çalıştırılır.
+
 ## Testler
 
 ```bash
@@ -170,10 +183,6 @@ Doğruluk kalibrasyondan gelir. Robot yürürken tutarlı bir sapma görülürse
 - 18 eklemin kart/kanal haritası
 - VL53L0X'lerin XSHUT GPIO'ları ve bakış yönleri (üçü de 0x29'da doğar)
 - IMU adresi ve montaj yönelimi
-
-**Konvansiyon**
-- `frames.body.forward_offset_deg` — hangi yön burun. Geometriden simetri
-  düzlemi biliniyor (x=0), yani bu değer 90 ya da −90 olacak.
 
 ## Kaynak notları
 

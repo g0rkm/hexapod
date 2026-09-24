@@ -6,7 +6,7 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa
 > özetidir; çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-24** · Son commit: `ff8a5ab` · Testler: **56/56**
+> Son güncelleme: **2026-09-24** (2. oturum) · Son kod commit'i: `0f3e56d` · Testler: **63/63**
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -40,6 +40,9 @@
 e-postası `gorkemmutlu227@gmail.com`. Proje bir üniversite kulübü takım
 projesi (TÜBİTAK Milli Teknoloji Kulüpler Birliği, Kulüp Geliştirme
 Desteği başvurusu). Görkem yazılım tarafını Claude ile yürütüyor.
+Takım arkadaşı **Samet** robotun başındaki işleri (kablolama, Pi kurulumu,
+kalibrasyon, tartım, sensörler, gerçek robotta denemeler) üstleniyor.
+Bu bir varsayım; görev sahipleri [GOREVLER.md](../GOREVLER.md)'de.
 
 **Önemli:** Görkem robotu **kendisi monte etmedi**. Donanım, lehim, kablo
 ve terminal işlerinde deneyimli değil ve bu tür işler istenince bunalıyor
@@ -119,14 +122,17 @@ artık geçersiz ya da güncellendi:
 | 1 | Servo sürücü katmanı (`hexapod_driver`) | ✅ bitti, testli |
 | 1b | Kalibrasyon, kanal haritası, donanım kontrolü, CAD çıkarım araçları | ✅ bitti |
 | 2 | Ters/düz kinematik + gövde pozu (`hexapod_kinematics`) | ✅ bitti, testli |
-| 3 | **URDF modeli** (robot.yaml'dan, STL'ler görsel mesh) | ⏭ **SIRADAKİ** — plan §14'te |
+| 3 | **URDF modeli** (robot.yaml'dan, STL'ler görsel mesh) | 🔄 **SÜRÜYOR** — veri katmanı bitti, XML üretimi kaldı (§14) |
 | 4 | Gazebo dünyası + ROS 2 kontrol arayüzü | ⛔ |
 | 5 | Klasik yürüyüş (tripod) — RL için referans ve yedek | ⛔ |
 | 6 | RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminler | ⛔ |
 | 7 | Pi 4'e aktarma: politika + ROS 2 düğümleri + gerçek sürücü | ⛔ |
 
-**Henüz yapılmamış donanım işleri (kullanıcının değil, robotu kuranın
-işi):** bkz. §13.
+**Görev dağılımı:** [GOREVLER.md](../GOREVLER.md). Aşamalar oradaki G (Görkem)
+ve S (Samet) görevlerine bölündü; her görev hangi görevi beklediğini ve
+hangisini açtığını söyler. Bir görev bittiğinde durumunu orada güncelle.
+
+**Henüz yapılmamış donanım işleri (Samet'in, S1–S8):** bkz. §13.
 
 ---
 
@@ -307,7 +313,9 @@ yapıştırıp yukarıdan bakarak saat yönünde 1–6 numaralandıracak (1 sol 
 eksenleri bacak düzleminde aynı yerde). Fark yalnızca servo yön
 işaretlerinde olabilir; o da kalibrasyonda eklem eklem belirlenir.
 Fiziksel robot başka bir "ön" ile etiketlenirse "aynalı" bilgisi yanlış
-tarafı gösterebilir. Bilgi amaçlıdır, hiçbir hesap buna dayanmaz.
+tarafı gösterebilir. IK ve kalibrasyon buna dayanmaz; yalnızca
+simülasyon modeli dayanır (aynalı bacaklarda kütle dağılımı y'de çevrilir,
+bkz. §7.7).
 
 ---
 
@@ -471,14 +479,36 @@ faturalar, ekran görüntüleri.
 ### 7.6 Testler
 
 ```bash
-python -m pytest -q          # depo kökünden; 56 test, ~1.5 sn, donanım gerekmez
+python -m pytest -q          # depo kökünden; 63 test, ~2 sn, donanım gerekmez
 ```
 
 Öne çıkan testler: eksik değerde `MissingValue`; PCA9685 prescale (50 Hz
 → 121) ve darbe→sayaç (1500 µs → 307); iki kart arası yönlendirme; her
 kanalın kıpırdatma sonrası kapatıldığı (yazmaç düzeyinde); IK gidiş-dönüş
 (270 poz, 1e-6°); "sol" etiketli bacakların gerçekten +y'de olması; gövde
-pozu gidiş-dönüşü.
+pozu gidiş-dönüşü; simülasyon ataletlerinin fiziksel olması (pozitif
+tanımlı, üçgen eşitsizliği); aynalı bacakta y'nin çevrilmesi.
+
+### 7.7 `hexapod_description`
+
+Simülasyon modelinin veri katmanı; URDF üreticisi (henüz yok) ve ileride
+Gazebo/RL ortamı sayıları buradan alacak.
+
+- `RobotModel.from_config(config)`: SI birimlerinde (m, kg, kg·m², rad).
+  Geometri ve bacak montajları **doğrudan `HexapodKinematics`'ten**; robot.yaml
+  ikinci kez okunmuyor ki simülasyon ile IK ayrışmasın.
+- `links`: body/coxa/femur/tibia için `Inertial` (kütle, ağırlık merkezi,
+  atalet) + `CollisionBox` listesi; normal bacak için. `leg_link(id, ad)`
+  aynalı bacaklarda y'yi çevirir (com.y, ixy, iyz, kutu merkezi).
+- `limits[(bacak, eklem)]`: kalibrasyon limitleri varsa onlar, yoksa
+  `simulation.provisional_joint_limits_deg` (`provisional=True`).
+  `provisional_joints()` hangilerinin geçici olduğunu söyler.
+- `effort` / `velocity`: MG996R katalog (6 V).
+- `meshes.yaml`: görsel mesh yerleşimi, `tools/cad_sim_model.py` üretir.
+  STL'ler git'te değil; `--copy-meshes` ile `meshes/` altına kopyalanır.
+- Link çerçeveleri (URDF ile aynı olacak): coxa = bacak çerçevesi; femur
+  orijini J2'de, +x femur boyunca; tibia orijini J3'te, tibia −z boyunca.
+  Femur ve tibia eksenleri **−y** (femur + = yukarı, tibia + = ayak dışarı).
 
 ---
 
@@ -521,8 +551,21 @@ adresteyse A0'ın lehimlenmesini söyler.
 `--leg-only`, `--body-only`, `--verbose`. CAD'i `cad/Hexapod/` (ya da eski
 `Hexapod/`, `Kerem Baltacı/Hexapod/`) altında arar. Çıktı: coxa 50.000, femur
 80.000, tibia 126.635 mm, altı bacakta coxa yarıçapı 100.0; iki
-tutarlılık kontrolü. Tam montaj çözümlemesi (85 MB STEP) birkaç dakika
-sürer.
+tutarlılık kontrolü. Tam montaj çözümlemesi (85 MB STEP) ~5 sn.
+
+### `cad_sim_model.py` — simülasyon verisi
+Basılan parçaların STL'lerinden link başına kütle, ağırlık merkezi,
+atalet ve çarpışma kutularını hesaplar; `robot.yaml`'a yapıştırılacak
+`simulation.links` bloğunu basar, `meshes.yaml`'ı yazar. `--copy-meshes`
+STL'leri pakete kopyalar. Girdiler `simulation.mass_inputs`'ta (PETG
+yoğunluğu, doluluk oranı, servo kütlesi/boyutu, elektronik kütlesi).
+Kontroller: segment uzunlukları cad_extract ile aynı çıkmalı; CAD coxa
+eksenleri robot.yaml montajlarıyla 0.000 mm örtüşmeli. Parça→link
+ataması ve gerekçesi aracın başındaki açıklamada (coxa servosunun
+gövdesi bacakla döner; Coxa_top gövdeye bağlı). ~8 sn.
+
+Her iki CAD aracı da ortak kodu `tools/cadlib/`'den alır (STEP
+ayrıştırma, montaj ağacı, dönüşümler, STL/kütle, çerçeveler).
 
 ---
 
@@ -607,6 +650,13 @@ sürer.
 | 09-24 | ROS 2 Lyrical + Gazebo Jetty, Ubuntu 26.04 | PC'deki WSL Ubuntu 26.04; LTS 2031'e kadar; Pi'de de aynı sistem |
 | 09-24 | Klasörler düzleştirildi (`Kerem Baltacı/`, `yavuz selim/` kalktı) | Kullanıcı yaptı; ezilen liste geri kondu, alternatif ayrı adla saklandı |
 | 09-24 | .gitignore desen tabanlı (tüm PDF'ler) | Klasör kalkınca eski koruma boşa düşmüştü |
+| 09-24 | Simülasyon kütle/atalet CAD'den, `robot.yaml` → `simulation` altında, hepsi TAHMİN işaretli | Robot tartılmadı; uydurmak yerine STL hacmi × PETG × doluluk (0.6) + katalog; araçla tekrar üretilebilir |
+| 09-24 | Geçici eklem limitleri ±90° (yalnız simülasyon) | Servo aralığının yarısı; kalibrasyon limitleri gelince otomatik onlar kullanılır |
+| 09-24 | Gövde kapağı kütleye dahil değil (~43 g) | STL baskı tablası konumunda, CAD'deki yeri bilinmiyor; yer tahmin edilmedi |
+| 09-24 | Tibia çarpışması iki kutu + ayak küresi (r = 5.1 mm) | Tek kutu, tibia ~25°'den fazla eğilince ayaktan önce yere değiyordu |
+| 09-24 | Aynalı bacaklarda simülasyon kütlesi y'de çevrilir; görsel mesh çevrilmez | URDF mesh yansıtamaz; fark yalnız görünüşte |
+| 09-24 | Klasör düzeni: `docs/` (devir, brif, `malzeme/`), `cad/` (yerel CAD), `tools/cadlib/` | Kullanıcı istedi: kök dağınıktı, kütüphane kodu script'lerin içindeydi |
+| 09-24 | Görev dağılımı GOREVLER.md'de: Görkem yazılım (G), Samet donanım (S), bağımlılıklarla | Kullanıcı istedi; Samet'in donanımı üstlendiği varsayıldı |
 
 ---
 
@@ -644,6 +694,19 @@ sürer.
    varsayılan değer uydurma" dedi; bu, `MissingValue` tasarımının kökeni.
    Simülasyon için tahmini değer gerekirse (kütle, atalet), kaynağıyla ve
    `measured: false` / "simülasyon tahmini" notuyla gir.
+10. **Yansıtılan mesh'in hacmi negatif çıkar.** Bir STL'i yansıtınca
+    (ör. aynalı bacak için y → −y) üçgenlerin dönüş yönü tersine döner;
+    dörtyüzlü toplamıyla hesaplanan hacim ve kütle negatif olur, parça
+    kütle eklemek yerine çıkarır. İlk hesapta gövde ağırlık merkezi bu
+    yüzden 9 mm kaymıştı. Yansıtınca üçgen sırasını da çevir
+    (`cadlib.mesh.flip_winding`).
+11. **Her STL, STEP parça çerçevesinde değil.** `pla_body-lid.stl`
+    (yalnız `Baskı Dosyaları/`'nda) baskı tablası konumunda dışa
+    aktarılmış; montaj dönüşümü uygulanınca gövdenin 100 mm dışına
+    düşüyordu. Yeni bir STL kullanmadan önce dönüştürülmüş sınır
+    kutusunun beklenen yerde olduğunu kontrol et.
+12. **Uzun heredoc'lar Bash aracında bozuluyor** ("unexpected EOF").
+    Uzun dosyaları Write aracıyla yaz; kısa betikler için heredoc olur.
 
 ---
 
@@ -656,18 +719,20 @@ sürer.
 - `joints[*].driver`, `joints[*].channel` (36) — kanal haritası,
   `map_channels.py` çıkarır.
 - `joints[*].limits_deg.min/max` (36) — `calibrate.py` içinde `span` +
-  `limit` ile bulunur. Simülasyon için geçici limitler gerekirse ayrıca
-  işaretlenerek girilebilir (bkz. §14).
+  `limit` ile bulunur. Simülasyon şimdilik `simulation.provisional_joint_
+  limits_deg` (±90°) kullanıyor; **RL eğitiminden (G10) önce gerçek
+  limitler şart**, coxa ±90'da komşu bacağa girer.
 - `body.standing_height` — ölçüm değil, IK/gait çalışınca seçilecek
   hedef.
-- `body.total_mass_kg` — terazi; ilk yürüyüş için şart değil. Simülasyon
-  için STL hacmi × PETG yoğunluğu (~1.27 g/cm³) × doluluk tahmini + 18 ×
-  55 g servo + elektronik ile tahmin edilebilir.
+- `body.total_mass_kg` — terazi (S6). Simülasyon şimdilik CAD tahmini
+  kullanıyor: 2.13 kg (`simulation.links`). Tartım gelince doluluk oranı
+  ve elektronik kütlesi (`simulation.mass_inputs`) buna göre düzeltilip
+  `tools/cad_sim_model.py` yeniden çalıştırılır.
 - `sensors.imu.address`, `sensors.imu.mount_rotation_deg`,
   `sensors.range_finders.devices[*]` (XSHUT GPIO, adres, bakış yönü) —
   otonomi katmanında gerekecek.
 
-### 13.2 Donanım tarafı (robotu kuran kişinin işi, kullanıcının değil)
+### 13.2 Donanım tarafı (Samet'in işi; GOREVLER.md S1–S8)
 
 1. Bacaklara "ÖN" + 1–6 bandı (§5.5).
 2. Kartlardan birinin A0'ını lehimle.
@@ -683,8 +748,17 @@ sürer.
 
 ## 14. Sıradaki iş için hazır plan: URDF + Gazebo
 
-Önceki oturum bir sonraki adım olarak **robotun simülasyon modelini**
-yazacaktı. Önerilen yaklaşım:
+**Durum (2. oturum sonu):** 1, 3, 4 ve 5 bitti. `src/hexapod_description`
+paketi var; kütle/atalet/çarpışma/limit verisi `RobotModel`'de, mesh
+yerleşimi `meshes.yaml`'da. **Sıradaki: 2 ve 6** — `RobotModel`'den URDF
+XML'i üreten modül (`hexapod_description/urdf.py`) ve URDF FK = IK testi.
+Adlandırma önerisi: `base_link`, `leg{i}_coxa|femur|tibia|foot` linkleri,
+`leg{i}_coxa_joint` vb. eklemler (calibration.yaml anahtarı `leg0_coxa`
+ile uyumlu). Ayak küresi tibia linkine konsun (Gazebo, ataletsiz linkleri
+sabit eklemle birleştirirken çarpışmasını kaybedebilir); `leg{i}_foot`
+yalnızca çerçeve. Mesh'siz modda görseller çarpışma kutularından.
+
+Asıl plan:
 
 1. **Yeni paket `src/hexapod_description`** (ament_python ya da
    ament_cmake + xacro). URDF'i elle yazma; `robot.yaml`'dan **üreten** bir
@@ -699,8 +773,8 @@ yazacaktı. Önerilen yaklaşım:
      azimutları).
 3. **Görsel mesh:** `cad/Hexapod/leg/*.stl` ve `cad/Hexapod/body/*.stl`
    (mm → `scale="0.001 0.001 0.001"`). STL'ler parçanın kendi çerçevesinde;
-   STEP'teki montaj dönüşümleri `tools/cad_extract.py`'deki
-   `occurrences()` ile alınabilir. Çarpışma için basit geometri (silindir,
+   STEP'teki montaj dönüşümleri `tools/cadlib/assembly.py` ile alınır
+   (✅ `tools/cad_sim_model.py` yapıyor, sonuç `meshes.yaml`). Çarpışma için basit geometri (silindir,
    kutu, ayakta küre r≈5 mm) daha hızlı ve kararlı.
 4. **Kütle/atalet:** config'de yok. Simülasyon için tahmin gerekiyor:
    MG996R 55 g (katalog), parçalar STL hacmi × PETG yoğunluğu × doluluk
@@ -770,18 +844,20 @@ servo karşılaştırması (25 kg·cm). **DS3225 alınmadı**, robot MG996R ile.
 
 ## 16. Yeni oturumda ilk adımlar
 
-1. Bu belgeyi ve `CLAUDE.md`'yi oku.
+1. Bu belgeyi (`docs/PROJE_DEVIR.md`), `CLAUDE.md`'yi ve `GOREVLER.md`'yi oku.
 2. Durumu doğrula:
    ```bash
    git log --oneline | head -5
    python -m pytest -q
    ```
-   56 test geçmeli.
+   63 test geçmeli.
 3. CAD yerelde var mı bak: `cad/Hexapod/leg/leg-v2-v20.step`. Yoksa ve
    gerekiyorsa kullanıcıdan istemek yerine Printables 606030'dan
    indirilebileceğini söyle (yine de indirme işlemi için izin al).
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının olabilir;
    dokunmadan incele (§12, madde 7–8).
-5. Kullanıcı başka bir şey istemediyse **sıradaki iş §14: URDF modeli.**
+5. Kullanıcı başka bir şey istemediyse **sıradaki iş §14: G3'ün kalanı
+   (URDF XML üreticisi + FK testi).** Hangi işin kimde olduğu ve neyi
+   beklediği GOREVLER.md'de.
    Kullanıcıdan donanım/ölçüm işi isteme.
 6. Önemli bir karar ya da biten aşama olduğunda bu belgeyi güncelle.

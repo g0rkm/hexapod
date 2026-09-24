@@ -159,7 +159,8 @@ body:
 # bacak düzleminde aynı yerde); fark yalnızca servo yön işaretlerinde
 # olabilir ve o da calibration.yaml'da eklem eklem belirlenir. Robot
 # fiziksel olarak başka bir "ön" ile kurulursa bu alan yanlış tarafı
-# gösterebilir; bilgi amaçlıdır, hiçbir hesap buna dayanmaz.
+# gösterebilir. IK ve kalibrasyon buna dayanmaz; yalnızca simülasyon modeli
+# dayanır (aynalı bacaklarda kütle dağılımı y'de çevrilir).
 legs:
   - {id: 0, azimuth_deg:    0.0, mirrored: false, label: "sol orta"}
   - {id: 1, azimuth_deg:   60.0, mirrored: false, label: "sol ön"}

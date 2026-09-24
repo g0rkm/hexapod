@@ -8,7 +8,8 @@
 
 Bu depoda çalışırken bilmen gerekenler. Ayrıntılı bağlam:
 [docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md), ilk brif:
-[docs/hexapod-proje-brifi.md](docs/hexapod-proje-brifi.md), kullanım: [README.md](README.md).
+[docs/hexapod-proje-brifi.md](docs/hexapod-proje-brifi.md), kullanım: [README.md](README.md),
+görev dağılımı (kim neyi yapıyor, ne neyi bekliyor): [GOREVLER.md](GOREVLER.md).
 
 ## Proje
 
@@ -176,7 +177,8 @@ simülasyonda ilerler; donanım bilgileri config'e sonradan girilir.
 
 1. ✅ Servo sürücü katmanı, kalibrasyon ve kanal haritası araçları
 2. ✅ Ters/düz kinematik + gövde pozu (`hexapod_kinematics`)
-3. ⏭ URDF modeli (robot.yaml'dan üretilecek, STL'ler görsel mesh olarak)
+3. 🔄 URDF modeli — veri katmanı (`hexapod_description`, `simulation`) bitti,
+   XML üreticisi sıradaki
 4. Gazebo dünyası + ROS 2 kontrol arayüzü
 5. Klasik yürüyüş (tripod) — RL için referans ve yedek
 6. RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminlerle
