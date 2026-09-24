@@ -100,3 +100,43 @@ def test_hedef_limitlere_kirpilir(sim, model):
 def test_yanlis_hedef_sayisi_reddedilir(sim):
     with pytest.raises(ValueError):
         sim.step([0.0] * 17)
+
+
+def test_simulasyon_yurumeye_izin_veriyor(sim):
+    """Açık döngü tripod (IK ile ayak yörüngesi) beklenen hızın en az %70'ine ulaşmalı.
+
+    Bu test, hız komutlu servo modelinde ayakların kaydığını (beklenenin
+    %12'si) yakalardı; o model yüzünden iki PPO eğitimi boşa gitti. Yürüyüş
+    Samet'in işi (S2); buradaki yalnızca fiziği doğrulayan en basit yörünge.
+    """
+    from hexapod_rl.task import tripod_groups
+
+    step_mm, lift_mm, hz, reach, height = 30.0, 25.0, 1.5, 130.0, 100.0
+    kin = HexapodKinematics.from_config(RobotConfig.load(REAL_CONFIG))
+    group_a, _ = tripod_groups({leg: m.yaw for leg, m in kin.mounts.items()})
+    home = {leg: (m.x + reach * math.cos(m.yaw), m.y + reach * math.sin(m.yaw), -height)
+            for leg, m in kin.mounts.items()}
+
+    def targets(phase):
+        feet = {}
+        for leg, (x, y, z) in home.items():
+            p = phase if leg in group_a else (phase + 0.5) % 1.0
+            if p < 0.5:                      # destek: ayak geriye kayar
+                s, dz = 0.5 - 2 * p, 0.0
+            else:                            # salınım: kalkıp öne gelir
+                q = (p - 0.5) * 2
+                s, dz = -0.5 + q, lift_mm * math.sin(math.pi * q)
+            feet[leg] = (x + s * step_mm, y, z + dz)
+        ang = kin.inverse(feet)
+        return [math.radians(v) for leg in range(6) for v in ang[leg].as_dict().values()]
+
+    sim.reset()
+    s = run(sim, targets(0.0), 1.0)
+    x0, phase = s.base_pos[0], 0.0
+    for _ in range(int(round(4.0 / sim.dt))):
+        phase = (phase + hz * sim.dt) % 1.0
+        s = sim.step(targets(phase))
+    speed = (s.base_pos[0] - x0) / 4.0
+    expected = step_mm / 1000 / (0.5 / hz)
+    assert speed > 0.7 * expected, f"{speed:.3f} m/s, beklenen {expected:.3f}"
+    assert abs(s.base_pos[2] - height / 1000) < 0.005

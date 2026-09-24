@@ -21,10 +21,11 @@ LEVEL = (1.0, 0.0, 0.0, 0.0)
 
 
 def state(z=0.1, quat=LEVEL, lin=(0.0, 0.0, 0.0), ang=(0.0, 0.0, 0.0), targets=None,
-          vel=None) -> SimState:
+          vel=None, effort=None) -> SimState:
     return SimState(
         time=0.0, joint_pos=tuple([0.0] * 18), joint_vel=tuple(vel or [0.0] * 18),
-        joint_target=tuple(targets or [0.0] * 18), base_pos=(0.0, 0.0, z), base_quat=quat,
+        joint_target=tuple(targets or [0.0] * 18), joint_effort=tuple(effort or [0.0] * 18),
+        base_pos=(0.0, 0.0, z), base_quat=quat,
         base_lin_vel=lin, base_ang_vel=ang, foot_pos=tuple([(0.0, 0.0, 0.0)] * 6),
         foot_contact=tuple([True] * 6),
     )
@@ -73,9 +74,10 @@ def test_tam_izleme_en_yuksek_hiz_odulu():
 
 def test_cezalar_isaretli():
     cfg = TaskConfig()
-    _, terms = reward(state(z=0.08, vel=[1.0] * 18), [1.0] * 18, [0.0] * 18,
+    _, terms = reward(state(z=0.08, vel=[1.0] * 18, effort=[-0.5] * 18), [1.0] * 18, [0.0] * 18,
                       (0.0, 0.0, 0.0), cfg, True)
-    for k in ("height", "joint_vel", "action_rate", "fall"):
+    assert terms["power"] == pytest.approx(cfg.w["power"] * 18 * 0.5)  # |tork x hız|, işaretsiz
+    for k in ("height", "power", "action_rate", "fall"):
         assert terms[k] < 0, k
 
 

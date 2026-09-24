@@ -81,8 +81,10 @@ class RobotModel:
     limits: dict[tuple[int, str], JointLimit]
     effort: float  # N·m
     velocity: float  # rad/s
-    servo_time_constant: float  # s
+    servo_time_constant: float  # s (ROS simi: gz_ros2_control konum kazancı)
     control_rate: float  # Hz
+    servo_stiffness: float  # N·m/rad (RL simi: tork tabanlı servo)
+    servo_damping: float  # N·m·s/rad
 
     @classmethod
     def from_config(cls, config: RobotConfig) -> "RobotModel":
@@ -99,6 +101,10 @@ class RobotModel:
                                     "simulation.servo.time_constant_s")
         rate = Value.parse((sim.get("control") or {}).get("update_rate_hz"),
                            "simulation.control.update_rate_hz")
+        stiffness = Value.parse(servo.get("stiffness_nm_per_rad"),
+                                "simulation.servo.stiffness_nm_per_rad")
+        damping = Value.parse(servo.get("damping_nm_s_per_rad"),
+                              "simulation.servo.damping_nm_s_per_rad")
 
         mounts = {
             i: LegMount(m.x * _MM, m.y * _MM, m.z * _MM, m.yaw) for i, m in kin.mounts.items()
@@ -117,6 +123,8 @@ class RobotModel:
             velocity=float(velocity.require()),
             servo_time_constant=float(time_constant.require()),
             control_rate=float(rate.require()),
+            servo_stiffness=float(stiffness.require()),
+            servo_damping=float(damping.require()),
         )
 
     def leg_link(self, leg_id: int, name: str) -> LinkModel:

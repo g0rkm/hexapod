@@ -11,21 +11,33 @@ Python'dan süreç içinde adımlayınca (gz.sim TestFixture) ölçülenler:
     4 ms          7.7x        -
 
 (Ubuntu 26.04 / WSL2, i5-10300H 8 iş parçacığı, Gazebo 10.5; ayrıntı
-PROJE_DEVIR.md.) Fizik motoru, robot modeli (aynı URDF) ve servo modeli
-ROS'lu simülasyonla AYNI; yalnızca ROS katmanı yok. Eğitilen politika sonra
-ROS arayüzü (docs/ARAYUZ.md) üzerinden çalışır (G8).
+PROJE_DEVIR.md; tork modeliyle hızlar yeniden ölçüldü, aşağıda.) Fizik
+motoru ve robot modeli (aynı URDF) ROS'lu simülasyonla aynı; yalnızca ROS
+katmanı yok. Eğitilen politika sonra ROS arayüzü (docs/ARAYUZ.md) üzerinden
+çalışır (G8).
 
-Servo modeli
-------------
-gz_ros2_control'ün konum komutu ile birebir aynı: kontrol döngüsü hızında
-(robot.yaml simulation.control.update_rate_hz)
+Servo modeli: tork tabanlı
+--------------------------
+Her fizik adımında, hobi servosu gibi bir P denetleyici ve DC motorun
+doğrusal tork-hız eğrisi:
 
-    hız = kazanç x (hedef - konum) x döngü hızı,   |hız| <= hız limiti
+    tork = sertlik x (hedef - konum) - sönüm x hız
+    hareket yönünde en fazla  durma torku x (1 - |hız| / yüksüz hız)
+    frenlerken en fazla       durma torku
 
-hesaplanıp ekleme hız komutu olarak verilir; kazanç = RobotModel.position_gain().
-Hedefler ros2_control'de olduğu gibi eklem limitlerine kırpılır. Hız komutu
-Gazebo'da bir sonraki komuta kadar kalıcı (ölçüldü: yalnız döngüde verildiğinde
-robot yine duruşunu koruyor).
+(robot.yaml simulation.servo: effort_nm, velocity_rad_s,
+stiffness_nm_per_rad, damping_nm_s_per_rad). Hedefler eklem limitlerine
+kırpılır.
+
+Neden hız komutlu model (gz_ros2_control'ün konum komutu) değil: o model
+eklemi her adımda istenen hıza ANINDA zorluyor; bacak ivmelenirken bu, tork
+sınırını boşa harcayan anlık zorlamalar demek. Ölçüldü (2026-09-25): elle
+yazılmış açık döngü tripod, aynı katalog torkunda (1.08 N·m) hız modeliyle
+beklenen hızın %12'siyle (ayaklar kayıyor), bu modelle %94-97'siyle yürüyor.
+İlk iki PPO eğitimi (robot yerinde saydı) bu yüzden geçersiz. Hareketsiz
+tripod duruşu ikisinde de 0.6 N·m'de bile çökmüyor; sorun dinamikti.
+ROS'lu simülasyon (sim.launch.py) hâlâ hız modelini kullanıyor; açık iş
+(PROJE_DEVIR §13).
 
 Bu modül ROS'a bağımlı değil ama gz.sim Python bağlarına bağımlı; onlar ROS 2
 Lyrical kurulumuyla geliyor (source /opt/ros/lyrical/setup.bash).
@@ -69,18 +81,18 @@ class HexapodSim:
         self.model = model
         self.physics_step = physics_step
         physics_rate = 1.0 / physics_step
-        self.servo_every = _whole(physics_rate / model.control_rate, "fizik hızı / servo hızı")
         self.steps_per_action = _whole(physics_rate / action_rate, "fizik hızı / eylem hızı")
         self.dt = self.steps_per_action * physics_step
 
         self.names = joint_names(model.mounts)
         self._limits = [model.limits[(int(n[3]), n.split("_")[1])] for n in self.names]
-        self._gain = model.position_gain()
-        self._rate = model.control_rate
+        self._kp = model.servo_stiffness
+        self._kd = model.servo_damping
+        self._tau = model.effort
         self._vmax = model.velocity
         self.initial_targets = tuple(0.0 for _ in self.names)  # sıfır duruşu
         self._targets = list(self.initial_targets)
-        self._cmd = [0.0] * len(self.names)
+        self._effort = [0.0] * len(self.names)
 
         self._dir = Path(workdir) if workdir else Path(tempfile.mkdtemp(prefix="hexapod_rl_"))
         self._dir.mkdir(parents=True, exist_ok=True)
@@ -122,7 +134,7 @@ class HexapodSim:
         else:
             raise RuntimeError("Gazebo sıfırlaması 5 adımda gerçekleşmedi")
         self._targets = list(self.initial_targets)
-        self._cmd = [0.0] * len(self.names)
+        self._effort = [0.0] * len(self.names)
         return self._advance(self.steps_per_action)
 
     def step(self, targets: Sequence[float]) -> SimState:
@@ -152,13 +164,18 @@ class HexapodSim:
             return
         if self._joints is None:
             self._bind(ecm)
-        if self._iter % self.servo_every == 0:
-            for i, joint in enumerate(self._joints):
-                pos = joint.position(ecm)
-                if pos:
-                    v = self._gain * (self._targets[i] - pos[0]) * self._rate
-                    self._cmd[i] = max(-self._vmax, min(self._vmax, v))
-                joint.set_velocity(ecm, [self._cmd[i]])
+        kp, kd, tau_s, w0 = self._kp, self._kd, self._tau, self._vmax
+        for i, joint in enumerate(self._joints):
+            q = joint.position(ecm)
+            w = joint.velocity(ecm)
+            if not q or not w:
+                continue  # bağlandığı ilk adım: bileşenler henüz yok
+            tau = kp * (self._targets[i] - q[0]) - kd * w[0]
+            # motor hareket yönünde itiyorsa tork-hız doğrusu, frenliyorsa durma torku
+            limit = tau_s * max(0.0, 1.0 - abs(w[0]) / w0) if tau * w[0] > 0 else tau_s
+            tau = max(-limit, min(limit, tau))
+            self._effort[i] = tau
+            joint.set_force(ecm, [tau])
         self._iter += 1
 
     def _post(self, info, ecm) -> None:
@@ -203,6 +220,7 @@ class HexapodSim:
         return SimState(
             time=_seconds(info.sim_time),
             joint_pos=tuple(pos), joint_vel=tuple(vel), joint_target=tuple(self._targets),
+            joint_effort=tuple(self._effort),
             base_pos=(pose.pos().x(), pose.pos().y(), pose.pos().z()),
             base_quat=(q.w(), q.x(), q.y(), q.z()),
             base_lin_vel=_vec(lin), base_ang_vel=_vec(ang),

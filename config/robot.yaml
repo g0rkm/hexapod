@@ -305,6 +305,21 @@ simulation:
       value: 0.05
       source: "TAHMİN - MG996R 0.14 s/60°: 20° adım ~47 ms; birinci derece model. Ölçülmedi."
       measured: false
+    # RL simülasyonunun tork tabanlı servo modeli (hexapod_rl.sim): hobi
+    # servosu gibi P denetleyici + DC motorun doğrusal tork-hız eğrisi:
+    #   tork = sertlik x hata - sönüm x hız
+    #   hareket yönünde en fazla  effort_nm x (1 - |hız| / velocity_rad_s)
+    # Neden: ros2_control'ün hız komutlu konum modeli ile elle yazılmış tripod
+    # bile beklenen hızın %12'siyle yürüyordu (ayaklar kayıyordu); bu modelle
+    # aynı katalog torkunda %94-97 (2026-09-25 ölçümü, PROJE_DEVIR.md).
+    stiffness_nm_per_rad:
+      value: 20.0
+      source: "TAHMİN - durma torkuna ~3° hatada ulaşan hobi servosu (1.08 N·m / 0.054 rad). Ölçülmedi."
+      measured: false
+    damping_nm_s_per_rad:
+      value: 0.05
+      source: "TAHMİN - 2 ms fizik adımında kararlı kalan sönüm (tibia ataletiyle Kd·dt/I < 1). Ölçülmedi."
+      measured: false
 
   control:
     # ros2_control kontrol döngüsü. Komutlar 50 Hz gelir (MG996R PWM 50 Hz;

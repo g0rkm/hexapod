@@ -15,6 +15,7 @@ class SimState:
     joint_pos: tuple[float, ...]     # rad, ÖLÇÜLEN (yalnız simülasyonda var)
     joint_vel: tuple[float, ...]     # rad/s
     joint_target: tuple[float, ...]  # rad, son komut (gerçek robotta /joint_states budur)
+    joint_effort: tuple[float, ...]  # N·m, servonun uyguladığı tork (yalnız sim)
     base_pos: Vec3              # m, dünya
     base_quat: Quat             # dünya <- gövde
     base_lin_vel: Vec3          # m/s, dünya

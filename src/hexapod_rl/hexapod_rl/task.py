@@ -17,9 +17,9 @@ eklem limitlerine kırpılır. Varsayılan duruş ayakta duruş.
 
 Ödül — TÜBİTAK başvurusundaki tanım: devrilmeden, en az enerjiyle, en hızlı
 ilerleme. Terimler ve ağırlıkları TaskConfig'te; bunlar robot parametresi
-değil, eğitim ayarı (G7'de ayarlanacak). Enerji için gerçek tork yok (servo
-hız kontrollü modelleniyor); vekil olarak eklem hızlarının karesi ve eylem
-değişimi cezalandırılıyor.
+değil, eğitim ayarı (G7'de ayarlanacak). Enerji: servonun uyguladığı tork
+simülasyonda bilindiği için gerçek mekanik güç Σ|tork x açısal hız| (W)
+cezalandırılıyor; ayrıca eylem değişimi (sarsıntı).
 
 Ödül v2 (ilk 1M adımlık eğitimden sonra): v1'de robot yerinde durmayı
 öğrendi, çünkü durarak da adım başı ~0.8 puan alıyordu (hız komutu 0'a
@@ -70,7 +70,7 @@ class TaskConfig:
         "yaw_rate": 0.2,
         "orientation": -2.0,   # gövdenin yatması
         "height": -20.0,       # yükseklik sapması (m^2)
-        "joint_vel": -5e-4,    # enerji vekili
+        "power": -0.02,        # mekanik güç, W (enerji)
         "action_rate": -0.01,  # sarsıntı
         "fall": -10.0,         # devrilince bir kez
     })
@@ -141,7 +141,8 @@ def reward(state: SimState, action, prev_action, command: tuple[float, float, fl
         "yaw_rate": math.exp(-((command[2] - wz) ** 2) / cfg.yaw_rate_sigma ** 2),
         "orientation": g[0] ** 2 + g[1] ** 2,
         "height": (state.base_pos[2] - cfg.stand_height_mm / 1000.0) ** 2,
-        "joint_vel": sum(v * v for v in state.joint_vel if math.isfinite(v)),
+        "power": sum(abs(t * v) for t, v in zip(state.joint_effort, state.joint_vel)
+                     if math.isfinite(v)),
         "action_rate": sum((a - b) ** 2 for a, b in zip(action, prev_action)),
         "fall": 1.0 if fell else 0.0,
     }
