@@ -47,7 +47,7 @@ Bacak kimlikleri `config/robot.yaml`'daki `legs[*].id` (0 sol orta, 1 sol ön, 2
 | femur | femur yere paralel | bacak yukarı kalkar |
 | tibia | tibia femura dik | diz açılır, ayak dışarı gider |
 
-- Limitler: kalibrasyon limitleri (`joints[*].limits_deg`) varsa onlar, yoksa geçici ±90° (`simulation.provisional_joint_limits_deg`). Limit dışı komut gerçek robotta `LimitError` verir (servoya gitmez); simülasyondaki davranışı ros2_control sürümüne bağlı ve denenmedi. **Yayınlayan taraf limit içinde kalmalı.**
+- Limitler: kalibrasyon limitleri (`joints[*].limits_deg`) varsa onlar, yoksa geçici ±90° (`simulation.provisional_joint_limits_deg`). Limit dışı komut gerçek robotta `LimitError` verir (servoya gitmez). Simülasyonda ros2_control komutu konum ve hız limitine kırpar (doğrulandı: femur'a 2.0 rad → 1.5708'de durdu) ve günlüğe "out of limits" yazar. İkisi farklı davrandığı için **yayınlayan taraf limit içinde kalmalı.**
 
 ## Örnek: komut yayınlamak (S3, G8)
 
@@ -79,7 +79,7 @@ def on_command(msg):
 1. **MG996R konum geri bildirimi vermez.** Gerçek robotta `/joint_states` ölçüm değil, **son gönderilen komuttur.** RL politikası eklem açısını gözlem olarak kullanacaksa simülasyonda da komut edilen açıyı (ya da gürültülü, gecikmeli hâlini) görmeli; yoksa simülasyonda öğrendiği bilgiyi gerçekte bulamaz.
 2. **Ayak temas sensörü yok.** `/leg{i}/foot_contact` yalnız simülasyonda. Politikanın **gözlemine girmemeli**; ödül ve değerlendirme (S6) için var.
 3. **IMU yönelimi:** `/imu` her zaman `base_link` yöneliminde yayınlanır. Gerçek sürücü (S7/D8), BNO055'in ham verisini montaj yönelimine (`sensors.imu.mount_rotation_deg`, henüz bilinmiyor) göre döndürür. Bu yüzden politika IMU'nun robotta nasıl takıldığından habersizdir.
-4. **Servo tepkisi:** simülasyonda konum komutu birinci dereceden bir sistem gibi uygulanır (zaman sabiti `simulation.servo.time_constant_s`, şimdilik tahmin 0.05 s); URDF'teki hız limiti 7.48 rad/s (Gazebo'nun bu limiti uyguladığı ROS kurulunca doğrulanacak). Gerçek servo farklıysa (D9'da ölçülür) değer güncellenir.
+4. **Servo tepkisi:** simülasyonda konum komutu birinci dereceden bir sistem gibi uygulanır (zaman sabiti `simulation.servo.time_constant_s`, şimdilik tahmin 0.05 s); hız 7.48 rad/s ile sınırlı (doğrulandı: ros2_control komutu 100 Hz'de adım başı 0.0748 rad'a kırpıyor). Gerçek servo farklıysa (D9'da ölçülür) değer güncellenir.
 
 ## Değiştirme kuralı
 

@@ -107,6 +107,7 @@ tools/cad_sim_model.py    CAD'den kütle/atalet/çarpışma (simülasyon)
 tools/make_urdf.py        robot.yaml -> URDF (ROS'suz)
 tools/preview_urdf.py     URDF'i PNG'ye çizer (ROS'suz önizleme)
 tools/wsl/ros_kurulum.sh  WSL'e ROS 2 Lyrical + Gazebo kurulumu
+tools/wsl/derle.sh        ROS paketlerini ~/hexapod_ws'te derler
 tools/cadlib/             CAD araçlarının ortak kütüphanesi
 tests/
 docs/                     PROJE_DEVIR.md, ARAYUZ.md (eklem arayüzü), brif, malzeme/
@@ -183,9 +184,8 @@ donanım bilgileri config'e sonradan girilir.
 
 1. ✅ Servo sürücü katmanı, kalibrasyon ve kanal haritası araçları
 2. ✅ Ters/düz kinematik + gövde pozu (`hexapod_kinematics`)
-3. 🔄 URDF modeli — üretici ve FK = IK testi bitti; RViz kontrolü ROS
-   kurulumunu bekliyor (`tools/wsl/ros_kurulum.sh`)
-4. Gazebo dünyası + ROS 2 kontrol arayüzü
+3. ✅ URDF modeli (`hexapod_description`), RViz ve check_urdf'ten geçti
+4. ✅ Gazebo dünyası + eklem komut arayüzü (`hexapod_gazebo`, docs/ARAYUZ.md)
 5. Klasik yürüyüş (tripod) — RL için referans ve yedek
 6. RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminlerle
 7. Pi 4'e aktarma: eğitilmiş politika + ROS 2 düğümleri + gerçek sürücü

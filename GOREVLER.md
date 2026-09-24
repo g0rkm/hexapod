@@ -90,9 +90,9 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 |---|---|---|---|---|---|
 | G1 | Servo sürücü katmanı, kalibrasyon ve kanal haritası araçları | Görkem | — | (vardiya) | ✅ |
 | G2 | Ters/düz kinematik + gövde pozu | Görkem | — | G3, S2 | ✅ |
-| G3 | URDF modeli | Görkem | G2 (son kontrol: G4) | G5 | 🔄 |
-| G4 | ROS 2 Lyrical + Gazebo kurulumu (Görkem'in PC'si) | Görkem | — | G3, G5 | 🔄 |
-| G5 | Gazebo dünyası + eklem komut arayüzü + sanal sensörler | Görkem | G3, G4 | S3, S4, S5, G6 | 🔄 |
+| G3 | URDF modeli | Görkem | G2 (son kontrol: G4) | G5 | ✅ |
+| G4 | ROS 2 Lyrical + Gazebo kurulumu (Görkem'in PC'si) | Görkem | — | G3, G5 | ✅ |
+| G5 | Gazebo dünyası + eklem komut arayüzü + sanal sensörler | Görkem | G3, G4 | S3, S4, S5, G6 | ✅ |
 | G6 | RL ortamı (Gymnasium) | Görkem | G5, S3 | G7 | ⏸ |
 | G7 | PPO eğitimi + alan rastgeleleştirme | Görkem | G6, S5, S6 | G8 | ⏸ |
 | G8 | Politika çalıştırma düğümü (ROS 2) | Görkem | G7, S4 | (vardiya) | ⏸ |
@@ -105,9 +105,9 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
 
 **Şu an başlanabilecekler:**
-- **Görkem:** G4 (kurulum betiğini çalıştırmak), ardından G3'ün son kontrolü ve G5.
+- **Görkem:** G6'nın tripod'a bağlı olmayan kısmı (simülasyon hızı, ortam iskeleti; bkz. G6). Tripod'u kullanan kısım S3'ü bekler.
 - **Samet:** S1, S2, S7. Üçü de Görkem'i beklemiyor. S2 ile S7 ROS bile gerektirmiyor.
-- **Eklem komut arayüzü hazır:** [docs/ARAYUZ.md](docs/ARAYUZ.md). Samet S3 ve S4'ün kodunu şimdiden bu arayüze göre yazabilir; yalnızca simülasyonda denemesi G5'in bitmesini bekler.
+- **G5 bitti, simülasyon çalışıyor:** Samet'in S3, S4 ve S5'i artık Görkem'i beklemiyor. Arayüz: [docs/ARAYUZ.md](docs/ARAYUZ.md). Derleme: `bash tools/wsl/derle.sh`.
 
 **İki kişinin birbirini beklediği yerler:**
 1. **G5 → S3, S4, S5:** Samet'in simülasyon işleri Görkem'in Gazebo dünyasını ve eklem komut arayüzünü bekler. Samet o sırada S2 (tripod çekirdeği) ve S7 (sensör sürücüleri) ile meşgul olur, boşta kalmaz.
@@ -123,36 +123,44 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 #### G2 — Ters kinematik ✅
 `hexapod_kinematics`: tek bacak IK/FK, altı bacak, gövde pozu. IK ↔ kalibrasyon sözleşmesi [CLAUDE.md](CLAUDE.md)'de.
 
-#### G3 — URDF modeli 🔄
+#### G3 — URDF modeli ✅
 - **Bekler:** G2; son kontrol (RViz, `check_urdf`) için G4 · **Açar:** G5
 - Bitenler:
   - CAD'den kütle/atalet/çarpışma verisi (`tools/cad_sim_model.py`, `robot.yaml` → `simulation`).
   - URDF üreticisi (`hexapod_description.urdf`, `python tools/make_urdf.py`); görsel mesh'ler `meshes.yaml`'dan.
   - Test: URDF zincirindeki ayak konumları IK ile 300 rastgele pozda aynı; eksen yönleri kalibrasyon sözleşmesiyle uyumlu (`tests/test_urdf.py`).
   - ROS'suz önizleme (`python tools/preview_urdf.py`): parçalar eklemlerde doğru oturuyor.
-  - RViz için `ros2 launch hexapod_description display.launch.py` (yazıldı, ROS kurulunca denenecek).
-- Kalan: ROS kurulunca (G4) paketi derleyip RViz'de açmak ve `check_urdf`.
+  - `check_urdf` hatasız; robot_state_publisher'ın TF'i IK ile aynı (bacak 0 ayağı (0, 0.230, −0.137) m, bacak 2 (0.199, −0.115, −0.137) m).
+  - RViz: `ros2 launch hexapod_description display.launch.py` hatasız açılıyor, mesh'ler yükleniyor. WSLg'de RViz Wayland'de çöküyordu ("Invalid parentWindowHandle"); launch dosyası Wayland varsa `QT_QPA_PLATFORM=xcb` veriyor.
 - **Bitti sayılır:** RViz'de robot doğru görünüyor, eklem kaydırıcıları bacakları doğru yönde oynatıyor; `check_urdf` hatasız.
 
-#### G4 — ROS 2 + Gazebo kurulumu 🔄
+#### G4 — ROS 2 + Gazebo kurulumu ✅
 - **Bekler:** — · **Açar:** G3, G5
 - WSL2 Ubuntu 26.04'e ROS 2 Lyrical + Gazebo. Hepsini tek betik yapar: WSL terminalinde depo klasöründen `bash tools/wsl/ros_kurulum.sh`. `sudo` şifresini betik bir kez sorar, Görkem kendisi girer.
 - **Bitti sayılır:** betik "KURULUM TAMAM" diyor; `gz sim shapes.sdf` pencere açıyor.
+- Sonuç: ROS 2 Lyrical, Gazebo 10.5 (Jetty), Python 3.14. Paketler `bash tools/wsl/derle.sh` ile `~/hexapod_ws`'te derleniyor.
 
-#### G5 — Gazebo dünyası + eklem komut arayüzü 🔄
+#### G5 — Gazebo dünyası + eklem komut arayüzü ✅
 - **Bekler:** G3, G4 · **Açar:** S3, S4, S5, G6
 - Bitenler (ROS'suz yazılabilen her şey, 15 test):
   - Arayüz: `hexapod_description.interface` + [docs/ARAYUZ.md](docs/ARAYUZ.md). `/leg_controller/commands` (Float64MultiArray, 18 değer, radyan), `/joint_states`, `/imu`, `/leg{i}/foot_contact` (yalnız sim).
   - URDF'e Gazebo ekleri: ros2_control (konum komutu), gz_ros2_control eklentisi (kazanç servo tepki süresinden), IMU ve altı ayak temas sensörü.
   - Kontrolcü ayarı üretici (`hexapod_description.control`; ForwardCommandController).
   - `hexapod_gazebo` paketi: `worlds/flat.sdf`, `launch/sim.launch.py`, `ros2 run hexapod_gazebo stand` (ayağa kalkma duruşu).
-- Kalan: ROS kurulunca (G4) derleyip Gazebo'da denemek. Launch ve düğüm dosyaları **henüz hiç çalıştırılmadı**.
+- Gazebo'da doğrulandı (`sim.launch.py gui:=false`):
+  - İki kontrolcü açık; bütün konular (/imu, /joint_states, 6 temas, komut) yayında.
+  - Doğunca sıfır duruşunda gövde 0.1366 m (= tibia + 10.05 mm, ayaklar yerde).
+  - `ros2 run hexapod_gazebo stand` sonrası gövde 0.1001 m (istenen 100 mm), yatıklık yok.
+  - IMU `imu_link` çerçevesinde, z ivmesi 9.8. Temas sensörleri SDF'teki ayak küresine bağlı.
+  - Konum limiti (±90°) ve hız limiti (7.48 rad/s) ros2_control tarafından uygulanıyor.
+  - Gazebo penceresi WSLg'de açılıyor.
 - Robot düz zeminde doğar; 18 eklem pozisyon kontrollü (`gz_ros2_control`); IMU ve ayak temas sensörleri ROS 2 konularına yayınlanır.
 - **Eklem komut arayüzünü bu görev tanımlar:** hangi konu, hangi mesaj, hangi sıra, hangi birim. Samet'in tripod'u (S3), gerçek sürücüsü (S4) ve Görkem'in politika düğümü (G8) aynı arayüzü konuşur; simülasyondan robota geçişte yalnızca karşı taraf değişir. Arayüz bir belge olarak yazılır ve Samet'le birlikte gözden geçirilir.
 - **Bitti sayılır:** tek komutla robot simülasyonda doğup duruyor; eklemler arayüzden komut alıyor; IMU ve temas verisi `ros2 topic echo` ile görülüyor; arayüz belgesi depoda.
 
 #### G6 — RL ortamı ⏸
-- **Bekler:** G5, S3 · **Açar:** G7
+- **Bekler:** G5 ✅, S3 · **Açar:** G7
+- **Hız ölçümü (G5 sonrası), tasarımı belirliyor:** tam simülasyon (ROS + ros2_control + sensörler + köprü) sınırsız modda bile gerçek zamanın ~1.3 katı; 50 Hz'de 1 milyon adım ~4 saat. ROS'suz yalın Gazebo ~3–5 kat. `gz.sim` Python bağları kurulu (Python 3.14). Öneri: eğitim ortamı ROS'u aradan çıkarıp Gazebo'yu süreç içinden adımlasın, 8 çekirdekte paralel ortam; ROS arayüzü (docs/ARAYUZ.md) yalnız politika düğümünde (G8) kalır. Başka simülatöre geçmek TÜBİTAK başvurusundan sapma olur, önerilmiyor.
 - Gymnasium ortamı, ros_gz üzerinden. Gözlem: IMU + eklem açıları + ayak temasları. Eylem: eklem hedefleri ya da tripod parametre düzeltmeleri (S3'ün üstüne). Ödül: ileri hız − enerji − devrilme cezası (TÜBİTAK başvurusundaki tanım).
 - **Bitti sayılır:** rastgele politikayla bir bölüm uçtan uca koşuyor; tripod'un ödülü aynı ortamda ölçülüp kaydedildi.
 

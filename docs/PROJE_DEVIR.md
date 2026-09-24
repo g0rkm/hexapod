@@ -123,8 +123,8 @@ artık geçersiz ya da güncellendi:
 | 1 | Servo sürücü katmanı (`hexapod_driver`) | ✅ bitti, testli |
 | 1b | Kalibrasyon, kanal haritası, donanım kontrolü, CAD çıkarım araçları | ✅ bitti |
 | 2 | Ters/düz kinematik + gövde pozu (`hexapod_kinematics`) | ✅ bitti, testli |
-| 3 | **URDF modeli** (robot.yaml'dan, STL'ler görsel mesh) | 🔄 URDF üretiliyor ve testli; yalnız RViz kontrolü ROS kurulumunu bekliyor (§14) |
-| 4 | Gazebo dünyası + ROS 2 kontrol arayüzü | 🔄 arayüz ve dosyalar yazıldı, ROS kurulunca denenecek (G5) |
+| 3 | **URDF modeli** (robot.yaml'dan, STL'ler görsel mesh) | ✅ testli; RViz ve check_urdf'ten geçti |
+| 4 | Gazebo dünyası + ROS 2 kontrol arayüzü | ✅ robot Gazebo'da doğuyor ve ayağa kalkıyor (G5) |
 | 5 | Klasik yürüyüş (tripod) — RL için referans ve yedek | ⛔ |
 | 6 | RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminler | ⛔ |
 | 7 | Pi 4'e aktarma: politika + ROS 2 düğümleri + gerçek sürücü | ⛔ |
@@ -613,9 +613,13 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
   birincil sürümü. **Gazebo Jetty** `ros-lyrical-desktop` ile birlikte
   geliyor. (İlk taslakta Jazzy/24.04 varsayılmıştı; PC'de 26.04 olduğu
   için değiştirildi.)
-- **2026-09-24 itibarıyla WSL'de ROS 2 ve Gazebo KURULU DEĞİL.** WSL'de
-  Python 3.14, 955 GB boş disk, 8 çekirdek, 7 GB RAM (PC'nin yarısı) var.
-  Kurulum betiği hazır: `bash tools/wsl/ros_kurulum.sh` (G4).
+- **WSL'de ROS 2 Lyrical + Gazebo 10.5 (Jetty) KURULU** (2026-09-24,
+  `tools/wsl/ros_kurulum.sh`). Python 3.14, 8 çekirdek, 7 GB RAM (PC'nin yarısı).
+  Kullanıcı adı `gorkem`. Paketler: `bash tools/wsl/derle.sh` → `~/hexapod_ws`
+  (kaynaklar depoya sembolik bağlı, `--symlink-install`).
+- Claude WSL'de sudo gerektirmeyen her şeyi çalıştırabilir: `wsl -e bash <betik>`.
+  Tırnaklı uzun komutlar PowerShell→wsl geçişinde bozuluyor; betiği dosyaya yazıp
+  çalıştır. Aynı anda birkaç simülasyon koşacaksa farklı `ROS_DOMAIN_ID` ver.
 - **colcon derlemesini OneDrive klasöründe yapma**: `build/ install/ log/`
   OneDrive'a senkronlanır ve /mnt/c yavaştır. Çalışma alanı WSL'in kendi
   diskinde (ör. `~/hexapod_ws`) olmalı, kaynaklar depodan bağlanmalı.
@@ -703,6 +707,7 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-24 | Ayak temas sensörü yalnız simülasyonda; politika gözlemine girmez | Gerçek robotta yok; sim-to-real'de olmayan bilgiye dayanmasın |
 | 09-24 | `/joint_states` gerçek robotta ölçüm değil son komut | MG996R geri bildirim vermiyor; politika da simde komut edilen açıyı görmeli |
 | 09-24 | Simde servo = birinci derece sistem, T = 0.05 s (TAHMİN) | gz_ros2_control konum komutunu hız kontrolüyle uyguluyor; kazanç = 1/(T x 100 Hz) = 0.2 |
+| 09-24 | RL eğitim ortamı ROS'suz, Gazebo süreç içinden adımlanacak (öneri, G6) | Tam ROS simülasyonu sınırsızda bile ~1.3x gerçek zaman; yalın Gazebo ~3–5x; gz.sim Python bağları var |
 
 ---
 
@@ -762,6 +767,12 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
     değilse `_<sıra>` eki) olur. Temas sensörü bu adı ister; ayak küresi bu yüzden
     tibia'nın ilk çarpışması. gz-sim temas sensörünün konusu `<contact><topic>`
     içinde (sensör düzeyinde değil).
+15. **RViz WSLg'de Wayland'de çöker** ("Invalid parentWindowHandle ... GLXWindow",
+    100 denemeden sonra abort). `QT_QPA_PLATFORM=xcb` ile XWayland'de çalışıyor;
+    display.launch.py bunu Wayland varsa kendisi veriyor. Gazebo penceresi etkilenmiyor.
+16. **ament_python'da `setup.cfg` şart:** yoksa console_scripts `bin/`'e kurulur ve
+    `ros2 run paket komut` "No executable found" der. `[develop] script_dir` ve
+    `[install] install_scripts` `$base/lib/<paket>` olmalı.
 
 ---
 
@@ -804,14 +815,14 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 
 ## 14. Sıradaki iş için hazır plan: URDF + Gazebo
 
-**Durum (2. oturum sonu):** 1–6 bitti (§7.7). 7'nin ROS'suz her şeyi yazıldı:
-eklem arayüzü (`interface.py`, docs/ARAYUZ.md), URDF Gazebo ekleri, kontrolcü
-ayarı, `hexapod_gazebo` (dünya, `sim.launch.py`, `stand`). **Hiçbiri henüz
-çalıştırılmadı** — ROS kurulunca (G4) sırayla: `colcon build`, RViz
-(`display.launch.py`), `check_urdf`, Gazebo (`sim.launch.py` + `stand`).
-Özellikle doğrulanacaklar: mesh'lerin package:// ile bulunması (package.xml
-`gazebo_ros` dışa aktarımı), temas sensörünün çarpışma adıyla eşleşmesi,
-IMU `gz_frame_id`, spawner'ların kontrolcüleri açması.
+**Durum (2. oturum sonu): 1–7 BİTTİ.** URDF RViz ve check_urdf'ten geçti; robot
+Gazebo'da doğuyor, kontrolcüler açılıyor, sensörler yayında, `stand` ile
+istenen 100 mm'ye kalkıyor (ayrıntı GOREVLER.md G3–G5). **Sıradaki: 8 — ama
+tripod Samet'in (S2/S3); Görkem'in sıradaki işi G6 (RL ortamı).** G6'nın
+tasarımını belirleyen hız ölçümü GOREVLER.md G6'da: ROS'lu simülasyon ~1.3x,
+yalın Gazebo ~3–5x gerçek zaman; öneri ROS'suz, süreç içi `gz.sim` ile adımlama
+ve paralel ortamlar. Yalın Gazebo'da adımı 1→2 ms yapmak hızlandırmadı; darboğaz
+fizik değil, incelenmedi (G6'nın ilk işi).
 
 Asıl plan:
 

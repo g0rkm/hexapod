@@ -15,8 +15,8 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Servo sürücü katmanı | ✅ yazıldı, testli |
 | Kalibrasyon aracı | ✅ yazıldı, çalışıyor |
 | Ters kinematik (IK) + gövde pozu | ✅ yazıldı, testli |
-| URDF modeli | ✅ üretiliyor, testli (RViz kontrolü ROS kurulumunu bekliyor) |
-| Gazebo simülasyonu | 🔄 dosyalar ve eklem arayüzü yazıldı, ROS kurulunca denenecek |
+| URDF modeli | ✅ üretiliyor, testli, RViz'de açılıyor |
+| Gazebo simülasyonu | ✅ robot doğuyor, ayağa kalkıyor; sensörler yayında |
 | Gait motoru (tripod) | ⛔ |
 | RL (PPO) | ⛔ |
 | Pi 4'e aktarma | ⛔ |
@@ -166,6 +166,14 @@ Simülasyon, gerçek robot, yürüyüş ve RL politikası aynı konuları konuş
 [docs/ARAYUZ.md](docs/ARAYUZ.md). Kod: `hexapod_description.interface`.
 
 ## Gazebo (ROS kurulduktan sonra)
+
+Önce paketleri derle (WSL, depo klasöründen):
+
+```bash
+bash tools/wsl/derle.sh
+```
+
+Sonra:
 
 ```bash
 ros2 launch hexapod_gazebo sim.launch.py
