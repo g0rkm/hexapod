@@ -1,0 +1,45 @@
+# BU DOSYA ÜRETİLDİ: tools/cad_sim_model.py. Elle düzenlemeyin.
+#
+# Görsel mesh'lerin link çerçevesindeki yerleşimi (URDF <visual><origin>).
+# xyz metre, rpy radyan (URDF sırası). Mesh'ler mm cinsinden, URDF'te
+# 0.001 ölçekle kullanılır. STL'ler git'te değil (boyut); pakete
+# `python tools/cad_sim_model.py --copy-meshes` ile kopyalanır.
+#
+# Aynalı bacaklar da normal bacağın mesh'lerini kullanır: URDF bir mesh'i
+# yansıtamaz. Yalnızca görünüş; kütle ve çarpışma hesabı aynalamayı
+# hesaba katar.
+
+body:
+  - {file: pla_body-main_bottom.stl, xyz: [-0.000026, 0.000000, 0.000026], rpy: [1.570796, 0.000000, 1.570796]}
+  - {file: pla_body-main_top.stl, xyz: [-0.000026, 0.000000, 0.000026], rpy: [1.570796, 0.000000, 1.570796]}
+  - {file: pla_controll-platform.stl, xyz: [-0.000026, 0.000000, -0.036974], rpy: [0.000000, 0.000000, 1.570796]}
+  - {file: pla_power-pack.stl, xyz: [-0.000026, 0.000000, -0.036974], rpy: [0.000000, 0.000000, 1.570796]}
+  - {file: pla_body-spacer.stl, xyz: [-0.000026, 0.000000, 0.000026], rpy: [1.570796, 0.000000, 1.570796]}
+  - {file: pla_body-spacer.stl, xyz: [-0.000026, 0.000000, 0.000026], rpy: [1.570796, -0.000000, 2.617994]}
+  - {file: pla_body-spacer.stl, xyz: [-0.000026, 0.000000, 0.000026], rpy: [1.570796, -0.000000, -2.617994]}
+  - {file: pla_body-spacer.stl, xyz: [-0.000026, 0.000000, 0.000026], rpy: [1.570796, -0.000000, -1.570796]}
+  - {file: pla_body-spacer.stl, xyz: [-0.000026, 0.000000, 0.000026], rpy: [1.570796, 0.000000, -0.523599]}
+  - {file: pla_body-spacer.stl, xyz: [-0.000026, 0.000000, 0.000026], rpy: [1.570796, 0.000000, 0.523599]}
+  - {file: pla-coxa_top.stl, xyz: [0.000000, 0.120000, 0.000000], rpy: [1.570796, -0.000000, -0.000000]}
+  - {file: pla_bushing.stl, xyz: [0.000000, 0.100000, -0.026000], rpy: [1.570796, -0.000000, -0.000000]}
+  - {file: pla-coxa_top.stl, xyz: [0.103923, 0.060000, 0.000000], rpy: [1.570796, -0.000000, -1.047198]}
+  - {file: pla_bushing.stl, xyz: [0.086603, 0.050000, -0.026000], rpy: [1.570796, -0.000000, -1.047198]}
+  - {file: pla-coxa_top.stl, xyz: [0.103923, -0.060000, 0.000000], rpy: [1.570796, -0.000000, -2.094395]}
+  - {file: pla_bushing.stl, xyz: [0.086603, -0.050000, -0.026000], rpy: [1.570796, -0.000000, -2.094395]}
+  - {file: pla-coxa_top.stl, xyz: [0.000000, -0.120000, 0.000000], rpy: [1.570796, -0.000000, -3.141593]}
+  - {file: pla_bushing.stl, xyz: [-0.000000, -0.100000, -0.026000], rpy: [1.570796, -0.000000, -3.141593]}
+  - {file: pla-coxa_top.stl, xyz: [-0.103923, -0.060000, 0.000000], rpy: [1.570796, -0.000000, 2.094395]}
+  - {file: pla_bushing.stl, xyz: [-0.086603, -0.050000, -0.026000], rpy: [1.570796, -0.000000, 2.094395]}
+  - {file: pla-coxa_top.stl, xyz: [-0.103923, 0.060000, 0.000000], rpy: [1.570796, -0.000000, 1.047198]}
+  - {file: pla_bushing.stl, xyz: [-0.086603, 0.050000, -0.026000], rpy: [1.570796, -0.000000, 1.047198]}
+coxa:
+  - {file: pla-trochanter_servo-mount.stl, xyz: [0.020000, 0.000000, 0.010050], rpy: [1.570796, -0.000000, -1.570796]}
+femur:
+  - {file: pla_femur_left.stl, xyz: [-0.030000, 0.000000, 0.010050], rpy: [1.570796, -0.000000, -1.570796]}
+  - {file: pla-femur_right.stl, xyz: [-0.030000, 0.000000, 0.010050], rpy: [1.570796, -0.000000, -1.570796]}
+  - {file: pla_bushing.stl, xyz: [0.000000, 0.019950, 0.000000], rpy: [-0.000000, -0.261799, 3.141593]}
+  - {file: pla_bushing.stl, xyz: [0.080000, 0.019950, 0.000000], rpy: [-3.141593, -0.174533, -0.000000]}
+tibia:
+  - {file: pla-tibia_servo-mount.stl, xyz: [-0.009740, -0.000000, 0.110028], rpy: [0.179401, 0.000000, -1.570796]}
+  - {file: pla_tibia_main.stl, xyz: [-0.009740, -0.000000, 0.110028], rpy: [0.179401, 0.000000, -1.570796]}
+  - {file: pla_tibia_tip.stl, xyz: [-0.009740, -0.000000, 0.110028], rpy: [0.179401, 0.000000, -1.570796]}
