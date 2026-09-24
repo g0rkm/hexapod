@@ -163,14 +163,14 @@ def test_agac_gecerli(urdf):
         assert j.find("parent").get("link") in links
         assert j.find("child").get("link") in links
     assert sum(j.get("type") == "revolute" for j in joints) == 18
-    assert sum(j.get("type") == "fixed" for j in joints) == 7  # body + 6 ayak
+    assert sum(j.get("type") == "fixed" for j in joints) == 8  # body + imu + 6 ayak
 
 
 def test_kok_link_ataletsiz_diger_fiziksel_linkler_ataletli(urdf):
     root = ET.fromstring(urdf)
     for link in root.findall("link"):
         name = link.get("name")
-        frame_only = name == "base_link" or name.endswith("_foot")
+        frame_only = name in ("base_link", "imu_link") or name.endswith("_foot")
         assert (link.find("inertial") is None) == frame_only, name
 
 

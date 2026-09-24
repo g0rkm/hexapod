@@ -297,6 +297,22 @@ simulation:
       value: 7.48
       source: "MG996R katalog: 0.14 s/60° @6 V, yüksüz = 7.48 rad/s"
       measured: false
+    # Servonun küçük bir hedef değişikliğine tepki süresi. gz_ros2_control
+    # konum komutunu birinci dereceden bir sistem gibi uygular (zaman sabiti
+    # T = 1 / (kazanç x kontrol hızı)); URDF üreticisi kazancı buradan
+    # hesaplar. Büyük adımlarda hızı zaten velocity_rad_s sınırlar.
+    time_constant_s:
+      value: 0.05
+      source: "TAHMİN - MG996R 0.14 s/60°: 20° adım ~47 ms; birinci derece model. Ölçülmedi."
+      measured: false
+
+  control:
+    # ros2_control kontrol döngüsü. Komutlar 50 Hz gelir (MG996R PWM 50 Hz;
+    # hexapod_description.interface.COMMAND_RATE_HZ), döngü bunun iki katı.
+    update_rate_hz:
+      value: 100
+      source: "Simülasyon ayarı: komut hızının (50 Hz) iki katı"
+      measured: false
 
   # Eklem açı limitleri, derece. joints[*].limits_deg (kalibrasyonla bulunan
   # gerçek limitler) girilmişse URDF üreticisi ONLARI kullanır; bu değerler

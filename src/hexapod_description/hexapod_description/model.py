@@ -81,6 +81,8 @@ class RobotModel:
     limits: dict[tuple[int, str], JointLimit]
     effort: float  # N·m
     velocity: float  # rad/s
+    servo_time_constant: float  # s
+    control_rate: float  # Hz
 
     @classmethod
     def from_config(cls, config: RobotConfig) -> "RobotModel":
@@ -93,6 +95,10 @@ class RobotModel:
         servo = sim.get("servo") or {}
         effort = Value.parse(servo.get("effort_nm"), "simulation.servo.effort_nm")
         velocity = Value.parse(servo.get("velocity_rad_s"), "simulation.servo.velocity_rad_s")
+        time_constant = Value.parse(servo.get("time_constant_s"),
+                                    "simulation.servo.time_constant_s")
+        rate = Value.parse((sim.get("control") or {}).get("update_rate_hz"),
+                           "simulation.control.update_rate_hz")
 
         mounts = {
             i: LegMount(m.x * _MM, m.y * _MM, m.z * _MM, m.yaw) for i, m in kin.mounts.items()
@@ -109,6 +115,8 @@ class RobotModel:
             limits=_limits(config, sim),
             effort=float(effort.require()),
             velocity=float(velocity.require()),
+            servo_time_constant=float(time_constant.require()),
+            control_rate=float(rate.require()),
         )
 
     def leg_link(self, leg_id: int, name: str) -> LinkModel:
@@ -117,6 +125,23 @@ class RobotModel:
 
     def provisional_joints(self) -> list[tuple[int, str]]:
         return sorted(k for k, v in self.limits.items() if v.provisional)
+
+    def position_gain(self) -> float:
+        """gz_ros2_control position_proportional_gain.
+
+        Konum komutu: hız = kazanç x hata x kontrol hızı, yani zaman sabiti
+        T = 1 / (kazanç x hız). Kazanç > 1 salınım, > 2 kararsızlık demek
+        (gz_ros2_control belgesi); öyleyse config tutarsızdır, sessizce
+        kırpılmaz.
+        """
+        gain = 1.0 / (self.servo_time_constant * self.control_rate)
+        if not 0.0 < gain <= 1.0:
+            raise ConfigError(
+                f"position_proportional_gain = {gain:.3f}; (0, 1] olmalı. "
+                "simulation.servo.time_constant_s ya da simulation.control.update_rate_hz "
+                "tutarsız (T x hız >= 1 olmalı)."
+            )
+        return gain
 
     def total_mass(self) -> float:
         legs = sum(self.links[n].inertial.mass for n in ("coxa", "femur", "tibia"))

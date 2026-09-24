@@ -26,5 +26,8 @@
 
   <export>
     <build_type>ament_python</build_type>
+    <!-- Gazebo package://hexapod_description/meshes/... yolunu bulsun diye
+         (ros_gz_sim gz_sim.launch.py bunu GZ_SIM_RESOURCE_PATH'e ekler). -->
+    <gazebo_ros gazebo_model_path="${prefix}/../"/>
   </export>
 </package>
