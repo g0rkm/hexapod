@@ -34,17 +34,23 @@ veya kalibrasyon aracı içinde `gaps`.
 
 Donanım hakkında çelişki çıkarsa sıra şu:
 
-1. **Faturalar** (`yavuz selim/*.pdf`) — gerçekte ne alındığının tek kaydı
-2. **CAD** (`Kerem Baltacı/`) — yalnızca mekanik geometri
-3. Malzeme listesi txt'leri — **güvenilmez**, ikisi birbiriyle çelişiyor
+1. **Faturalar** — gerçekte ne alındığının tek kaydı. Depoda DEĞİL: TCKN
+   ve adres içeriyor. `.gitignore` bütün PDF'leri ve ekran görüntülerini
+   klasörden bağımsız olarak dışarıda tutuyor; bu kuralı gevşetme.
+2. **CAD** (`Hexapod/`, `Baskı Dosyaları/`) — yalnızca mekanik geometri.
+   Binary'ler depoda değil (344 MB), yerelde durur.
+3. Malzeme listesi txt'leri — **güvenilmez**, ikisi birbiriyle çelişiyor:
+   `gömülü malzemeler listesi.txt` (faturalara daha yakın) ve
+   `gömülü malzemeler listesi (alternatif).txt` (TF-Luna, LM2596 —
+   bunlar hiç alınmadı).
 
 Bilinen çelişkiler: PCA9685 (liste 1, gerçek **2**), VL53L0X (liste 2,
 gerçek **3**), batarya (liste 2200 mAh, gerçek **2800 mAh**).
 
 ## CAD donör bir tasarım
 
-`Kerem Baltacı/` altındaki her şey Sir Kuhnhero'nun "3D Printed Hexapod"
-tasarımından (Printables 606030, CC BY-SA 4.0).
+`Hexapod/` ve `Baskı Dosyaları/` altındaki her şey Sir Kuhnhero'nun
+"3D Printed Hexapod" tasarımından (Printables 606030, CC BY-SA 4.0).
 
 - Mekanik geometri geçerli.
 - **Elektronik geçerli değil.** Donör tasarım STM32 BluePill + 4×18650 +

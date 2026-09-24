@@ -114,7 +114,7 @@ python tools/cad_extract.py
 
 `robot.yaml`'daki coxa=50, femur=80, tibia=126.6, yarıçap=100 değerlerinin
 STEP assembly'si ve basılan STL'lerden türetilmesini yeniden çalıştırır.
-CAD dosyaları depoda yok (344 MB); `Kerem Baltacı/` altına yerel olarak konmalı. Kendi tutarlılık
+CAD dosyaları depoda yok (344 MB); depo kökündeki `Hexapod/` klasörüne yerel olarak konmalı. Kendi tutarlılık
 kontrolünü yapar (altı bacak da aynı yarıçapta çıkmalı).
 
 ## Testler
@@ -169,9 +169,11 @@ Doğruluk kalibrasyondan gelir. Robot yürürken tutarlı bir sapma görülürse
   CC BY-SA 4.0. Geometri buradan alındı.
 - **CAD'in elektroniği bu robotu tanımlamaz.** Donör tasarım STM32 BluePill +
   4×18650 kullanıyor; bu robot Raspberry Pi 4 + 2S LiPo kullanıyor.
-- Donanım envanterinin tek güvenilir kaynağı `yavuz selim/*.pdf` faturalarıdır.
-  İki adet "gömülü malzemeler listesi.txt" birbiriyle ve faturalarla çelişiyor
-  (PCA9685 sayısı, VL53L0X sayısı, batarya kapasitesi).
+- Donanım envanterinin tek güvenilir kaynağı faturalardır. Faturalar kişisel
+  veri (TCKN, adres) içerdiği için depoda değil; `.gitignore` bütün PDF'leri
+  ve ekran görüntülerini dışarıda tutuyor. İki malzeme listesi
+  (`gömülü malzemeler listesi.txt` ve `... (alternatif).txt`) birbiriyle ve
+  faturalarla çelişiyor (PCA9685 sayısı, VL53L0X sayısı, batarya kapasitesi).
 
 ## Çalışma ortamı
 

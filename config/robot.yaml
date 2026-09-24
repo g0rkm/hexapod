@@ -22,7 +22,7 @@ meta:
   # CAD kaynağı: Sir Kuhnhero "3D Printed Hexapod", Printables model 606030,
   # CC BY-SA 4.0. Mekanik geometri bu tasarımdan; elektronik DEĞİL
   # (donör tasarım STM32 + 4x18650 kullanıyor, bu robot Pi 4 + 2S LiPo).
-  cad_source: "Kerem Baltacı/Hexapod/ (Printables 606030, CC BY-SA 4.0)"
+  cad_source: "Hexapod/ (Printables 606030, CC BY-SA 4.0)"
 
 units:
   length: mm
