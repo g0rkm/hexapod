@@ -35,6 +35,7 @@ from .task import (
     fallen,
     observation,
     reward,
+    tripod_groups,
 )
 
 
@@ -54,6 +55,7 @@ class HexapodEnv(gym.Env):
                              self.task.stand_reach_mm, self.task.stand_height_mm)
         self.default = [math.radians(v) for leg in sorted(pose)
                         for v in pose[leg].as_dict().values()]
+        self.groups = tripod_groups({leg: m.yaw for leg, m in model.mounts.items()})
         self.limits = [(model.limits[(int(n[3]), n.split("_")[1])].lower,
                         model.limits[(int(n[3]), n.split("_")[1])].upper)
                        for n in self.sim.names]
@@ -91,7 +93,8 @@ class HexapodEnv(gym.Env):
         self._steps += 1
         self._phase = (self._phase + self.task.gait_hz * self.dt) % 1.0
         fell = fallen(state, self.task)
-        r, terms = reward(state, action, self._prev_action, self._command, self.task, fell)
+        r, terms = reward(state, action, self._prev_action, self._command, self.task, fell,
+                          phase=self._phase, groups=self.groups)
         self._prev_action = action
         self._state = state
         info = {"reward_terms": terms, "command": self._command,

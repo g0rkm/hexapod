@@ -6,9 +6,8 @@
 depoda değil): model.zip, ara kayıtlar (checkpoints/), progress.csv
 (SB3 günlüğü), degerlendirme.txt. Ortam: tools/wsl/rl_kurulum.sh.
 
-Sonda kısa bir değerlendirme yapılır: öğrenilen politika ileri hız
-komutuyla (vx) deterministik koşturulur; alınan yol, ortalama hız ve
-devrilme yazılır. Ayrıntılı ölçüm aracı Samet'in işi (GOREVLER.md S6).
+Sonda kısa bir değerlendirme yapılır (evaluate.py); ara kayıtlar da
+`python -m hexapod_rl.evaluate <zip>` ile değerlendirilebilir.
 """
 
 from __future__ import annotations
@@ -17,27 +16,7 @@ import argparse
 import time
 from pathlib import Path
 
-import numpy as np
-
-
-def evaluate(model, seconds: float = 10.0, vx: float = 0.1) -> dict:
-    from .env import HexapodEnv
-
-    env = HexapodEnv()
-    obs, _ = env.reset(seed=123, options={"command": (vx, 0.0, 0.0)})
-    x0 = env._state.base_pos[0]
-    steps = int(round(seconds / env.dt))
-    fell = False
-    for _ in range(steps):
-        action, _ = model.predict(obs, deterministic=True)
-        obs, _, terminated, truncated, info = env.step(action)
-        if terminated:
-            fell = True
-            break
-    dx = info["base_pos"][0] - x0
-    env.close()
-    return {"komut_vx": vx, "sure_s": seconds, "alinan_yol_m": dx,
-            "ortalama_hiz_m_s": dx / seconds, "devrildi": fell}
+from .evaluate import evaluate, format_result
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -70,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         policy_kwargs={"net_arch": [128, 128]},
     )
     model.set_logger(configure(str(out), ["csv", "stdout"]))
-    every = max(50_000 // args.envs, 1)
+    every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
     t0 = time.time()
     model.learn(total_timesteps=args.steps,
                 callback=CheckpointCallback(every, str(out / "checkpoints"), "ppo"))
@@ -81,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     result = evaluate(model)
     lines = [f"adım: {args.steps}, ortam: {args.envs}, süre: {wall / 60:.1f} dk "
              f"({args.steps / wall:.0f} adım/s)"]
-    lines += [f"{k}: {v:.3f}" if isinstance(v, float) else f"{k}: {v}" for k, v in result.items()]
+    lines.append(format_result(result))
     (out / "degerlendirme.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     print(f"kaydedildi -> {out}")

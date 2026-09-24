@@ -91,3 +91,48 @@ def test_devrilme():
 
 def test_eylem_boyutu():
     assert ACTION_SIZE == 18
+
+
+# --- ödül v2 --------------------------------------------------------------------
+
+from hexapod_rl.task import gait_score, tripod_groups  # noqa: E402
+
+
+def test_tripod_gruplari_komsu_bacaklari_ayirir():
+    # gövde azimutları (robot.yaml'daki gibi): 0:+90 1:+30 2:-30 3:-90 4:-150 5:+150
+    yaws = {0: 90, 1: 30, 2: -30, 3: -90, 4: -150, 5: 150}
+    a, b = tripod_groups({k: math.radians(v) for k, v in yaws.items()})
+    assert set(a) | set(b) == set(range(6)) and len(a) == len(b) == 3
+    around = sorted(yaws, key=lambda k: yaws[k])
+    for i in range(6):  # gövde etrafında komşu iki bacak farklı grupta
+        x, y = around[i], around[(i + 1) % 6]
+        assert (x in a) != (y in a)
+
+
+def test_ritim_puani():
+    groups = ((0, 2, 4), (1, 3, 5))
+    ideal_ilk = [False, True, False, True, False, True]   # ilk yarı: 0,2,4 havada
+    assert gait_score(ideal_ilk, 0.2, groups) == 1.0
+    assert gait_score(ideal_ilk, 0.7, groups) == 0.0      # ikinci yarıda tam tersi olmalı
+    assert gait_score([True] * 6, 0.2, groups) == 0.5     # hepsi yerde: yalnız destek grubu doğru
+
+
+def test_yerinde_durmak_yurumekten_az_kazandirir():
+    """v1'in hatası: durmak neredeyse yürümek kadar kazandırıyordu."""
+    cfg = TaskConfig()
+    cmd = (0.1, 0.0, 0.0)
+    duran, _ = reward(state(), [0.0] * 18, [0.0] * 18, cmd, cfg, False, phase=0.2)
+    yuruyen_temas = tuple([False, True, False, True, False, True])
+    yuruyen = SimState(**{**state(lin=(0.1, 0.0, 0.0)).__dict__, "foot_contact": yuruyen_temas})
+    giden, terms = reward(yuruyen, [0.0] * 18, [0.0] * 18, cmd, cfg, False, phase=0.2)
+    assert terms["progress"] == pytest.approx(cfg.w["progress"] * 0.1)
+    assert giden > duran + 1.0
+
+
+def test_ilerleme_komutla_sinirli_ve_geri_gitmek_sifir():
+    cfg = TaskConfig()
+    cmd = (0.1, 0.0, 0.0)
+    _, hizli = reward(state(lin=(0.3, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False)
+    _, geri = reward(state(lin=(-0.1, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False)
+    assert hizli["progress"] == pytest.approx(cfg.w["progress"] * 0.1)
+    assert geri["progress"] == 0.0
