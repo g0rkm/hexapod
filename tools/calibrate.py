@@ -54,6 +54,20 @@ START_PULSE_US = 1500
 DEFAULT_STEP_US = 10
 
 HELP = """\
+Merkez (c) ne demek
+-------------------
+IK'daki sıfır duruşu. Her eklemi şu konuma getirip 'c' ile kaydet:
+  coxa  : bacak gövdeden dümdüz dışarı bakıyor
+  femur : femur yere paralel
+  tibia : tibia femura dik (femur yataysa tibia dümdüz aşağı)
+Bu tanım hexapod_kinematics/leg.py ile aynı olmak ZORUNDA.
+
+Pozitif yönler (dir için)
+-------------------------
+  coxa  + : yukarıdan bakınca saat yönünün tersine
+  femur + : bacak yukarı kalkar
+  tibia + : diz açılır, ayak dışarı gider
+
 Komutlar
 --------
   +  /  -          darbeyi adım kadar artır / azalt
@@ -341,8 +355,10 @@ class Session:
             print(
                 "Kullanım: dir +  veya  dir -\n"
                 "  Darbeyi artırdığında eklem POZİTİF yönde dönüyorsa '+',\n"
-                "  ters yönde dönüyorsa '-'. Pozitif yön, robot çerçevesi\n"
-                "  kararı verildikten sonra netleşir."
+                "  ters yönde dönüyorsa '-'. Pozitif yönler:\n"
+                "    coxa  + : yukarıdan bakınca saat yönünün tersine\n"
+                "    femur + : bacak yukarı kalkar\n"
+                "    tibia + : diz açılır, ayak dışarı gider"
             )
             return
         leg, joint = self.current
