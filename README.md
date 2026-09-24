@@ -43,6 +43,7 @@ src/hexapod_driver/   # ROS 2 (ament_python) paketi, çekirdeği saf Python
     backends.py       # gerçek I2C / dry-run arka uçları
     servo_bus.py      # eklem adı -> kart/kanal -> darbe
 tools/
+  map_channels.py     # hangi servo hangi kanalda — servoları kıpırdatıp sorar
   calibrate.py        # etkileşimli servo kalibrasyon aracı
   hwcheck.py          # I2C tarama + robot.yaml karşılaştırma
   cad_extract.py      # CAD'den geometri türetme (sayıların kaynağı)
@@ -52,6 +53,17 @@ tests/
 `hexapod_driver` bir ROS 2 paketi olarak derlenir, ama ROS'a **bağımlı değildir**.
 Kalibrasyon aracı ve testler ROS kurulu olmadan çalışır; bu, tezgâh üstü
 kalibrasyonu Pi'de ROS ortamı ayağa kaldırmadan yapabilmek için bilinçli bir seçim.
+
+## Kanal haritası
+
+```bash
+python3 tools/map_channels.py
+```
+
+Servo kartlarını I2C'de kendisi bulur, her kanaldaki servoyu sırayla
+kıpırdatır; kullanıcı hangi bacağın hangi ekleminin kıpırdadığını yazar
+(ör. `1c` = bacak 1 coxa). Kabloların hangi sırayla takıldığı önemli değil.
+Robot bir kutunun üstünde, bacaklar havada olmalı.
 
 ## Kalibrasyon
 

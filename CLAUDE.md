@@ -82,6 +82,7 @@ o bacaklarda ters olabileceği anlamına gelir — varsayma, kalibrasyonda
 config/robot.yaml         robotun fiziksel tanımı
 config/calibration.yaml   servo merkez/yön/limit — calibrate.py üretir
 src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
+tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma
 tools/cad_extract.py      CAD'den geometri türetme
