@@ -41,7 +41,17 @@ for _stream in (sys.stdout, sys.stderr):
 import stepasm as S  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CAD_ROOT = REPO_ROOT / "Kerem Baltacı" / "Hexapod"
+
+
+def _find_cad_root() -> Path:
+    """CAD klasörünü bul. Depo kökünde ya da eski "Kerem Baltacı/" altında olabilir."""
+    for candidate in (REPO_ROOT / "Hexapod", REPO_ROOT / "Kerem Baltacı" / "Hexapod"):
+        if (candidate / "leg" / "leg-v2-v20.step").is_file():
+            return candidate
+    return REPO_ROOT / "Hexapod"  # hiçbiri yoksa main() bu yolu "bulunamadı" diye raporlar
+
+
+CAD_ROOT = _find_cad_root()
 LEG_STEP = CAD_ROOT / "leg" / "leg-v2-v20.step"
 FULL_STEP = CAD_ROOT / "Full Hexapod Model" / "hexapod-v8.step"
 
