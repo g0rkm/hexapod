@@ -13,6 +13,9 @@
   <exec_depend>hexapod_description</exec_depend>
   <exec_depend>hexapod_driver</exec_depend>
   <exec_depend>hexapod_kinematics</exec_depend>
+  <exec_depend>hexapod_gazebo</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <!-- gymnasium, stable-baselines3, torch: rosdep'te yok; tools/wsl/rl_kurulum.sh (venv) -->
   <!-- gz.sim / gz.math Python bağları -->
   <exec_depend>gz_sim_vendor</exec_depend>
   <exec_depend>gz_math_vendor</exec_depend>

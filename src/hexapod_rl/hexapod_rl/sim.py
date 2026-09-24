@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import math
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
@@ -46,39 +45,13 @@ from hexapod_description.interface import COMMAND_RATE_HZ, joint_names
 from hexapod_description.model import RobotModel
 from hexapod_description.urdf import build_urdf, link_name
 
-from .math3d import Quat, Vec3, rotate_inverse
+from .math3d import Vec3
+from .state import SimState
 
 #: Doğarken sıfır duruşunda ayakların yerden yüksekliği.
 SPAWN_CLEARANCE_M = 0.01
 #: Ayak küresinin alt ucu yere bu kadar yakınsa "temas" sayılır.
 CONTACT_TOLERANCE_M = 0.002
-
-
-@dataclass(frozen=True)
-class SimState:
-    """Bir kontrol adımının sonundaki durum. Dizi sırası interface.joint_names()."""
-
-    time: float                 # s, simülasyon zamanı
-    joint_pos: tuple[float, ...]     # rad, ÖLÇÜLEN (yalnız simülasyonda var)
-    joint_vel: tuple[float, ...]     # rad/s
-    joint_target: tuple[float, ...]  # rad, son komut (gerçek robotta /joint_states budur)
-    base_pos: Vec3              # m, dünya
-    base_quat: Quat             # dünya <- gövde
-    base_lin_vel: Vec3          # m/s, dünya
-    base_ang_vel: Vec3          # rad/s, dünya
-    foot_pos: tuple[Vec3, ...]  # m, dünya, ayak küresinin alt ucu (6)
-    foot_contact: tuple[bool, ...]  # yalnız simülasyon; politika gözlemine girmemeli
-
-    def gravity_in_base(self) -> Vec3:
-        """Yerçekimi yönünün gövde çerçevesindeki birim vektörü (IMU'dan çıkarılabilir)."""
-        return rotate_inverse(self.base_quat, (0.0, 0.0, -1.0))
-
-    def ang_vel_in_base(self) -> Vec3:
-        """Gövde çerçevesinde açısal hız (IMU jiroskobunun ölçtüğü)."""
-        return rotate_inverse(self.base_quat, self.base_ang_vel)
-
-    def lin_vel_in_base(self) -> Vec3:
-        return rotate_inverse(self.base_quat, self.base_lin_vel)
 
 
 class HexapodSim:
