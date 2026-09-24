@@ -107,6 +107,14 @@ leg:
     source: "CAD: leg-v2-v20.step, J2 ekseni y=-10.05 (montaj orijinine göre)"
     measured: false
 
+  # Ayak ucunun yuvarlaklık yarıçapı. Simülasyonda ayak bu yarıçapta bir
+  # küre olarak modellenir; kürenin en alt noktası tibia uzunluğunda durur.
+  # IK bunu kullanmaz (ayak noktası tibia ucundaki tek nokta).
+  foot_tip_radius:
+    value: 5.1
+    source: "CAD: pla_tibia_tip.stl, uç kapağına küre uydurma (tools/cad_sim_model.py)"
+    measured: false
+
 # -----------------------------------------------------------------------------
 # Gövde geometrisi
 # -----------------------------------------------------------------------------
@@ -265,3 +273,103 @@ sensors:
   camera:
     model: "Raspberry Pi Camera Module V2"
     interface: csi
+
+# -----------------------------------------------------------------------------
+# Simülasyon (URDF / Gazebo)
+# -----------------------------------------------------------------------------
+# Bu bölümdeki HER DEĞER bir TAHMİNDİR: veri sayfası, CAD hacmi ya da
+# gerekçesi yazılmış bir varsayım. Hiçbiri robottan ölçülmedi. Gerçek robotu
+# sürmek için kullanılmaz; yalnızca simülasyon modelini (src/hexapod_description)
+# besler. Robot tartılınca / kalibre edilince buradaki tahminler güncellenir.
+#
+# RL eğitiminde kütle ve sürtünme zaten rastgeleleştirilecek (alan
+# rastgeleleştirmesi); bu tahminlerin ±%20-30 hatası o aralığın içinde kalır.
+simulation:
+  servo:
+    # URDF <limit effort>. Durma torku; sürekli torku bundan düşük.
+    effort_nm:
+      value: 1.08
+      source: "MG996R katalog: 11 kg·cm @6 V (durma torku) = 1.079 N·m"
+      measured: false
+    # URDF <limit velocity>. Yüksüz hız; yük altında daha yavaş.
+    velocity_rad_s:
+      value: 7.48
+      source: "MG996R katalog: 0.14 s/60° @6 V, yüksüz = 7.48 rad/s"
+      measured: false
+
+  # Eklem açı limitleri, derece. joints[*].limits_deg (kalibrasyonla bulunan
+  # gerçek limitler) girilmişse URDF üreticisi ONLARI kullanır; bu değerler
+  # yalnızca o alanlar boşken devreye girer.
+  #
+  # ±90 = MG996R'ın 180 derecelik nominal aralığının yarısı: servo bundan
+  # öteye gidemez. Mekanik çarpışma limitleri (komşu bacağa değme, femurun
+  # gövdeye değmesi) bilinmiyor ve daha dar; özellikle coxa ±90'da komşu
+  # bacağa girer. RL eğitiminden önce gerçek limitler ya da daha dar bir
+  # eylem aralığı gerekecek.
+  provisional_joint_limits_deg:
+    value:
+      coxa: [-90.0, 90.0]
+      femur: [-90.0, 90.0]
+      tibia: [-90.0, 90.0]
+    source: "MG996R 180° nominal aralığın yarısı; mekanik limitler bilinmiyor (geçici)"
+    measured: false
+
+  # tools/cad_sim_model.py'nin girdileri. Link kütleleri bunlardan hesaplanır.
+  mass_inputs:
+    petg_density_g_cm3:
+      value: 1.27
+      source: "PETG tipik yoğunluk (veri sayfası 1.27 g/cm³); parçalar PETG basıldı (fatura)"
+      measured: false
+    print_fill_ratio:
+      # Basılan parçanın, aynı hacimde dolu bir parçaya göre kütle oranı.
+      # Duvarlar dolu, iç kısım seyrek dolgu; bu boyuttaki parçalarda tipik
+      # olarak 0.5-0.7. Baskı ayarları bilinmiyor.
+      value: 0.6
+      source: "TAHMİN - baskı ayarları (duvar sayısı, dolgu %) bilinmiyor"
+      measured: false
+    servo_mass_kg:
+      value: 0.055
+      source: "MG996R katalog: 55 g (horn ve vida hariç)"
+      measured: false
+    servo_size_mm:
+      value: [40.7, 19.7, 42.9]
+      source: "MG996R katalog: uzunluk x genişlik x yükseklik (mil yönü)"
+      measured: false
+    electronics_mass_kg:
+      # Gövdede taşınan elektronik, tek parça kabul edilir. Kırılım (katalog):
+      # Pi 4 46 g, 2S 2800 mAh LiPo ~160 g (tek batarya takılı varsayıldı),
+      # 300W buck ~90 g (bir adet varsayıldı), 5V USB regülatör ~20 g,
+      # 2x PCA9685 ~18 g, IMU + 3x VL53L0X + kamera ~15 g, kablo/konnektör ~50 g.
+      # Kaç batarya ve kaç buck'ın robotun üstünde olduğu bilinmiyor.
+      value: 0.40
+      source: "TAHMİN - katalog kütleleri toplamı, yerleşim bilinmiyor (bkz. yorum)"
+      measured: false
+
+
+
+  # --- tools/cad_sim_model.py çıktısı: elle düzenlemeyin, aracı yeniden çalıştırın ---
+  # Link çerçeveleri URDF'teki gibi, sıfır duruşunda. Birimler mm, kg, kg·mm².
+  # inertia sırası: [ixx, iyy, izz, ixy, ixz, iyz], ağırlık merkezinde.
+  # collision_boxes: her biri [merkez x, y, z, boy x, y, z]; ayak ucu ayrıca
+  # küre (leg.foot_tip_radius). Aynalı bacaklarda URDF üreticisi y'yi çevirir.
+  links:
+    body:
+      mass_kg: {value: 0.7002, source: "TAHMİN - CAD STL x PETG x doluluk 0.6; gövde plakaları + 6x Coxa_top/bushing (kapak hariç) + elektronik tahmini (tools/cad_sim_model.py)", measured: false}
+      com_mm: {value: [-0.46, 0.00, -13.61], source: "TAHMİN - CAD STL x PETG x doluluk 0.6; gövde plakaları + 6x Coxa_top/bushing (kapak hariç) + elektronik tahmini (tools/cad_sim_model.py)", measured: false}
+      inertia_kg_mm2: {value: [1250.5, 1653.7, 2400.6, 0.0, 4.3, 0.0], source: "TAHMİN - CAD STL x PETG x doluluk 0.6; gövde plakaları + 6x Coxa_top/bushing (kapak hariç) + elektronik tahmini (tools/cad_sim_model.py)", measured: false}
+      collision_boxes_mm: {value: [[-0.0, 0.0, -2.2, 193.2, 220.0, 69.5]], source: "CAD STL + servo kutusu sınırları, link çerçevesinde (tools/cad_sim_model.py)", measured: false}
+    coxa:
+      mass_kg: {value: 0.1254, source: "TAHMİN - CAD STL x PETG x doluluk 0.6; trochanter yuvası + 2x MG996R (katalog) (tools/cad_sim_model.py)", measured: false}
+      com_mm: {value: [30.48, -4.40, 12.01], source: "TAHMİN - CAD STL x PETG x doluluk 0.6; trochanter yuvası + 2x MG996R (katalog) (tools/cad_sim_model.py)", measured: false}
+      inertia_kg_mm2: {value: [40.1, 82.0, 74.5, 10.8, 8.6, -1.0], source: "TAHMİN - CAD STL x PETG x doluluk 0.6; trochanter yuvası + 2x MG996R (katalog) (tools/cad_sim_model.py)", measured: false}
+      collision_boxes_mm: {value: [[24.9, -4.3, 9.8, 70.6, 56.5, 59.5]], source: "CAD STL + servo kutusu sınırları, link çerçevesinde (tools/cad_sim_model.py)", measured: false}
+    femur:
+      mass_kg: {value: 0.0314, source: "TAHMİN - CAD STL x PETG x doluluk 0.6; iki femur plakası (tools/cad_sim_model.py)", measured: false}
+      com_mm: {value: [44.60, 0.47, 4.45], source: "TAHMİN - CAD STL x PETG x doluluk 0.6; iki femur plakası (tools/cad_sim_model.py)", measured: false}
+      inertia_kg_mm2: {value: [16.7, 15.3, 28.9, 0.1, -0.3, 0.2], source: "TAHMİN - CAD STL x PETG x doluluk 0.6; iki femur plakası (tools/cad_sim_model.py)", measured: false}
+      collision_boxes_mm: {value: [[40.0, -0.0, 2.0, 105.0, 61.0, 29.0]], source: "CAD STL + servo kutusu sınırları, link çerçevesinde (tools/cad_sim_model.py)", measured: false}
+    tibia:
+      mass_kg: {value: 0.0819, source: "TAHMİN - CAD STL x PETG x doluluk 0.6; tibia gövdesi + ayak kapağı + MG996R (katalog) (tools/cad_sim_model.py)", measured: false}
+      com_mm: {value: [3.46, -6.70, -26.20], source: "TAHMİN - CAD STL x PETG x doluluk 0.6; tibia gövdesi + ayak kapağı + MG996R (katalog) (tools/cad_sim_model.py)", measured: false}
+      inertia_kg_mm2: {value: [90.1, 80.0, 16.9, -0.9, 6.1, 9.0], source: "TAHMİN - CAD STL x PETG x doluluk 0.6; tibia gövdesi + ayak kapağı + MG996R (katalog) (tools/cad_sim_model.py)", measured: false}
+      collision_boxes_mm: {value: [[1.8, -4.3, -9.8, 26.7, 56.5, 43.6], [7.0, 5.0, -74.0, 21.9, 38.0, 84.8]], source: "CAD STL + servo kutusu sınırları, link çerçevesinde (tools/cad_sim_model.py)", measured: false}
