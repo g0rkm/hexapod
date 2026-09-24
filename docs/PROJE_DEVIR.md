@@ -6,7 +6,7 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa
 > özetidir; çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-24** (2. oturum) · Testler: **109/109** (Linux; Windows'ta 98, Gazebo/Gymnasium testleri atlanır)
+> Son güncelleme: **2026-09-25** (2. oturum) · Testler: **114/114** (Linux; Windows'ta 102, Gazebo/Gymnasium testleri atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -718,6 +718,9 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-24 | RL gözlemi yalnız gerçek robotta da olanlar: IMU (yerçekimi yönü, açısal hız), son eklem komutları, hız komutu, adım saati | Sim-to-real: ölçülen açı ve ayak teması gerçekte yok; ödülde kullanılabilir, gözlemde değil |
 | 09-24 | RL eylemi: ayakta duruş + 0.5 rad x [-1,1], limitlere kırpılır | Politika sıfırdan değil, dengeli bir duruştan başlasın |
 | 09-24 | İlk PPO (1M adım, 34 dk): robot yürümedi (10 s'de -1.5 cm), devrilmedi; ödül 550 → 810 | Ödül yerinde durmayı fazla ödüllendiriyor. Kullanıcı: ödülü düzelt + uzun eğitim, S3 gelince tripod üstüne öğrenme |
+| 09-25 | Ödül v2 ile 10M eğitim 5.75M'de DURDURULDU | Robot ritmi öğrendi (%93) ama yerinde saydı (10 s'de 0.7 cm). Sebep servo modeli çıktı (alttaki satır); o fizikle eğitmek boşa |
+| 09-25 | **RL simi tork tabanlı servo: tork = Kp·hata − Kd·hız, DC motor tork-hız doğrusuyla sınırlı (Kp 20, Kd 0.05, TAHMİN)** | Hız komutlu model (gz_ros2_control'ünki) ile elle yazılmış tripod bile beklenenin %12'siyle yürüyordu (ayaklar kayıyor); tork modeliyle aynı 1.08 N·m'de %94–97. Hareketsiz tripod iki modelde de 0.6 N·m'de sağlam: sorun dinamik |
+| 09-25 | Enerji cezası artık gerçek mekanik güç Σ\|τ·ω\| (W) | Tork modeliyle tork biliniyor; TÜBİTAK'taki "en az enerji" tanımına uygun |
 
 ---
 
@@ -790,6 +793,15 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
     (`Joint.set_velocity`) adımlar arasında kalıcı: her fizik adımında değil, servo
     döngüsünde vermek yetiyor ve ~%30 hızlandırıyor. Kamera sensörü, konusunu
     dinleyen yoksa kare üretmiyor (`<save>` olsa bile).
+18. **Servo modeli yürümeyi belirliyor; önce fiziği doğrula.** Hız komutlu servo
+    modelinde robot yürüyemiyordu ama bu RL eğitiminden anlaşılmadı: iki eğitim
+    (6+ saat) "ödül yanlış" sanılarak harcandı. Teşhis sırası şuydu ve işe yaradı:
+    (1) RL'siz, elle yazılmış açık döngü yörüngeyle yürüyor mu? (2) değilse
+    parametreleri tek tek değiştir (tork, sürtünme, tepki süresi) (3) hareketsiz
+    duruşla statik/dinamik ayrımı. Artık `test_simulasyon_yurumeye_izin_veriyor`
+    bunu her test koşusunda denetliyor. Ayrıca: gz.sim'de `Joint.transmitted_wrench`
+    Python'da bozuk (gz::msgs::Wrench çevrilemiyor); tork gerekiyorsa servo
+    modelinin uyguladığı tork kullanılır (`SimState.joint_effort`).
 
 ---
 
@@ -815,6 +827,15 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 - `sensors.imu.address`, `sensors.imu.mount_rotation_deg`,
   `sensors.range_finders.devices[*]` (XSHUT GPIO, adres, bakış yönü) —
   otonomi katmanında gerekecek.
+
+### 13.1b Yazılım tarafı
+
+- **ROS'lu simülasyon (sim.launch.py) hâlâ hız komutlu servo modelinde.** RL simi
+  tork modeline geçti (karar günlüğü 09-25); ROS'lu simde tripod ayakları kayar.
+  Çözüm seçenekleri: gz_ros2_control'ün effort arayüzü + tork modelini uygulayan
+  özel bir GazeboSimSystem eklentisi (C++), ya da gz-sim JointPositionController
+  (PID + kuvvet sınırı; tork-hız eğrisi yok). G8 (politika düğümü) simde
+  denenmeden önce yapılmalı.
 
 ### 13.2 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)
 
