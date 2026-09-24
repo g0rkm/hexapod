@@ -41,13 +41,20 @@ frames:
     azimuth_definition: "atan2(z, x)"
   body:
     convention: "REP-103: +X ileri, +Y sol, +Z yukarı"
-    # KARAR BEKLİYOR: CAD çerçevesinde hangi azimut "ileri" kabul edilecek?
-    # Geometriden bilinen: simetri düzlemi x=0, yani ileri yön CAD +Z veya -Z.
-    # Yani bu değer 90 ya da -90 olacak. Hangisi, ekibin burun tercihi.
-    # Ayarlandığında: govde_azimut = cad_azimut - forward_offset_deg
+    # İleri yönün CAD çerçevesindeki azimutu.
+    #
+    # Robot simetrik: altı bacağın geometrisi aynı, 60 derece aralıklı. IK
+    # için hangi tarafın ön sayıldığı önemsiz, bu yüzden keyfi seçildi.
+    # (Aynalı bacakların eklem yön işaretleri kalibrasyonda zaten eklem
+    # eklem belirleniyor.)
+    #
+    # Dönüşüm:  govde_azimut = forward_offset_deg - cad_azimut
+    # İşaret ters çünkü CAD azimutu atan2(z,x) yukarıdan bakınca saat
+    # yönünde artar; gövde çerçevesinde (REP-103, +Z yukarı) saat yönünün
+    # tersine artar.
     forward_offset_deg:
-      value: null
-      source: "KARAR BEKLİYOR - hangi yön burun"
+      value: 90.0
+      source: "Keyfi seçildi (robot simetrik, ön önemsiz) - CAD +Z ileri kabul edildi"
       measured: false
 
 # -----------------------------------------------------------------------------
@@ -125,19 +132,33 @@ body:
 # -----------------------------------------------------------------------------
 # Bacaklar
 # -----------------------------------------------------------------------------
-# azimuth_deg CAD çerçevesindedir. Gövde çerçevesine geçiş için
-# frames.body.forward_offset_deg ayarlanmalı.
+# azimuth_deg CAD çerçevesindedir (izlenebilirlik için öyle bırakıldı).
+# Gövde çerçevesindeki karşılığı: forward_offset_deg - azimuth_deg.
+#
+#   id  CAD az.  gövde az.  konum       fiziksel bant no.
+#   0      0        +90     sol orta     6
+#   1     60        +30     sol ön       1
+#   2    120        -30     sağ ön       2
+#   3    180        -90     sağ orta     3
+#   4   -120       -150     sağ arka     4
+#   5    -60       +150     sol arka     5
+#
+# "Fiziksel bant no." tools/map_channels.py'nin sorduğu numaralardır
+# (ÖN bandından başlayıp yukarıdan bakınca saat yönünde 1-6).
 #
 # mirrored: true olan 3 bacak aynalı basılmış (CAD'de "leg v2 - Mirrored").
-# Bu, servo horn'larının da ters yönde oturduğu anlamına GELEBİLİR; yön
-# işaretleri varsayılmaz, calibration.yaml'da her eklem için ayrı belirlenir.
+# Kinematik olarak aynalı bacak normal bacakla aynıdır (eklem eksenleri
+# bacak düzleminde aynı yerde); fark yalnızca servo yön işaretlerinde
+# olabilir ve o da calibration.yaml'da eklem eklem belirlenir. Robot
+# fiziksel olarak başka bir "ön" ile kurulursa bu alan yanlış tarafı
+# gösterebilir; bilgi amaçlıdır, hiçbir hesap buna dayanmaz.
 legs:
-  - {id: 0, azimuth_deg:    0.0, mirrored: false, label: null}
-  - {id: 1, azimuth_deg:   60.0, mirrored: false, label: null}
-  - {id: 2, azimuth_deg:  120.0, mirrored: true,  label: null}
-  - {id: 3, azimuth_deg:  180.0, mirrored: true,  label: null}
-  - {id: 4, azimuth_deg: -120.0, mirrored: true,  label: null}
-  - {id: 5, azimuth_deg:  -60.0, mirrored: false, label: null}
+  - {id: 0, azimuth_deg:    0.0, mirrored: false, label: "sol orta"}
+  - {id: 1, azimuth_deg:   60.0, mirrored: false, label: "sol ön"}
+  - {id: 2, azimuth_deg:  120.0, mirrored: true,  label: "sağ ön"}
+  - {id: 3, azimuth_deg:  180.0, mirrored: true,  label: "sağ orta"}
+  - {id: 4, azimuth_deg: -120.0, mirrored: true,  label: "sağ arka"}
+  - {id: 5, azimuth_deg:  -60.0, mirrored: false, label: "sol arka"}
 
 # -----------------------------------------------------------------------------
 # Servo donanımı
