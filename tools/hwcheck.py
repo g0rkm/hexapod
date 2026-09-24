@@ -45,6 +45,9 @@ KNOWN = {
 }
 # PCA9685 0x40-0x7F aralığında yapılandırılabilir; fabrika çıkışı 0x40.
 PCA_RANGE = range(0x40, 0x80)
+# Bütün PCA9685'ler fabrika ayarında bu adreste de cevap verir (ALLCALL).
+# Bir kartın kendi adresi DEĞİL; kart adayı olarak önerilmemeli.
+PCA_ALLCALL = 0x70
 
 
 def scan_bus(bus_number: int) -> list[int]:
@@ -74,6 +77,8 @@ def scan_bus(bus_number: int) -> list[int]:
 
 
 def guesses(address: int) -> list[str]:
+    if address == PCA_ALLCALL:
+        return ["PCA9685 ortak çağrı adresi (ALLCALL) — kart adresi değil, normal"]
     out = list(KNOWN.get(address, []))
     if address in PCA_RANGE:
         label = "PCA9685" + (" (fabrika çıkışı)" if address == 0x40 else "")
@@ -150,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     # -- öneri ------------------------------------------------------------
     missing = [d for d in config.drivers.values() if not d.address.known]
     if missing and found:
-        candidates = [a for a in found if a in PCA_RANGE]
+        candidates = [a for a in found if a in PCA_RANGE and a != PCA_ALLCALL]
         print("ÖNERİ — config/robot.yaml -> drivers:")
         if len(candidates) >= len(missing):
             for driver, address in zip(sorted(missing, key=lambda d: d.id), candidates):
@@ -160,7 +165,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"  {len(missing)} kart bekleniyordu, PCA9685 aralığında "
                   f"{len(candidates)} adres bulundu.")
-            print("  Adres jumper'larını ve besleme bağlantılarını kontrol edin.")
+            if len(candidates) == 1 and PCA_ALLCALL in found:
+                print("  Büyük ihtimalle iki kart da aynı adreste. Kartlardan birinin")
+                print("  A0 pedini lehimle birleştirin; o kart 0x41'e geçer.")
+            else:
+                print("  Adres jumper'larını ve besleme bağlantılarını kontrol edin.")
         print()
 
     vl53 = [a for a in found if a == 0x29]
