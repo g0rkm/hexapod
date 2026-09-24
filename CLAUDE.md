@@ -99,7 +99,7 @@ src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
 src/hexapod_kinematics/   ters/düz kinematik + gövde pozu, saf Python
 src/hexapod_description/  simülasyon modeli, URDF, eklem arayüzü (interface.py)
 src/hexapod_gazebo/       Gazebo dünyaları, sim.launch.py, stand komutu
-src/hexapod_rl/           RL: ROS'suz süreç içi Gazebo (sim.py), ortam
+src/hexapod_rl/           RL: süreç içi Gazebo (sim), Gymnasium ortamı (env, task), PPO (train)
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma
@@ -109,6 +109,7 @@ tools/make_urdf.py        robot.yaml -> URDF (ROS'suz)
 tools/preview_urdf.py     URDF'i PNG'ye çizer (ROS'suz önizleme)
 tools/wsl/ros_kurulum.sh  WSL'e ROS 2 Lyrical + Gazebo kurulumu
 tools/wsl/derle.sh        ROS paketlerini ~/hexapod_ws'te derler
+tools/wsl/rl_kurulum.sh   ~/hexapod_venv: torch (CPU), SB3, Gymnasium
 tools/cadlib/             CAD araçlarının ortak kütüphanesi
 tests/
 docs/                     PROJE_DEVIR.md, ARAYUZ.md (eklem arayüzü), brif, malzeme/

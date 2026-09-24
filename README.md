@@ -18,7 +18,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | URDF modeli | ✅ üretiliyor, testli, RViz'de açılıyor |
 | Gazebo simülasyonu | ✅ robot doğuyor, ayağa kalkıyor; sensörler yayında |
 | Gait motoru (tripod) | ⛔ |
-| RL (PPO) | 🔄 hızlı simülasyon çekirdeği hazır (ROS'suz, ~21x gerçek zaman) |
+| RL (PPO) | 🔄 Gymnasium ortamı ve PPO eğitimi çalışıyor (8 paralel ortam, ~10x gerçek zaman) |
 | Pi 4'e aktarma | ⛔ |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.
@@ -181,6 +181,24 @@ ros2 launch hexapod_gazebo sim.launch.py
 
 ```bash
 ros2 run hexapod_gazebo stand
+```
+
+## RL eğitimi (WSL)
+
+Bir kez:
+
+```bash
+bash tools/wsl/rl_kurulum.sh
+```
+
+Eğitim (çıktılar `~/hexapod_runs/<ad>/`):
+
+```bash
+source ~/hexapod_venv/bin/activate
+```
+
+```bash
+python -m hexapod_rl.train --steps 1000000 --envs 8 --name deneme
 ```
 
 ## ROS 2 kurulumu (WSL)

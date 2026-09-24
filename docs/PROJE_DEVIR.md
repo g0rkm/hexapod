@@ -6,7 +6,7 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa
 > özetidir; çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-24** (2. oturum) · Testler: **97/97** (Linux; Windows'ta 91, Gazebo testleri atlanır)
+> Son güncelleme: **2026-09-24** (2. oturum) · Testler: **109/109** (Linux; Windows'ta 98, Gazebo/Gymnasium testleri atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -613,6 +613,11 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
   birincil sürümü. **Gazebo Jetty** `ros-lyrical-desktop` ile birlikte
   geliyor. (İlk taslakta Jazzy/24.04 varsayılmıştı; PC'de 26.04 olduğu
   için değiştirildi.)
+- **RL sanal ortamı** `~/hexapod_venv` (torch 2.14 CPU, SB3 2.9, Gymnasium 1.3;
+  `tools/wsl/rl_kurulum.sh`). Kullanım: `source /opt/ros/lyrical/setup.bash;
+  source ~/hexapod_ws/install/setup.bash; source ~/hexapod_venv/bin/activate`.
+  python3-venv sistemde yoktu (sudo ister); betik get-pip.py ile sudo'suz kurdu.
+  Eğitim çıktıları `~/hexapod_runs/<ad>/` (depoda değil).
 - **WSL'de ROS 2 Lyrical + Gazebo 10.5 (Jetty) KURULU** (2026-09-24,
   `tools/wsl/ros_kurulum.sh`). Python 3.14, 8 çekirdek, 7 GB RAM (PC'nin yarısı).
   Kullanıcı adı `gorkem`. Paketler: `bash tools/wsl/derle.sh` → `~/hexapod_ws`
@@ -710,6 +715,8 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-24 | **RL simülasyonu ROS'suz, süreç içi Gazebo (`hexapod_rl.sim`)** | ROS'lu sim ~1.3x; süreç içi 2 ms adım 4.5x/süreç, 8 süreç ~21x. Aynı URDF, fizik ve servo modeli |
 | 09-24 | RL fizik adımı 2 ms (ROS simi 1 ms) | 1 ms 1.8x, 2 ms 4.5x, 4 ms 7.7x; üçünde de robot 100.0 mm'de duruyor. Yürüyüşte temas doğruluğu için 2 ms; yürüyüş gelince tekrar bakılacak |
 | 09-24 | PyTorch CPU sürümü (venv'de) | Politika küçük MLP, SB3 PPO için CPU öneriyor; CUDA sürümü GB'larca, CPU 196 MB |
+| 09-24 | RL gözlemi yalnız gerçek robotta da olanlar: IMU (yerçekimi yönü, açısal hız), son eklem komutları, hız komutu, adım saati | Sim-to-real: ölçülen açı ve ayak teması gerçekte yok; ödülde kullanılabilir, gözlemde değil |
+| 09-24 | RL eylemi: ayakta duruş + 0.5 rad x [-1,1], limitlere kırpılır | Politika sıfırdan değil, dengeli bir duruştan başlasın |
 
 ---
 
