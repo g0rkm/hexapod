@@ -12,14 +12,13 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 |---|---|
 | Servo sürücü katmanı | ✅ yazıldı, testli |
 | Kalibrasyon aracı | ✅ yazıldı, çalışıyor |
-| Ters kinematik (IK) | ⛔ eksik parametreler kapanmadan başlanmayacak |
-| Gait motoru | ⛔ aynı |
+| Ters kinematik (IK) | ⏸ geometri hazır (CAD), başlanmadı |
+| Gait motoru | ⏸ IK'dan sonra |
 | Kumanda / telemetri | ⛔ |
 | Gazebo + RL | ⛔ |
 
-IK ve gait, `config/robot.yaml` içindeki `null` alanlar dolmadan yazılmayacak.
-Sebebi brifin kendi risk maddesi: eksik parametre yerine varsayılan koymak,
-sonraki her katmanı sessizce tutarsız hâle getirir.
+IK için geometrik bir engel kalmadı: coxa, femur ve tibia CAD'den alındı.
+Donanımda denenebilmesi için önce kablolama ve kalibrasyon bitmeli.
 
 ## Kurulum
 
@@ -94,8 +93,9 @@ karşılaştırır ve adres alanları boşsa yapıştırılabilir öneri üretir
 python tools/cad_extract.py
 ```
 
-`robot.yaml`'daki coxa=50, femur=80, yarıçap=100 değerlerinin STEP
-assembly'sinden türetilmesini yeniden çalıştırır. Kendi tutarlılık
+`robot.yaml`'daki coxa=50, femur=80, tibia=126.6, yarıçap=100 değerlerinin
+STEP assembly'si ve basılan STL'lerden türetilmesini yeniden çalıştırır.
+CAD dosyaları depoda yok (344 MB); `Kerem Baltacı/` altına yerel olarak konmalı. Kendi tutarlılık
 kontrolünü yapar (altı bacak da aynı yarıçapta çıkmalı).
 
 ## Testler
@@ -115,13 +115,24 @@ python -c "import sys; sys.path.insert(0,'src/hexapod_driver'); from hexapod_dri
 
 Özetle bekleyenler:
 
-**Ölçüm (monte robottan, kumpasla)**
-- `leg.segments.tibia` — J3 ekseninden ayağın yere değdiği noktaya. CAD ~121 mm
-  ama ayak ucu yuvarlak, tek doğru sayı çıkmıyor.
-- `leg.segments.coxa` / `femur` — CAD 50 / 80 mm girili ama `measured: false`.
-  Baskı toleransı ve horn kalınlığı yüzünden doğrulanmalı.
-- `body.standing_height`, `body.total_mass_kg`
-- Eklem açı limitleri (`joints[*].limits_deg`)
+**Geometri — kumpasla ölçülmüyor**
+
+coxa 50, femur 80, tibia 126.6 mm CAD'den alındı (`measured: false`). Brif
+kumpasla ölçmeyi öneriyordu, ama hata büyüklükleri buna değmediğini gösteriyor:
+
+| Hata kaynağı | Ayak ucunda etkisi | Nasıl giderilir |
+|---|---|---|
+| Baskı toleransı | < 0.5 mm | gerek yok |
+| Yuvarlak ayak ucunun kayması | 1–3 mm | gerek yok |
+| Servo horn'unun mil dişlisine oturması (25 diş, diş başına 14.4°) | **~10 mm'ye kadar** | kalibrasyon |
+
+Doğruluk kalibrasyondan gelir. Robot yürürken tutarlı bir sapma görülürse
+ölçüme dönülür.
+
+**Robotun kendisiyle belirlenecekler**
+- Eklem açı limitleri (`joints[*].limits_deg`) — `calibrate.py` içinde `limit`
+- `body.standing_height` — ölçüm değil, IK çalışınca seçilecek bir hedef
+- `body.total_mass_kg` — terazi; ilk yürüyüş için şart değil
 
 **Kablolama**
 - İki PCA9685'in I2C adresleri

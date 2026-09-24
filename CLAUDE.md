@@ -53,8 +53,8 @@ tasarımından (Printables 606030, CC BY-SA 4.0).
 
 ## Geometri nereden geldi
 
-`config/robot.yaml`'daki coxa=50, femur=80, yarıçap=100 değerleri STEP
-assembly'sinden türetildi. Türetme yeniden çalıştırılabilir:
+`config/robot.yaml`'daki coxa=50, femur=80, tibia=126.6, yarıçap=100 değerleri
+STEP assembly'sinden ve basılan STL'lerden türetildi. Türetme yeniden çalıştırılabilir:
 
 ```bash
 python tools/cad_extract.py
@@ -63,6 +63,12 @@ python tools/cad_extract.py
 Yöntem: her eklemin dönme ekseni, servo horn'u ile karşısındaki bushing'i
 birleştiren doğru. Araç kendi tutarlılık kontrolünü yapar (altı bacak da
 aynı yarıçapta çıkmalı).
+
+**STEP'te parça adı ↔ geometri eşlemesine güvenme.** tibia_tip ile
+tibia_main için ters çıkıyor; ilk türetmede tibia bu yüzden 121 yazıldı
+(doğrusu 126.6). Tibia artık adı doğru olan STL'lerden hesaplanıyor.
+Ayrıca B-spline kontrol noktaları yüzeyin dışında durur: bir parçanın
+en uç noktasını STEP noktalarından değil, mesh köşelerinden al.
 
 **Aynalı bacaklar tuzak.** Bacak 2, 3, 4 aynalı basılmış ve Fusion bunları
 ayrı gövde olarak dışa aktarmış: dönüşüm matrisi düzgün bir dönme, yansıma
@@ -106,10 +112,26 @@ katman saf Python kalsın, ROS sarmalayıcısı ayrı olsun.
 python -m pytest -q
 ```
 
+## Geometri CAD'den alınır, kumpasla ölçülmez
+
+Brif segment uzunluklarının kumpasla ölçülmesini öneriyordu. Bu karar
+2026-09-24'te değişti: coxa, femur ve tibia CAD'den alınıyor
+(`measured: false`), fiziksel ölçüm yapılmıyor.
+
+Gerekçe hata büyüklüklerinin karşılaştırması:
+- Baskı toleransı segment uzunluğunda ~0.5 mm'den az hata yaratır.
+- Yuvarlak ayak ucunun kayması ~r·sin(açı), yani 1-3 mm.
+- Servo horn'unun mil dişlisine oturma hatası (MG996R, 25 diş, diş başına
+  14.4°) femur ucunda **~10 mm'ye kadar** sapma yaratır.
+
+Asıl hata kaynağı sonuncusu, onu da kumpas göremez: kalibrasyon
+(`center_us`) giderir. Yani doğruluk kalibrasyondan gelir, ölçümden değil.
+
+Robot yürürken ayak konumunda tutarlı bir sapma görülürse, ancak o zaman
+ölçüme dönülür.
+
 ## Şu an yazılmayacak olanlar
 
-IK ve gait, `config/robot.yaml`'daki ölçüm alanları dolmadan yazılmayacak.
-Özellikle `leg.segments.tibia` eksik — CAD ~121 mm veriyor ama ayak ucu
-yuvarlak olduğu için tek doğru sayı çıkmıyor, kumpasla ölçülmeli.
-
-Bu kuralı kendi başına gevşetme; parametreler geldiğinde kullanıcı söyler.
+IK ve gait için geometrik bir engel kalmadı, ama kullanıcı söylemeden
+başlanmaz. Kablolama (kart adresleri + kanal haritası) ve kalibrasyon
+tamamlanmadan IK donanımda denenemez zaten.
