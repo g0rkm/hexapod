@@ -77,12 +77,20 @@ leg:
       source: "CAD: leg-v2-v20.step, J2->J3 = 79.997 mm. Tasarım değeri 80."
       measured: false
     tibia:
-      # J3 ekseninden ayağın YERE DEĞDİĞİ noktaya mesafe.
-      # CAD'de ayak ucu yuvarlak, temas noktası tibia açısıyla kayıyor.
-      # Bu yüzden CAD'den tek bir doğru sayı çıkmıyor -> ölçülmeli.
-      value: null
-      cad_estimate: 121.0
-      source: "ÖLÇÜM BEKLİYOR. CAD'de ayak kapağının en uç noktası J3'ten 121.0 mm."
+      # J3 ekseninden ayak kapağının en uç noktasına mesafe.
+      #
+      # Ayak kapağı (pla_tibia_tip) tibia gövdesinin ucuna geçiyor ve onu
+      # 8 mm aşıyor; yere değen parça kapak. Gövdenin ucu 118.6 mm'de.
+      #
+      # DÜZELTME (2026-09-24): ilk türetmede 121.0 yazılmıştı. STEP içinde
+      # parça adı -> geometri eşlemesi tip ile main için ters çıkıyordu ve
+      # değer yanlış parçanın B-spline kontrol noktalarından gelmişti.
+      # Doğru değer basılan STL'lerden (mesh köşeleri yüzeyin tam üstünde).
+      #
+      # Ayak ucu yaklaşık 5 mm yarıçaplı yuvarlak; yere değen nokta tibia
+      # açısıyla ~r*sin(açı) kadar kayar (normal duruşta 1-3 mm). İhmal edildi.
+      value: 126.6
+      source: "CAD: pla_tibia_tip.stl + leg-v2-v20.step montaj dönüşümü, J3 -> uç 126.635 mm (tools/cad_extract.py)"
       measured: false
 
   # J2 femur ekleminin, bacak montaj referans düzlemine göre dikey ofseti.

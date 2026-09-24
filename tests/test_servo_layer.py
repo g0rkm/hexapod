@@ -78,13 +78,21 @@ def test_cad_degerleri_olculmemis_olarak_isaretli():
     assert "CAD" in coxa.source
 
 
-def test_tibia_bilinmiyor_ve_okunmaya_calisilinca_hata_veriyor():
+def test_bilinmeyen_deger_okunmaya_calisilinca_hata_veriyor():
     config = RobotConfig.load(REAL_CONFIG)
-    tibia = config.segments["tibia"]
-    assert tibia.known is False
+    height = config.standing_height
+    assert height.known is False
     with pytest.raises(MissingValue) as exc:
-        tibia.require()
-    assert "leg.segments.tibia" in str(exc.value)
+        height.require()
+    assert "body.standing_height" in str(exc.value)
+
+
+def test_segment_uzunluklari_cadden_dolu_ama_olculmemis():
+    config = RobotConfig.load(REAL_CONFIG)
+    for name, expected in (("coxa", 50.0), ("femur", 80.0), ("tibia", 126.6)):
+        segment = config.segments[name]
+        assert segment.require() == expected
+        assert segment.measured is False, f"{name} ölçülmüş gibi işaretlenmemeli"
 
 
 def test_kablolama_eksik_oldugu_bildiriliyor():
