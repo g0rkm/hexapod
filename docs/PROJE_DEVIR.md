@@ -717,6 +717,7 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-24 | PyTorch CPU sürümü (venv'de) | Politika küçük MLP, SB3 PPO için CPU öneriyor; CUDA sürümü GB'larca, CPU 196 MB |
 | 09-24 | RL gözlemi yalnız gerçek robotta da olanlar: IMU (yerçekimi yönü, açısal hız), son eklem komutları, hız komutu, adım saati | Sim-to-real: ölçülen açı ve ayak teması gerçekte yok; ödülde kullanılabilir, gözlemde değil |
 | 09-24 | RL eylemi: ayakta duruş + 0.5 rad x [-1,1], limitlere kırpılır | Politika sıfırdan değil, dengeli bir duruştan başlasın |
+| 09-24 | İlk PPO (1M adım, 34 dk): robot yürümedi (10 s'de -1.5 cm), devrilmedi; ödül 550 → 810 | Ödül yerinde durmayı fazla ödüllendiriyor. Kullanıcı: ödülü düzelt + uzun eğitim, S3 gelince tripod üstüne öğrenme |
 
 ---
 
