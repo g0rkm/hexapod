@@ -88,6 +88,7 @@ PAKETLER=(
     "ros-$DISTRO-joint-state-publisher-gui"   # RViz'de eklem kaydırıcıları
     "ros-$DISTRO-xacro"
     python3-yaml python3-pytest python3-numpy python3-matplotlib
+    python3-venv                              # RL sanal ortamı (tools/wsl/rl_kurulum.sh)
 )
 calistir sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "${PAKETLER[@]}"
 tamam
