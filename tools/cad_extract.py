@@ -3,8 +3,8 @@
 
 Neden var
 ---------
-config/robot.yaml içindeki coxa=50, femur=80, yarıçap=100 gibi değerler
-STEP assembly'sinden türetildi. Bu araç o türetmeyi yeniden çalıştırır, yani
+config/robot.yaml içindeki coxa=50, femur=80, tibia=126.6, yarıçap=100
+değerleri STEP assembly'sinden ve basılan STL'lerden türetildi. Bu araç o türetmeyi yeniden çalıştırır, yani
 sayılar "birinin bir yerde hesapladığı" değil, tekrar üretilebilir olur.
 TÜBİTAK projesi kapsamında bu izlenebilirlik önemli.
 
@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import math
 import re
+import struct
 import sys
 from pathlib import Path
 
@@ -187,15 +188,68 @@ def analyse_leg(verbose: bool = False) -> None:
     print(f"  femur (J2 -> J3)                  = {femur:.3f} mm")
     print(f"  femur ekleminin dikey ofseti      = {j2[1]:.2f} mm")
 
-    tip = max(
-        (S.apply(matrix, (0, 0, 0)) for name, _, matrix in items if "Tibia_tip" in name),
-        default=None,
-    )
-    if tip is not None:
-        print(f"  tibia: ayak kapağı yerleşimi bulundu; en uç nokta ölçümü için")
-        print(f"         --verbose ile parça geometrisine bakın. CAD ~121 mm,")
-        print(f"         ayak ucu yuvarlak olduğu için KUMPASLA doğrulanmalı.")
+    analyse_tibia(items, (j3[1], j3[2]))
     print()
+
+
+def analyse_tibia(items, j3_yz: tuple[float, float]) -> None:
+    """Tibia uzunluğu: J3 ekseninden ayak kapağının en uç noktasına.
+
+    Ayak ucu STEP'te serbest form (B-spline) bir yüzey; kontrol noktaları
+    yüzeyin dışında durduğu için STEP noktalarından en uç nokta bulunamaz.
+    Bunun yerine basılan STL'ler kullanılıyor: mesh köşeleri yüzeyin tam
+    üstündedir. STL'ler parçanın kendi çerçevesinde; STEP'teki montaj
+    dönüşümü uygulanınca bacak çerçevesine geçiyorlar.
+
+    DİKKAT: STEP içinde parça adı -> geometri eşlemesi tibia_tip ile
+    tibia_main için ters çıkıyor (ilk türetmede 121 mm hatası buradan geldi).
+    Bu fonksiyon STEP'teki geometriye değil, adı doğru olan STL'lere bakar.
+    """
+    matrix = next((m for name, _, m in items if "Tibia_tip" in name), None)
+    tip_stl = LEG_STEP.parent / "pla_tibia_tip.stl"
+    main_stl = LEG_STEP.parent / "pla_tibia_main.stl"
+    if matrix is None or not tip_stl.is_file() or not main_stl.is_file():
+        print("  tibia: hesaplanamadı (montajda ayak kapağı ya da STL dosyaları yok)")
+        return
+
+    def farthest(stl: Path):
+        best = (-1.0, None)
+        for p in set(read_stl(stl)):
+            q = S.apply(matrix, p)
+            d = math.hypot(q[1] - j3_yz[0], q[2] - j3_yz[1])
+            if d > best[0]:
+                best = (d, q)
+        return best
+
+    tip_d, tip_p = farthest(tip_stl)
+    main_d, _ = farthest(main_stl)
+    print(f"  tibia (J3 -> ayak ucu)            = {tip_d:.3f} mm")
+    print(f"        ayak kapağı gövdenin {tip_d - main_d:.1f} mm dışına taşıyor "
+          f"(gövde ucu {main_d:.2f} mm)")
+
+    # Tutarlılık: uç bacağın orta düzleminde olmalı ve kapak gövdeden
+    # daha dışarıda olmalı. Değilse STL/çerçeve eşleşmesi bozulmuştur.
+    if abs(tip_p[0]) > 1.0 or tip_d <= main_d:
+        print("  -> UYARI: ayak ucu beklenen yerde değil; STL'ler montajla")
+        print("     eşleşmiyor olabilir, bu sayıya güvenmeyin.")
+    else:
+        print("  -> tutarlılık kontrolü GEÇTİ: uç bacak orta düzleminde, "
+              "kapak gövdenin dışında.")
+
+
+def read_stl(path: Path) -> list[tuple[float, float, float]]:
+    """Binary ya da ASCII STL'den köşe noktalarını oku."""
+    data = path.read_bytes()
+    if data[:5] == b"solid" and b"facet" in data[:400]:
+        found = re.findall(rb"vertex\s+(\S+)\s+(\S+)\s+(\S+)", data)
+        return [tuple(float(x) for x in v) for v in found]
+    count = struct.unpack_from("<I", data, 80)[0]
+    points = []
+    for i in range(count):
+        offset = 84 + i * 50 + 12
+        for k in range(3):
+            points.append(struct.unpack_from("<3f", data, offset + 12 * k))
+    return points
 
 
 def analyse_body(verbose: bool = False) -> None:
@@ -267,8 +321,8 @@ def main(argv: list[str] | None = None) -> int:
         analyse_body(args.verbose)
 
     print("Bu sayılar config/robot.yaml içinde measured:false olarak duruyor.")
-    print("Brifin uyarısı geçerli: baskı toleransı ve horn kalınlığı yüzünden")
-    print("monte robottan kumpasla doğrulanmadan nihai kabul edilmemeli.")
+    print("Kumpasla ölçülmüyor: doğruluğu belirleyen servo horn'unun mile oturma")
+    print("hatası ve onu kalibrasyon gideriyor (bkz. CLAUDE.md).")
     return 0
 
 
