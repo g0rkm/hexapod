@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hexapod_kinematics</name>
+  <version>0.1.0</version>
+  <description>
+    Hexapod ters/düz kinematiği ve gövde pozu. Saf Python, donanıma
+    dokunmaz; geometriyi config/robot.yaml'dan alır.
+  </description>
+  <maintainer email="gorkemmutlu227@gmail.com">hexapod takımı</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>hexapod_driver</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

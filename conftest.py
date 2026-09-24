@@ -1,5 +1,7 @@
-"""pytest'in hexapod_driver'i ROS kurulumu olmadan bulabilmesi icin."""
+"""pytest'in paketleri ROS 2 kurulumu olmadan bulabilmesi için."""
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "src" / "hexapod_driver"))
+_SRC = Path(__file__).resolve().parent / "src"
+for _pkg in ("hexapod_driver", "hexapod_kinematics"):
+    sys.path.insert(0, str(_SRC / _pkg))
