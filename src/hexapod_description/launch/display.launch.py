@@ -37,8 +37,21 @@ def _nodes(context):
              parameters=[{"robot_description": urdf}]),
         Node(package="joint_state_publisher_gui", executable="joint_state_publisher_gui"),
         Node(package="rviz2", executable="rviz2",
-             arguments=["-d", os.path.join(share, "rviz", "display.rviz")]),
+             arguments=["-d", os.path.join(share, "rviz", "display.rviz")],
+             additional_env=qt_x11_env()),
     ]
+
+
+def qt_x11_env() -> dict:
+    """Wayland oturumunda (ör. WSLg) RViz'i X11'e zorla.
+
+    RViz'in OGRE penceresi Wayland'de açılamıyor ("Invalid parentWindowHandle",
+    100 denemeden sonra çöküyor); XWayland üzerinden (QT_QPA_PLATFORM=xcb)
+    çalışıyor. X11'i olmayan saf Wayland'e dokunulmaz.
+    """
+    if os.environ.get("WAYLAND_DISPLAY") and os.environ.get("DISPLAY"):
+        return {"QT_QPA_PLATFORM": "xcb"}
+    return {}
 
 
 def generate_launch_description():

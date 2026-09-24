@@ -16,6 +16,5 @@ setup(
     maintainer_email="gorkemmutlu227@gmail.com",
     description="Hexapod servo surucu katmani (PCA9685)",
     license="Apache-2.0",
-    tests_require=["pytest"],
     entry_points={"console_scripts": []},
 )

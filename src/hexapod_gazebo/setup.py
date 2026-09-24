@@ -22,6 +22,5 @@ setup(
     maintainer_email="gorkemmutlu227@gmail.com",
     description="Hexapod Gazebo simulasyonu",
     license="Apache-2.0",
-    tests_require=["pytest"],
     entry_points={"console_scripts": ["stand = hexapod_gazebo.stand:main"]},
 )
