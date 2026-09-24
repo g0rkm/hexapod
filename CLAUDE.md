@@ -99,6 +99,7 @@ src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
 src/hexapod_kinematics/   ters/düz kinematik + gövde pozu, saf Python
 src/hexapod_description/  simülasyon modeli, URDF, eklem arayüzü (interface.py)
 src/hexapod_gazebo/       Gazebo dünyaları, sim.launch.py, stand komutu
+src/hexapod_rl/           RL: ROS'suz süreç içi Gazebo (sim.py), ortam
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma

@@ -6,7 +6,7 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa
 > özetidir; çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-24** (2. oturum) · Testler: **88/88**
+> Son güncelleme: **2026-09-24** (2. oturum) · Testler: **97/97** (Linux; Windows'ta 91, Gazebo testleri atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -707,7 +707,9 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-24 | Ayak temas sensörü yalnız simülasyonda; politika gözlemine girmez | Gerçek robotta yok; sim-to-real'de olmayan bilgiye dayanmasın |
 | 09-24 | `/joint_states` gerçek robotta ölçüm değil son komut | MG996R geri bildirim vermiyor; politika da simde komut edilen açıyı görmeli |
 | 09-24 | Simde servo = birinci derece sistem, T = 0.05 s (TAHMİN) | gz_ros2_control konum komutunu hız kontrolüyle uyguluyor; kazanç = 1/(T x 100 Hz) = 0.2 |
-| 09-24 | RL eğitim ortamı ROS'suz, Gazebo süreç içinden adımlanacak (öneri, G6) | Tam ROS simülasyonu sınırsızda bile ~1.3x gerçek zaman; yalın Gazebo ~3–5x; gz.sim Python bağları var |
+| 09-24 | **RL simülasyonu ROS'suz, süreç içi Gazebo (`hexapod_rl.sim`)** | ROS'lu sim ~1.3x; süreç içi 2 ms adım 4.5x/süreç, 8 süreç ~21x. Aynı URDF, fizik ve servo modeli |
+| 09-24 | RL fizik adımı 2 ms (ROS simi 1 ms) | 1 ms 1.8x, 2 ms 4.5x, 4 ms 7.7x; üçünde de robot 100.0 mm'de duruyor. Yürüyüşte temas doğruluğu için 2 ms; yürüyüş gelince tekrar bakılacak |
+| 09-24 | PyTorch CPU sürümü (venv'de) | Politika küçük MLP, SB3 PPO için CPU öneriyor; CUDA sürümü GB'larca, CPU 196 MB |
 
 ---
 
@@ -773,6 +775,13 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 16. **ament_python'da `setup.cfg` şart:** yoksa console_scripts `bin/`'e kurulur ve
     `ros2 run paket komut` "No executable found" der. `[develop] script_dir` ve
     `[install] install_scripts` `$base/lib/<paket>` olmalı.
+17. **gz.sim Python bağları:** `import gz.math` yapılmadan `Link.world_pose` çağrılırsa
+    pybind11 Pose3d'yi çeviremez ve süreç ÇÖKER (yakalanamaz). `reset_all()`
+    isteği bir adım gecikmeyle işlenir ve sıfırlama `run(n)`'in adımlarından birini
+    yer; `HexapodSim.reset()` bunu tek adımlık çağrılarla çözüyor. Hız komutu
+    (`Joint.set_velocity`) adımlar arasında kalıcı: her fizik adımında değil, servo
+    döngüsünde vermek yetiyor ve ~%30 hızlandırıyor. Kamera sensörü, konusunu
+    dinleyen yoksa kare üretmiyor (`<save>` olsa bile).
 
 ---
 
