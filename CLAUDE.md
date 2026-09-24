@@ -82,6 +82,7 @@ o bacaklarda ters olabileceği anlamına gelir — varsayma, kalibrasyonda
 config/robot.yaml         robotun fiziksel tanımı
 config/calibration.yaml   servo merkez/yön/limit — calibrate.py üretir
 src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
+src/hexapod_kinematics/   ters/düz kinematik + gövde pozu, saf Python
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma
@@ -131,8 +132,39 @@ Asıl hata kaynağı sonuncusu, onu da kumpas göremez: kalibrasyon
 Robot yürürken ayak konumunda tutarlı bir sapma görülürse, ancak o zaman
 ölçüme dönülür.
 
-## Şu an yazılmayacak olanlar
+## Sıfır duruşu ve pozitif yönler (IK ↔ kalibrasyon sözleşmesi)
 
-IK ve gait için geometrik bir engel kalmadı, ama kullanıcı söylemeden
-başlanmaz. Kablolama (kart adresleri + kanal haritası) ve kalibrasyon
-tamamlanmadan IK donanımda denenemez zaten.
+Kalibrasyonda kaydedilen "merkez" (`center_us`) ile IK'daki 0 açısı AYNI
+duruştur. Biri değişirse öteki de değişmeli, yoksa her ayak kayık basar.
+
+| Eklem | 0 açısı | + yönü |
+|---|---|---|
+| coxa  | bacak gövdeden dümdüz dışarı | yukarıdan bakınca saat yönünün tersi |
+| femur | femur yere paralel | bacak yukarı kalkar |
+| tibia | tibia femura dik | diz açılır, ayak dışarı gider |
+
+Kaynak: `src/hexapod_kinematics/hexapod_kinematics/leg.py` modül açıklaması.
+`tools/calibrate.py` yardım metni aynı tabloyu gösterir.
+
+## Hedef ve yol haritası
+
+Kullanıcının hedefi (2026-09-24): **otonom** bir hexapod. ROS 2 + Gazebo
+simülasyonunda geliştirilip Raspberry Pi 4'e aktarılacak; farklı zemin ve
+zorluklarda kendi çözümünü üreten (RL ile öğrenilmiş) bir sistem.
+
+Önce yazılım, sonra donanım. Kullanıcı robotu kendisi kurmadı; kablolama
+ve kalibrasyon robotu kuran kişiye kalıyor. Yazılım CAD geometrisiyle
+simülasyonda ilerler; donanım bilgileri config'e sonradan girilir.
+
+1. ✅ Servo sürücü katmanı, kalibrasyon ve kanal haritası araçları
+2. ✅ Ters/düz kinematik + gövde pozu (`hexapod_kinematics`)
+3. ⏭ URDF modeli (robot.yaml'dan üretilecek, STL'ler görsel mesh olarak)
+4. Gazebo dünyası + ROS 2 kontrol arayüzü
+5. Klasik yürüyüş (tripod) — RL için referans ve yedek
+6. RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminlerle
+7. Pi 4'e aktarma: eğitilmiş politika + ROS 2 düğümleri + gerçek sürücü
+
+Gerçekçi beklenti: RL politikası eğitimde gördüğü zorluk türlerine karşı
+sağlam olur, "her koşula" değil. Eğitim senaryoları neyi kapsarsa sistem
+onu çözer. Eğitim bir PC'de yapılır; Pi 4 sadece eğitilmiş politikayı
+çalıştırır.

@@ -12,13 +12,16 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 |---|---|
 | Servo sürücü katmanı | ✅ yazıldı, testli |
 | Kalibrasyon aracı | ✅ yazıldı, çalışıyor |
-| Ters kinematik (IK) | ⏸ geometri hazır (CAD), başlanmadı |
-| Gait motoru | ⏸ IK'dan sonra |
-| Kumanda / telemetri | ⛔ |
-| Gazebo + RL | ⛔ |
+| Ters kinematik (IK) + gövde pozu | ✅ yazıldı, testli |
+| URDF modeli | ⏭ sıradaki |
+| Gazebo simülasyonu | ⛔ |
+| Gait motoru (tripod) | ⛔ |
+| RL (PPO) | ⛔ |
+| Pi 4'e aktarma | ⛔ |
 
-IK için geometrik bir engel kalmadı: coxa, femur ve tibia CAD'den alındı.
-Donanımda denenebilmesi için önce kablolama ve kalibrasyon bitmeli.
+Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.
+Kablolama ve kalibrasyon robotu kuran kişi tarafından sonra yapılacak;
+yazılımın önünde engel değil, sadece config'e girilecek değerler.
 
 ## Kurulum
 
@@ -42,6 +45,10 @@ src/hexapod_driver/   # ROS 2 (ament_python) paketi, çekirdeği saf Python
     pca9685.py        # PCA9685 I2C PWM sürücüsü
     backends.py       # gerçek I2C / dry-run arka uçları
     servo_bus.py      # eklem adı -> kart/kanal -> darbe
+src/hexapod_kinematics/  # ters/düz kinematik + gövde pozu, saf Python
+  hexapod_kinematics/
+    leg.py            # tek bacak IK/FK, sıfır duruşu ve yön tanımları
+    body.py           # altı bacak, gövde çerçevesi, gövde pozu
 tools/
   map_channels.py     # hangi servo hangi kanalda — servoları kıpırdatıp sorar
   calibrate.py        # etkileşimli servo kalibrasyon aracı
