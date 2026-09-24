@@ -22,7 +22,7 @@ meta:
   # CAD kaynağı: Sir Kuhnhero "3D Printed Hexapod", Printables model 606030,
   # CC BY-SA 4.0. Mekanik geometri bu tasarımdan; elektronik DEĞİL
   # (donör tasarım STM32 + 4x18650 kullanıyor, bu robot Pi 4 + 2S LiPo).
-  cad_source: "Hexapod/ (Printables 606030, CC BY-SA 4.0)"
+  cad_source: "cad/Hexapod/ (Printables 606030, CC BY-SA 4.0)"
 
 units:
   length: mm
@@ -62,7 +62,7 @@ frames:
 # -----------------------------------------------------------------------------
 # Eklem sırası: coxa (yaw, dikey eksen) -> femur (pitch) -> tibia (pitch).
 # 3 DOF x 6 bacak = 18 servo.
-#   Kanıt: Malzeme Listesi.txt "Total: 18x MG996R Servo Horn";
+#   Kanıt: docs/malzeme/Malzeme Listesi.txt "Total: 18x MG996R Servo Horn";
 #          leg-v2-v20.step içinde tam 3 MG996R + 3 horn + 3 bushing.
 #
 # Eklem eksenleri leg-v2-v20.step'ten çıkarıldı. Yöntem: her eklemin ekseni,

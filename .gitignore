@@ -17,7 +17,7 @@
 # Faturalardan çıkan donanım envanteri CLAUDE.md ve config/robot.yaml içinde
 # zaten özetlendi; ham belgelere ihtiyaç yok.
 *.pdf
-!Hexapod/606030-3d-printed-hexapod-*.pdf
+!cad/Hexapod/606030-3d-printed-hexapod-*.pdf
 Ekran görüntüsü*
 Screenshot*
 yavuz selim/
@@ -32,7 +32,7 @@ yavuz selim/
 # Printables model 606030, CC BY-SA 4.0 — oradan indirilebilir.
 #
 # tools/cad_extract.py çalıştırılacaksa CAD'i yerel olarak depo kökündeki
-# "Hexapod/" klasörüne yerleştirmek yeterli; araç dosyaları orada arar.
+# "cad/Hexapod/" klasörüne yerleştirmek yeterli; araç dosyaları orada arar.
 *.step
 *.f3z
 *.3mf

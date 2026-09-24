@@ -1,14 +1,14 @@
 # CLAUDE.md
 
-> **Yeni bir oturumdaysan önce [PROJE_DEVIR.md](PROJE_DEVIR.md)'yi baştan
+> **Yeni bir oturumdaysan önce [docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md)'yi baştan
 > sona oku.** Projenin bütün bağlamı orada: kullanıcının çalışma tarzı ve
 > git tercihleri (Türkçe detaylı commit, **Claude imzası yok**), alınan
 > kararlar ve gerekçeleri, bulunan hatalar, donanım özeti, açık işler ve
 > sıradaki adımın planı. Bu dosya onun kısa özetidir.
 
 Bu depoda çalışırken bilmen gerekenler. Ayrıntılı bağlam:
-[PROJE_DEVIR.md](PROJE_DEVIR.md), ilk brif:
-[hexapod-proje-brifi.md](hexapod-proje-brifi.md), kullanım: [README.md](README.md).
+[docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md), ilk brif:
+[docs/hexapod-proje-brifi.md](docs/hexapod-proje-brifi.md), kullanım: [README.md](README.md).
 
 ## Proje
 
@@ -44,9 +44,9 @@ Donanım hakkında çelişki çıkarsa sıra şu:
 1. **Faturalar** — gerçekte ne alındığının tek kaydı. Depoda DEĞİL: TCKN
    ve adres içeriyor. `.gitignore` bütün PDF'leri ve ekran görüntülerini
    klasörden bağımsız olarak dışarıda tutuyor; bu kuralı gevşetme.
-2. **CAD** (`Hexapod/`, `Baskı Dosyaları/`) — yalnızca mekanik geometri.
+2. **CAD** (`cad/Hexapod/`, `cad/Baskı Dosyaları/`) — yalnızca mekanik geometri.
    Binary'ler depoda değil (344 MB), yerelde durur.
-3. Malzeme listesi txt'leri — **güvenilmez**, ikisi birbiriyle çelişiyor:
+3. Malzeme listesi txt'leri (`docs/malzeme/`) — **güvenilmez**, ikisi birbiriyle çelişiyor:
    `gömülü malzemeler listesi.txt` (faturalara daha yakın) ve
    `gömülü malzemeler listesi (alternatif).txt` (TF-Luna, LM2596 —
    bunlar hiç alınmadı).
@@ -56,7 +56,7 @@ gerçek **3**), batarya (liste 2200 mAh, gerçek **2800 mAh**).
 
 ## CAD donör bir tasarım
 
-`Hexapod/` ve `Baskı Dosyaları/` altındaki her şey Sir Kuhnhero'nun
+`cad/Hexapod/` ve `cad/Baskı Dosyaları/` altındaki her şey Sir Kuhnhero'nun
 "3D Printed Hexapod" tasarımından (Printables 606030, CC BY-SA 4.0).
 
 - Mekanik geometri geçerli.
@@ -92,15 +92,20 @@ o bacaklarda ters olabileceği anlamına gelir — varsayma, kalibrasyonda
 ## Depo yapısı
 
 ```
-config/robot.yaml         robotun fiziksel tanımı
+config/robot.yaml         robotun fiziksel tanımı (+ simulation: tahminler)
 config/calibration.yaml   servo merkez/yön/limit — calibrate.py üretir
 src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
 src/hexapod_kinematics/   ters/düz kinematik + gövde pozu, saf Python
+src/hexapod_description/  simülasyon modeli (URDF'in girdisi), saf Python
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma
 tools/cad_extract.py      CAD'den geometri türetme
+tools/cad_sim_model.py    CAD'den kütle/atalet/çarpışma (simülasyon)
+tools/cadlib/             CAD araçlarının ortak kütüphanesi
 tests/
+docs/                     PROJE_DEVIR.md, brif, malzeme/ (listeler)
+cad/                      CAD + baskı dosyaları (yerelde, git'te değil)
 ```
 
 `hexapod_driver` ROS 2 paketi olarak derlenir ama **ROS'a bağımlı değildir**.

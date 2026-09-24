@@ -1,7 +1,7 @@
 # Hexapod
 
 Altı bacaklı robotun yazılımı. Projenin tüm bağlamı, kararları ve durumu:
-[PROJE_DEVIR.md](PROJE_DEVIR.md). İlk brif: [hexapod-proje-brifi.md](hexapod-proje-brifi.md).
+[docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md). İlk brif: [docs/hexapod-proje-brifi.md](docs/hexapod-proje-brifi.md).
 
 Hedef mimari, TÜBİTAK Kulüp Geliştirme Desteği başvurusunda tanımlanan yön:
 **ROS 2 + Gazebo**, üzerine pekiştirmeli öğrenme (Stable-Baselines3 / PPO) ile
@@ -37,25 +37,36 @@ pip install pyyaml smbus2 pytest
 
 ```
 config/
-  robot.yaml          # robotun fiziksel tanımı (geometri, kablolama, limitler)
+  robot.yaml          # robotun fiziksel tanımı (geometri, kablolama, limitler, simülasyon)
   calibration.yaml    # servo merkez/yön değerleri — calibrate.py üretir
-src/hexapod_driver/   # ROS 2 (ament_python) paketi, çekirdeği saf Python
-  hexapod_driver/
-    config.py         # robot.yaml yükleyici + eksik alan raporu
-    calibration.py    # calibration.yaml okuma/yazma
-    pca9685.py        # PCA9685 I2C PWM sürücüsü
-    backends.py       # gerçek I2C / dry-run arka uçları
-    servo_bus.py      # eklem adı -> kart/kanal -> darbe
-src/hexapod_kinematics/  # ters/düz kinematik + gövde pozu, saf Python
-  hexapod_kinematics/
-    leg.py            # tek bacak IK/FK, sıfır duruşu ve yön tanımları
-    body.py           # altı bacak, gövde çerçevesi, gövde pozu
-tools/
+src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
+  hexapod_driver/     # servo sürücü katmanı
+    config.py         #   robot.yaml yükleyici + eksik alan raporu
+    calibration.py    #   calibration.yaml okuma/yazma
+    pca9685.py        #   PCA9685 I2C PWM sürücüsü
+    backends.py       #   gerçek I2C / dry-run arka uçları
+    servo_bus.py      #   eklem adı -> kart/kanal -> darbe
+  hexapod_kinematics/ # ters/düz kinematik + gövde pozu
+    leg.py            #   tek bacak IK/FK, sıfır duruşu ve yön tanımları
+    body.py           #   altı bacak, gövde çerçevesi, gövde pozu
+  hexapod_description/  # simülasyon modeli (URDF'in girdisi)
+    model.py          #   kütle/atalet/çarpışma/limitler, SI birimlerinde
+    meshes.yaml       #   görsel mesh yerleşimi (cad_sim_model.py üretir)
+tools/                # komut satırı araçları
   map_channels.py     # hangi servo hangi kanalda — servoları kıpırdatıp sorar
   calibrate.py        # etkileşimli servo kalibrasyon aracı
   hwcheck.py          # I2C tarama + robot.yaml karşılaştırma
   cad_extract.py      # CAD'den geometri türetme (sayıların kaynağı)
+  cad_sim_model.py    # CAD'den kütle, atalet, çarpışma kutuları
+  cadlib/             # iki CAD aracının ortak kütüphanesi (STEP, STL, çerçeveler)
 tests/
+docs/
+  PROJE_DEVIR.md      # projenin bütün bağlamı, kararlar, dersler
+  hexapod-proje-brifi.md
+  malzeme/            # malzeme listeleri (güvenilmez; faturalar esas)
+cad/                  # CAD ve baskı dosyaları — git'te DEĞİL, yerelde durur
+  Hexapod/            #   STEP/STL (Printables 606030); yalnız lisans PDF'i git'te
+  Baskı Dosyaları/    #   basılan STL'ler
 ```
 
 `hexapod_driver` bir ROS 2 paketi olarak derlenir, ama ROS'a **bağımlı değildir**.
@@ -115,7 +126,7 @@ python tools/cad_extract.py
 
 `robot.yaml`'daki coxa=50, femur=80, tibia=126.6, yarıçap=100 değerlerinin
 STEP assembly'si ve basılan STL'lerden türetilmesini yeniden çalıştırır.
-CAD dosyaları depoda yok (344 MB); depo kökündeki `Hexapod/` klasörüne yerel olarak konmalı. Kendi tutarlılık
+CAD dosyaları depoda yok (344 MB); yerelde `cad/Hexapod/` klasörüne konmalı. Kendi tutarlılık
 kontrolünü yapar (altı bacak da aynı yarıçapta çıkmalı).
 
 ## Testler
@@ -173,7 +184,7 @@ Doğruluk kalibrasyondan gelir. Robot yürürken tutarlı bir sapma görülürse
 - Donanım envanterinin tek güvenilir kaynağı faturalardır. Faturalar kişisel
   veri (TCKN, adres) içerdiği için depoda değil; `.gitignore` bütün PDF'leri
   ve ekran görüntülerini dışarıda tutuyor. İki malzeme listesi
-  (`gömülü malzemeler listesi.txt` ve `... (alternatif).txt`) birbiriyle ve
+  (`docs/malzeme/gömülü malzemeler listesi.txt` ve `... (alternatif).txt`) birbiriyle ve
   faturalarla çelişiyor (PCA9685 sayısı, VL53L0X sayısı, batarya kapasitesi).
 
 ## Çalışma ortamı

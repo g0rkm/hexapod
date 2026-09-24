@@ -102,7 +102,7 @@ Pi 4 yalnızca eğitilmiş politikayı çalıştırır.
 simülasyonda geliştiriliyor. Kablolama ve kalibrasyon yazılımın önünde
 engel değil; robotu kuran kişi tarafından yapılıp config'e girilecek.
 
-**Asıl brif:** `hexapod-proje-brifi.md`. Başlangıç belgesi. Şu kısımları
+**Asıl brif:** `docs/hexapod-proje-brifi.md`. Başlangıç belgesi. Şu kısımları
 artık geçersiz ya da güncellendi:
 - Mimari: brifteki düz, katmanlı Python yığını yerine **ROS 2 + Gazebo +
   RL** (TÜBİTAK başvurusu esas alındı). Katman sırası yine geçerli.
@@ -160,7 +160,7 @@ Mil dişlisi **25 diş** (diş başına 14.4°).
 
 ### 4.2 Malzeme listeleri güvenilmez
 
-Depoda iki malzeme listesi var ve **ikisi de hatalı**:
+Depoda (`docs/malzeme/`) iki malzeme listesi var ve **ikisi de hatalı**:
 - `gömülü malzemeler listesi.txt`: faturalara daha yakın (VL53L0X, 300W
   buck) ama PCA9685'i **1**, VL53L0X'i **2**, bataryayı **2200 mAh**
   gösteriyor. Doğrusu 2, 3 ve 2800 mAh.
@@ -173,9 +173,9 @@ Depoda iki malzeme listesi var ve **ikisi de hatalı**:
 
 ### 4.3 CAD donör bir tasarım
 
-`Hexapod/` ve `Baskı Dosyaları/` altındaki her şey **Sir Kuhnhero, "3D
+`cad/Hexapod/` ve `cad/Baskı Dosyaları/` altındaki her şey **Sir Kuhnhero, "3D
 Printed Hexapod", Printables model 606030, CC BY-SA 4.0** tasarımından.
-Lisans ve atıf belgesi: `Hexapod/606030-*.pdf` (depodaki tek PDF).
+Lisans ve atıf belgesi: `cad/Hexapod/606030-*.pdf` (depodaki tek PDF).
 
 - **Mekanik geometri geçerli**, robot bu parçalarla basıldı.
 - **Elektronik geçerli DEĞİL.** Donör tasarım STM32 BluePill + 4×18650
@@ -238,7 +238,7 @@ yarıçapta (`body-v35.step`).
 
 - STEP assembly ağacı çözüldü (`NEXT_ASSEMBLY_USAGE_OCCURRENCE` +
   `ITEM_DEFINED_TRANSFORMATION`); her parçanın montaj çerçevesindeki
-  konumu hesaplandı (`tools/stepasm.py`).
+  konumu hesaplandı (`tools/cadlib/assembly.py`).
 - Her eklemin dönme ekseni = o eklemin **servo horn'u ile karşısındaki
   bushing'i birleştiren doğru**. Bacak yerel çerçevesinde (`leg-v2-v20.step`;
   +Y yukarı, bacak −Z yönünde dışarı uzanıyor):
@@ -370,12 +370,14 @@ Her katman altındakine bağımlı, üstündekinden habersiz.
 
 ```
 hexapod/
-├── PROJE_DEVIR.md          bu belge
 ├── CLAUDE.md               kısa özet + kurallar (Claude Code otomatik okur)
 ├── README.md               insanlar için genel bakış
-├── hexapod-proje-brifi.md  ilk brif (bir kısmı geçersiz, bkz. §2)
+├── docs/
+│   ├── PROJE_DEVIR.md      bu belge
+│   ├── hexapod-proje-brifi.md  ilk brif (bir kısmı geçersiz, bkz. §2)
+│   └── malzeme/            Malzeme Listesi.txt, gömülü malzemeler listesi*.txt (güvenilmez, §4.2)
 ├── config/
-│   ├── robot.yaml          robotun fiziksel tanımı (geometri, kablolama, limitler)
+│   ├── robot.yaml          robotun fiziksel tanımı (geometri, kablolama, limitler, simulation)
 │   └── calibration.yaml    (henüz yok) calibrate.py üretecek; GİT'TE TUTULMALI
 ├── src/
 │   ├── hexapod_driver/     servo sürücü katmanı (ament_python)
@@ -386,28 +388,41 @@ hexapod/
 │   │       ├── backends.py     SMBusBackend (smbus2) ve DryRunBackend
 │   │       ├── servo_bus.py    eklem adı -> kart/kanal -> darbe
 │   │       └── errors.py       HexapodError, ConfigError, MissingValue, LimitError, BackendError
-│   └── hexapod_kinematics/ ters/düz kinematik + gövde pozu (ament_python)
-│       └── hexapod_kinematics/
-│           ├── leg.py      tek bacak IK/FK, sıfır duruşu ve yön tanımları
-│           ├── body.py     altı bacak, gövde çerçevesi, BodyPose
-│           └── errors.py   ReachError
-├── tools/
+│   ├── hexapod_kinematics/ ters/düz kinematik + gövde pozu (ament_python)
+│   │   └── hexapod_kinematics/
+│   │       ├── leg.py      tek bacak IK/FK, sıfır duruşu ve yön tanımları
+│   │       ├── body.py     altı bacak, gövde çerçevesi, BodyPose
+│   │       └── errors.py   ReachError
+│   └── hexapod_description/ simülasyon modeli, URDF'in girdisi (ament_python)
+│       ├── hexapod_description/
+│       │   ├── model.py    RobotModel: kütle/atalet/çarpışma/limit, SI birimleri
+│       │   └── meshes.yaml görsel mesh yerleşimi (cad_sim_model.py üretir)
+│       └── meshes/         STL kopyaları (git'te değil; --copy-meshes)
+├── tools/                  komut satırı araçları
 │   ├── map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 │   ├── calibrate.py        etkileşimli servo kalibrasyonu
 │   ├── hwcheck.py          I2C tarama + robot.yaml karşılaştırma
 │   ├── cad_extract.py      CAD'den geometri türetme
-│   └── stepasm.py          minimal STEP AP214 assembly parser'ı
+│   ├── cad_sim_model.py    CAD'den kütle, atalet, çarpışma kutuları, mesh yerleşimi
+│   └── cadlib/             iki CAD aracının ortak kütüphanesi
+│       ├── step.py         minimal STEP AP214 ayrıştırıcı
+│       ├── assembly.py     montaj ağacı -> Assembly / Occurrence
+│       ├── transform.py    3x4 katı dönüşüm cebiri
+│       ├── mesh.py         STL okuma, Box, MassProps
+│       └── frames.py       CAD <-> IK/gövde çerçeveleri
 ├── tests/
 │   ├── test_servo_layer.py   30 test
 │   ├── test_kinematics.py    17 test
-│   └── test_map_channels.py   9 test
+│   ├── test_map_channels.py   9 test
+│   └── test_description.py    7 test
 ├── conftest.py             src/ paketlerini sys.path'e ekler (ROS'suz test için)
 ├── pytest.ini, .gitignore, .gitattributes
-├── Malzeme Listesi.txt, gömülü malzemeler listesi*.txt
-└── Hexapod/606030-*.pdf    Printables lisans/atıf belgesi (depodaki tek PDF)
+└── cad/                    CAD ve baskı dosyaları (yerelde; git'te yalnız lisans PDF'i)
+    ├── Hexapod/            STEP/3MF/F3Z/STL + 606030-*.pdf (Printables lisans/atıf)
+    └── Baskı Dosyaları/    basılan STL'ler
 
-Yerelde durup git'e GİRMEYENLER: Hexapod/ altındaki STEP/3MF/F3Z/STL,
-Baskı Dosyaları/ (STL'ler), faturalar, ekran görüntüleri.
+Yerelde durup git'e GİRMEYENLER: cad/ altındaki STEP/3MF/F3Z/STL,
+faturalar, ekran görüntüleri.
 ```
 
 ### 7.4 `hexapod_driver`
@@ -502,9 +517,9 @@ VL53L0X 0x29, BMP280 0x76/0x77, PCA9685 0x40–0x7F; 0x70 ALLCALL olarak
 etiketlenir), robot.yaml ile karşılaştırır, adres önerir. İki kart aynı
 adresteyse A0'ın lehimlenmesini söyler.
 
-### `cad_extract.py` + `stepasm.py` — geometri türetme
-`--leg-only`, `--body-only`, `--verbose`. CAD'i `Hexapod/` (ya da eski
-`Kerem Baltacı/Hexapod/`) altında arar. Çıktı: coxa 50.000, femur
+### `cad_extract.py` — geometri türetme
+`--leg-only`, `--body-only`, `--verbose`. CAD'i `cad/Hexapod/` (ya da eski
+`Hexapod/`, `Kerem Baltacı/Hexapod/`) altında arar. Çıktı: coxa 50.000, femur
 80.000, tibia 126.635 mm, altı bacakta coxa yarıçapı 100.0; iki
 tutarlılık kontrolü. Tam montaj çözümlemesi (85 MB STEP) birkaç dakika
 sürer.
@@ -555,11 +570,11 @@ sürer.
   fork/cache/indeks yüzünden geri alınamaz.
 - `.gitignore` bunu **klasör adından bağımsız** koruyor: bütün `*.pdf`,
   `Ekran görüntüsü*`, `Screenshot*`, `yavuz selim/` dışarıda. Tek istisna
-  `!Hexapod/606030-3d-printed-hexapod-*.pdf`. **Bu kuralı gevşetme.**
+  `!cad/Hexapod/606030-3d-printed-hexapod-*.pdf`. **Bu kuralı gevşetme.**
   Paylaşılabilir bir PDF eklenecekse açık bir `!` istisnası yaz ve önce
   içinde kişisel veri olmadığından emin ol.
 - **CAD binary'leri** (`*.step`, `*.f3z`, `*.3mf`, `*.stl`, toplam 344 MB)
-  git'te değil; yerelde `Hexapod/` ve `Baskı Dosyaları/` altında. Yoksa
+  git'te değil; yerelde `cad/Hexapod/` ve `cad/Baskı Dosyaları/` altında. Yoksa
   Printables 606030'dan indirilebilir.
 - **`config/calibration.yaml` git'te TUTULMALI** (brifteki risk:
   kalibrasyon kayıt altına alınmazsa her seferinde sıfırdan başlanır).
@@ -682,7 +697,7 @@ yazacaktı. Önerilen yaklaşım:
      0'da tibia dümdüz aşağı) → ayak ucu tibia linkinde (0, 0, −126.6).
    - Bacak montajı: (100·cos φ, 100·sin φ, −10.05), yaw = φ (§5.5 gövde
      azimutları).
-3. **Görsel mesh:** `Hexapod/leg/*.stl` ve `Hexapod/body/*.stl`
+3. **Görsel mesh:** `cad/Hexapod/leg/*.stl` ve `cad/Hexapod/body/*.stl`
    (mm → `scale="0.001 0.001 0.001"`). STL'ler parçanın kendi çerçevesinde;
    STEP'teki montaj dönüşümleri `tools/cad_extract.py`'deki
    `occurrences()` ile alınabilir. Çarpışma için basit geometri (silindir,
@@ -762,7 +777,7 @@ servo karşılaştırması (25 kg·cm). **DS3225 alınmadı**, robot MG996R ile.
    python -m pytest -q
    ```
    56 test geçmeli.
-3. CAD yerelde var mı bak: `Hexapod/leg/leg-v2-v20.step`. Yoksa ve
+3. CAD yerelde var mı bak: `cad/Hexapod/leg/leg-v2-v20.step`. Yoksa ve
    gerekiyorsa kullanıcıdan istemek yerine Printables 606030'dan
    indirilebileceğini söyle (yine de indirme işlemi için izin al).
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının olabilir;

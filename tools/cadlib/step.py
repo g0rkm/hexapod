@@ -1,6 +1,12 @@
-# -*- coding: utf-8 -*-
-"""Minimal STEP AP214 assembly parser: product tree with resolved placements."""
-import re, math
+"""Minimal STEP AP214 ayrıştırıcı: yalnızca montaj ağacı için gereken varlıklar.
+
+Tam bir STEP okuyucu değil. Metni satır satır okuyup montaj ağacını
+(PRODUCT, NEXT_ASSEMBLY_USAGE_OCCURRENCE, ...) ve yerleşim eksenlerini
+(AXIS2_PLACEMENT_3D) çeker; geometriye (B-spline yüzeyler) bakmaz.
+Montaj çözümü assembly.py'de.
+"""
+
+import re
 
 WANT = ('PRODUCT(', 'PRODUCT_DEFINITION(', 'PRODUCT_DEFINITION_FORMATION',
         'PRODUCT_DEFINITION_SHAPE(', 'NEXT_ASSEMBLY_USAGE_OCCURRENCE(',
@@ -84,66 +90,3 @@ def split_top(arg):
 def name_of(arg):
     m = re.search(r"'((?:[^']|'')*)'", arg)
     return m.group(1) if m else ''
-
-
-# ---- linear algebra (3x4 matrices as tuple of 3 rows of 4) ----
-
-def mat_from_axis(loc, zdir, xdir):
-    if zdir is None:
-        zdir = (0.0, 0.0, 1.0)
-    if xdir is None:
-        xdir = (1.0, 0.0, 0.0)
-    z = _norm(zdir)
-    x = _norm(_sub(xdir, _scale(z, _dot(xdir, z))))
-    y = _cross(z, x)
-    return ((x[0], y[0], z[0], loc[0]),
-            (x[1], y[1], z[1], loc[1]),
-            (x[2], y[2], z[2], loc[2]))
-
-
-def mat_mul(a, b):
-    out = []
-    for i in range(3):
-        row = []
-        for j in range(3):
-            row.append(sum(a[i][k] * b[k][j] for k in range(3)))
-        row.append(sum(a[i][k] * b[k][3] for k in range(3)) + a[i][3])
-        out.append(tuple(row))
-    return tuple(out)
-
-
-def mat_inv(a):
-    out = []
-    for i in range(3):
-        row = [a[0][i], a[1][i], a[2][i]]
-        row.append(-(a[0][i] * a[0][3] + a[1][i] * a[1][3] + a[2][i] * a[2][3]))
-        out.append(tuple(row))
-    return tuple(out)
-
-
-def apply(m, p):
-    return tuple(m[i][0] * p[0] + m[i][1] * p[1] + m[i][2] * p[2] + m[i][3] for i in range(3))
-
-
-IDENT = ((1.0, 0, 0, 0), (0, 1.0, 0, 0), (0, 0, 1.0, 0))
-
-
-def _sub(a, b):
-    return tuple(a[i] - b[i] for i in range(3))
-
-
-def _dot(a, b):
-    return sum(a[i] * b[i] for i in range(3))
-
-
-def _cross(a, b):
-    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
-
-
-def _scale(a, s):
-    return tuple(v * s for v in a)
-
-
-def _norm(a):
-    n = math.sqrt(_dot(a, a)) or 1.0
-    return tuple(v / n for v in a)
