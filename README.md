@@ -173,7 +173,17 @@ Doğruluk kalibrasyondan gelir. Robot yürürken tutarlı bir sapma görülürse
   İki adet "gömülü malzemeler listesi.txt" birbiriyle ve faturalarla çelişiyor
   (PCA9685 sayısı, VL53L0X sayısı, batarya kapasitesi).
 
-## Varsayım — doğrulanmalı
+## Çalışma ortamı
 
-ROS 2 dağıtımı olarak **Jazzy** (Ubuntu 24.04, arm64) varsayıldı. `package.xml`
-buna göre. Farklı bir dağıtım kullanılacaksa söyleyin, bağımlılıklar değişir.
+| | Nerede | Sistem |
+|---|---|---|
+| Geliştirme + simülasyon + RL eğitimi | PC, WSL2 | Ubuntu 26.04 |
+| Robot | Raspberry Pi 4 | Ubuntu Server 26.04 (arm64) |
+
+ROS 2 dağıtımı: **Lyrical Luth** (LTS, Mayıs 2031'e kadar destekli), Ubuntu
+26.04'ün birincil ROS 2 sürümü. Simülatör: **Gazebo Jetty**,
+`ros-lyrical-desktop` ile birlikte geliyor. PC'de ve robotta aynı sistemin
+çalışması simülasyondan robota geçişi kolaylaştırıyor.
+
+(İlk taslakta Jazzy / Ubuntu 24.04 varsayılmıştı. Geliştirme bilgisayarındaki
+WSL'de Ubuntu 26.04 kurulu olduğu için Lyrical'a geçildi.)
