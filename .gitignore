@@ -1,15 +1,26 @@
 # =============================================================================
 # Faturalar ve ekran görüntüleri — KİŞİSEL VERİ, DEPOYA ALINMAZ
 # =============================================================================
-# yavuz selim/ altındaki fatura PDF'leri TCKN, ev adresi, telefon numarası ve
-# e-posta içeriyor. Bunlar üçüncü kişilerin kimlik bilgileri; herkese açık bir
-# depoya konulamaz ve GitHub'a bir kez gidince geri alınması pratikte mümkün
-# değildir (fork, cache, indeks).
+# Fatura PDF'leri TCKN, ev adresi, telefon numarası ve e-posta içeriyor.
+# Bunlar üçüncü kişilerin kimlik bilgileri; herkese açık bir depoya konulamaz
+# ve GitHub'a bir kez gidince geri alınması pratikte mümkün değildir (fork,
+# cache, indeks).
 #
-# Faturalardan çıkan donanım envanteri bilgisi CLAUDE.md ve config/robot.yaml
-# içinde zaten özetlendi; ham belgelere ihtiyaç yok.
-yavuz selim/*
-!yavuz selim/gömülü malzemeler listesi.txt
+# Koruma bilerek KLASÖR ADINA BAĞLI DEĞİL. Faturalar eskiden "yavuz selim/"
+# altındaydı; klasörler düzleştirilince o kural boşa düştü. Faturalar depo
+# içinde nereye kopyalanırsa kopyalansın git'e girmesin diye bütün PDF'ler
+# ve ekran görüntüleri varsayılan olarak dışarıda.
+#
+# Paylaşılabilir bir PDF (ör. veri sayfası) eklemek gerekirse aşağıya "!"
+# ile açık bir istisna yazın — önce içinde kişisel veri olmadığından emin olun.
+#
+# Faturalardan çıkan donanım envanteri CLAUDE.md ve config/robot.yaml içinde
+# zaten özetlendi; ham belgelere ihtiyaç yok.
+*.pdf
+!Hexapod/606030-3d-printed-hexapod-*.pdf
+Ekran görüntüsü*
+Screenshot*
+yavuz selim/
 
 # =============================================================================
 # CAD dosyaları — boyut nedeniyle depoya alınmaz
@@ -20,8 +31,8 @@ yavuz selim/*
 # Kaynağı zaten üçüncü taraf bir tasarım: Sir Kuhnhero, "3D Printed Hexapod",
 # Printables model 606030, CC BY-SA 4.0 — oradan indirilebilir.
 #
-# tools/cad_extract.py çalıştırılacaksa CAD'i yerel olarak "Kerem Baltacı/"
-# altına yerleştirmek yeterli; araç dosyaları orada arar.
+# tools/cad_extract.py çalıştırılacaksa CAD'i yerel olarak depo kökündeki
+# "Hexapod/" klasörüne yerleştirmek yeterli; araç dosyaları orada arar.
 *.step
 *.f3z
 *.3mf
