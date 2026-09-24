@@ -46,7 +46,7 @@ Donanım hakkında çelişki çıkarsa sıra şu:
    ve adres içeriyor. `.gitignore` bütün PDF'leri ve ekran görüntülerini
    klasörden bağımsız olarak dışarıda tutuyor; bu kuralı gevşetme.
 2. **CAD** (`cad/Hexapod/`, `cad/Baskı Dosyaları/`) — yalnızca mekanik geometri.
-   Binary'ler depoda değil (344 MB), yerelde durur.
+   2026-09-24'ten beri depoda (345 MB; depo gizli, kullanıcının kararı).
 3. Malzeme listesi txt'leri (`docs/malzeme/`) — **güvenilmez**, ikisi birbiriyle çelişiyor:
    `gömülü malzemeler listesi.txt` (faturalara daha yakın) ve
    `gömülü malzemeler listesi (alternatif).txt` (TF-Luna, LM2596 —
@@ -103,10 +103,13 @@ tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma
 tools/cad_extract.py      CAD'den geometri türetme
 tools/cad_sim_model.py    CAD'den kütle/atalet/çarpışma (simülasyon)
+tools/make_urdf.py        robot.yaml -> URDF (ROS'suz)
+tools/preview_urdf.py     URDF'i PNG'ye çizer (ROS'suz önizleme)
+tools/wsl/ros_kurulum.sh  WSL'e ROS 2 Lyrical + Gazebo kurulumu
 tools/cadlib/             CAD araçlarının ortak kütüphanesi
 tests/
 docs/                     PROJE_DEVIR.md, brif, malzeme/ (listeler)
-cad/                      CAD + baskı dosyaları (yerelde, git'te değil)
+cad/                      CAD + baskı dosyaları (depoda)
 ```
 
 `hexapod_driver` ROS 2 paketi olarak derlenir ama **ROS'a bağımlı değildir**.
@@ -171,14 +174,16 @@ Kullanıcının hedefi (2026-09-24): **otonom** bir hexapod. ROS 2 + Gazebo
 simülasyonunda geliştirilip Raspberry Pi 4'e aktarılacak; farklı zemin ve
 zorluklarda kendi çözümünü üreten (RL ile öğrenilmiş) bir sistem.
 
-Önce yazılım, sonra donanım. Kullanıcı robotu kendisi kurmadı; kablolama
-ve kalibrasyon robotu kuran kişiye kalıyor. Yazılım CAD geometrisiyle
-simülasyonda ilerler; donanım bilgileri config'e sonradan girilir.
+Önce yazılım, sonra donanım. Yazılım görevleri Görkem (G) ve Samet (S)
+arasında bölüşüldü; donanım işleri **durduruldu**, ayrı bir vardiyada
+(D1–D12) yapılacak — bkz. GOREVLER.md. Görkem robotu kurmadı; ondan
+donanım işi isteme. Yazılım CAD geometrisiyle simülasyonda ilerler;
+donanım bilgileri config'e sonradan girilir.
 
 1. ✅ Servo sürücü katmanı, kalibrasyon ve kanal haritası araçları
 2. ✅ Ters/düz kinematik + gövde pozu (`hexapod_kinematics`)
-3. 🔄 URDF modeli — veri katmanı (`hexapod_description`, `simulation`) bitti,
-   XML üreticisi sıradaki
+3. 🔄 URDF modeli — üretici ve FK = IK testi bitti; RViz kontrolü ROS
+   kurulumunu bekliyor (`tools/wsl/ros_kurulum.sh`)
 4. Gazebo dünyası + ROS 2 kontrol arayüzü
 5. Klasik yürüyüş (tripod) — RL için referans ve yedek
 6. RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminlerle

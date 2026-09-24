@@ -1,231 +1,249 @@
 # Görev Dağılımı
 
-İki kişi, iki hat:
+İş iki bölüm:
 
-- **Görkem** — yazılım ve simülasyon (Claude ile). Robotu kendisi kurmadı; donanım işi almaz.
-- **Samet** — robotun başında yapılan her şey: kablolama, Pi kurulumu, kalibrasyon, tartım, sensörler, gerçek robotta denemeler.
-
-> [!NOTE]
-> Samet'in donanım tarafını üstlendiği varsayıldı (robotu kuran kişi olarak). Değilse görevlerin
-> sahibini bu dosyada değiştirin; bağımlılıklar aynı kalır.
+1. **Yazılım aşaması — ŞİMDİ.** Görkem ve Samet'e bölüşüldü. Her şey CAD geometrisiyle simülasyonda ilerler; robota dokunulmaz.
+2. **Donanım vardiyası — ⏸ DURDURULDU.** Kablolama, kalibrasyon, tartım ve gerçek robotta denemeler. Yazılım aşaması belli bir noktaya gelince ayrı bir vardiya olarak topluca yapılır (başlama şartı [aşağıda](#donanım-vardiyası--durduruldu)).
 
 Proje bağlamı: [docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md). Kurulum ve araçlar: [README.md](README.md).
 
+> [!NOTE]
+> 2026-09-24'te yeniden düzenlendi. İlk dağılımdaki (commit `a2348a7`) numaralar geçersiz: o planda Samet donanıma ayrılmıştı, artık yazılım görevleri alıyor.
+
 ## Nasıl okunur
 
-- **Kimlik:** `G3` Görkem'in 3. görevi, `S5` Samet'in 5. görevi. Commit mesajlarında ve konuşurken bu kimlikler kullanılır.
+- **Kimlik:** `G` Görkem'in, `S` Samet'in yazılım görevleri; `D` donanım vardiyası. Örnek: `S3` Samet'in 3. görevi. Commit mesajlarında ve konuşurken bu kimlikler kullanılır.
 - **Bekler:** başlamadan önce bitmiş olması gereken görevler. Bunlar bitmeden başlanırsa iş ya yapılamaz ya da tekrar yapılır.
 - **Açar:** bu görev bitince başlayabilecek görevler.
 - **Bitti sayılır:** görevin kapanma şartı. Şart sağlanmadan ✅ konmaz.
-- **Durum:** ✅ bitti · 🔄 sürüyor · ⬜ başlayabilir · ⏸ bekliyor (bir bağımlılık bitmedi)
+- **Durum:** ✅ bitti · 🔄 sürüyor · ⬜ başlayabilir · ⏸ bekliyor (bir bağımlılık bitmedi ya da durduruldu)
 
-Bir görevi bitiren kişi: durumunu ✅ yapar, "Açar" satırındaki görevlerin sahiplerine haber verir.
+Bir görevi bitiren kişi durumunu ✅ yapar ve "Açar" satırındaki görevlerin sahiplerine haber verir.
 
-## Bağımlılık grafiği
+---
+
+## Yazılım aşaması (şimdi)
+
+### Bağımlılık grafiği
 
 ```mermaid
 flowchart LR
     classDef gorkem fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a
     classDef samet fill:#fef3c7,stroke:#b45309,color:#78350f
     classDef done fill:#dcfce7,stroke:#15803d,color:#14532d
+    classDef paused fill:#f3f4f6,stroke:#6b7280,color:#374151,stroke-dasharray:4 3
 
     G1[G1 Servo katmanı + araçlar]:::done
     G2[G2 Ters kinematik]:::done
     G3[G3 URDF modeli]:::gorkem
-    G4[G4 WSL: ROS 2 + Gazebo]:::gorkem
-    G5[G5 Gazebo + ROS 2 kontrol]:::gorkem
-    G6[G6 Tripod yürüyüş sim]:::gorkem
-    G7[G7 Kablolamayı config'e işle]:::gorkem
-    G8[G8 ROS 2 sürücü düğümü]:::gorkem
-    G9[G9 RL ortamı]:::gorkem
-    G10[G10 PPO eğitimi]:::gorkem
-    G11[G11 Pi'ye aktarma]:::gorkem
+    G4[G4 ROS 2 + Gazebo kurulumu]:::gorkem
+    G5[G5 Gazebo dünyası + eklem arayüzü]:::gorkem
+    G6[G6 RL ortamı]:::gorkem
+    G7[G7 PPO eğitimi]:::gorkem
+    G8[G8 Politika düğümü]:::gorkem
 
-    S1[S1 Etiket + A0 lehimi]:::samet
-    S2[S2 Kablolama + güç]:::samet
-    S3[S3 Pi kurulumu + hwcheck]:::samet
-    S4[S4 Kanal haritası]:::samet
-    S5[S5 Kalibrasyon]:::samet
-    S6[S6 Tartım]:::samet
-    S7[S7 Sensör montaj bilgisi]:::samet
-    S8[S8 Sensör sürücüleri]:::samet
-    S9[S9 Gerçek robotta tripod]:::samet
-    S10[S10 Saha denemesi]:::samet
+    S1[S1 Geliştirme ortamı]:::samet
+    S2[S2 Tripod çekirdeği]:::samet
+    S3[S3 Tripod simülasyonda]:::samet
+    S4[S4 Gerçek sürücü düğümü]:::samet
+    S5[S5 Zemin üreteci]:::samet
+    S6[S6 Ölçüm aracı]:::samet
+    S7[S7 Sensör sürücüleri]:::samet
 
-    G1 --> S3
-    G1 --> G7
+    D[Donanım vardiyası]:::paused
+
     G2 --> G3
+    G4 -.->|RViz kontrolü| G3
     G3 --> G5
     G4 --> G5
-    G5 --> G6
-    G5 --> G8
-    G5 --> G9
-    G6 --> G9
-    G9 --> G10
-    G10 --> G11
-    G8 --> G11
+    G2 --> S2
 
-    S1 --> S2 --> S3
+    G5 --> S3
+    G5 --> S4
+    G5 --> S5
+    S1 --> S3
     S1 --> S4
-    S3 --> S4
-    S2 --> S6
-    S3 --> S7 --> S8
+    S1 --> S5
+    S2 --> S3
 
-    S3 --> G7
-    S4 --> G7
-    G7 --> S5
-    S5 --> G10
-    S6 --> G10
-    S3 --> G11
-    S8 --> G11
-    S5 --> S9
-    G6 --> S9
-    G8 --> S9
-    G11 --> S10
+    S3 --> G6
+    G5 --> G6
+    G6 --> G7
+    S5 --> G7
+    S6 --> G7
+    S3 --> S6
+    S5 --> S6
+    G7 --> G8
+    S4 --> G8
+
+    S3 -.-> D
+    S4 -.-> D
+    S7 -.-> D
+    G8 -.-> D
 ```
 
-Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter, sonra şu başlar" demek.
+Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter, sonra şu başlar" demek. Gri kesikli kutu durdurulmuş donanım vardiyası.
 
-## Özet
+### Özet
 
 | Kimlik | Görev | Sahip | Bekler | Açar | Durum |
 |---|---|---|---|---|---|
-| G1 | Servo sürücü katmanı, kalibrasyon ve kanal haritası araçları | Görkem | — | G7, S3 | ✅ |
-| G2 | Ters/düz kinematik + gövde pozu | Görkem | — | G3 | ✅ |
-| G3 | URDF modeli | Görkem | G2 | G5 | 🔄 |
-| G4 | WSL'e ROS 2 Lyrical + Gazebo Jetty kurulumu | Görkem | — | G5 | ⬜ |
-| G5 | Gazebo dünyası + ROS 2 kontrol arayüzü + sanal sensörler | Görkem | G3, G4 | G6, G8, G9 | ⏸ |
-| G6 | Tripod yürüyüş, simülasyonda | Görkem | G5 | G9, S9 | ⏸ |
-| G7 | Kablolama sonuçlarını `robot.yaml`'a işle | Görkem | S3, S4 | S5 | ⏸ |
-| G8 | ROS 2 sürücü düğümü (gerçek servolar) | Görkem | G5 | S9, G11 | ⏸ |
-| G9 | RL ortamı (Gymnasium) | Görkem | G5, G6 | G10 | ⏸ |
-| G10 | PPO eğitimi + alan rastgeleleştirme | Görkem | G9, S5, S6 | G11 | ⏸ |
-| G11 | Pi 4'e aktarma: politika + düğümler | Görkem | G10, G8, S3, S8 | S10 | ⏸ |
-| S1 | "ÖN" bandı + bacak numaraları + A0 lehimi | Samet | — | S2, S4 | ⬜ |
-| S2 | Kablolama ve güç hattı | Samet | S1 | S3, S6 | ⏸ |
-| S3 | Pi kurulumu + `hwcheck.py` | Samet | S2 | S4, S7, G7, G11 | ⏸ |
-| S4 | Kanal haritası (`map_channels.py`) | Samet | S1, S3 | G7 | ⏸ |
-| S5 | 18 eklemin kalibrasyonu (`calibrate.py`) | Samet | G7 | G10, S9 | ⏸ |
-| S6 | Tartım ve elektronik envanteri | Samet | S2 | G10 | ⏸ |
-| S7 | Sensör montaj bilgisi (IMU, 3× VL53L0X) | Samet | S3 | S8 | ⏸ |
-| S8 | Sensör sürücüleri (saf Python, testli) | Samet | S7 | G11 | ⏸ |
-| S9 | Gerçek robotta tripod yürüyüş | Samet | S5, G6, G8 | — | ⏸ |
-| S10 | Saha denemesi: farklı zeminler | Samet | G11 | — | ⏸ |
+| G1 | Servo sürücü katmanı, kalibrasyon ve kanal haritası araçları | Görkem | — | (vardiya) | ✅ |
+| G2 | Ters/düz kinematik + gövde pozu | Görkem | — | G3, S2 | ✅ |
+| G3 | URDF modeli | Görkem | G2 (son kontrol: G4) | G5 | 🔄 |
+| G4 | ROS 2 Lyrical + Gazebo kurulumu (Görkem'in PC'si) | Görkem | — | G3, G5 | 🔄 |
+| G5 | Gazebo dünyası + eklem komut arayüzü + sanal sensörler | Görkem | G3, G4 | S3, S4, S5, G6 | ⏸ |
+| G6 | RL ortamı (Gymnasium) | Görkem | G5, S3 | G7 | ⏸ |
+| G7 | PPO eğitimi + alan rastgeleleştirme | Görkem | G6, S5, S6 | G8 | ⏸ |
+| G8 | Politika çalıştırma düğümü (ROS 2) | Görkem | G7, S4 | (vardiya) | ⏸ |
+| S1 | Geliştirme ortamı (ROS 2 + Gazebo, depo, testler) | Samet | — | S3, S4, S5 | ⬜ |
+| S2 | Tripod yürüyüş çekirdeği (saf Python) | Samet | G2 ✅ | S3 | ⬜ |
+| S3 | Tripod yürüyüş simülasyonda | Samet | S1, S2, G5 | G6, S6, (vardiya) | ⏸ |
+| S4 | Gerçek robot sürücü düğümü (ROS 2, dry-run) | Samet | S1, G5 | G8, (vardiya) | ⏸ |
+| S5 | Zemin / dünya üreteci | Samet | S1, G5 | G7, S6 | ⏸ |
+| S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3, S5 | G7 | ⏸ |
+| S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
 
-**Şu an başlanabilecekler:** Görkem → G3 (sürüyor), G4. Samet → S1.
+**Şu an başlanabilecekler:**
+- **Görkem:** G4 (kurulum betiğini çalıştırmak), ardından G3'ün son kontrolü ve G5.
+- **Samet:** S1, S2, S7. Üçü de Görkem'i beklemiyor. S2 ile S7 ROS bile gerektirmiyor.
 
-**Kritik kesişmeler:** iki hat üç yerde birbirini bekler.
-1. **S4 → G7 → S5:** kalibrasyon aracı kablolama `robot.yaml`'a girilmeden başlamaz. Samet kanal haritasını çıkarır, Görkem config'e işler, Samet kalibrasyona geçer. Aradaki iş küçük; beklemeyi kısa tutmak için S4 bitince hemen haber verin.
-2. **S5 + S6 → G10:** RL eğitimi gerçek eklem limitleri ve gerçek kütle olmadan yapılırsa politika simülasyonda robotun gerçekte yapamayacağı hareketleri öğrenir. Şu an simülasyon geçici ±90° limit ve CAD'den 2,13 kg kütle tahmini kullanıyor.
-3. **S3 + S8 → G11:** politika Pi'ye ancak Pi hazır ve gerçek sensörler okunabiliyorken aktarılır.
+**İki kişinin birbirini beklediği yerler:**
+1. **G5 → S3, S4, S5:** Samet'in simülasyon işleri Görkem'in Gazebo dünyasını ve eklem komut arayüzünü bekler. Samet o sırada S2 (tripod çekirdeği) ve S7 (sensör sürücüleri) ile meşgul olur, boşta kalmaz.
+2. **S3 → G6:** RL ortamı, tripod yürüyüşü hem karşılaştırma ölçütü hem de RL'in üstüne öğreneceği temel olarak kullanır.
+3. **S5 + S6 → G7:** PPO eğitimi, Samet'in ürettiği zeminlerde yapılır ve Samet'in ölçüm aracıyla değerlendirilir.
+4. **S4 → G8:** politika düğümü, gerçek sürücüyle aynı arayüzü konuşmalı ki simülasyondan robota geçişte kod değişmesin.
 
-## Görkem'in görevleri
+### Görkem'in görevleri
 
-### G1 — Servo sürücü katmanı ve araçlar ✅
-`hexapod_driver` paketi; `calibrate.py`, `map_channels.py`, `hwcheck.py`, `cad_extract.py`. 56 test.
+#### G1 — Servo sürücü katmanı ve araçlar ✅
+`hexapod_driver` paketi; `calibrate.py`, `map_channels.py`, `hwcheck.py`, `cad_extract.py`.
 
-### G2 — Ters kinematik ✅
+#### G2 — Ters kinematik ✅
 `hexapod_kinematics`: tek bacak IK/FK, altı bacak, gövde pozu. IK ↔ kalibrasyon sözleşmesi [CLAUDE.md](CLAUDE.md)'de.
 
-### G3 — URDF modeli 🔄
-- **Bekler:** G2 · **Açar:** G5
-- Bitenler: CAD'den kütle/atalet/çarpışma verisi (`tools/cad_sim_model.py`, `robot.yaml` → `simulation`), veri katmanı (`hexapod_description.model`).
-- Kalan: `robot.yaml`'dan URDF üreten modül; görsel mesh'ler (`meshes.yaml`); RViz'de görüntüleme.
-- **Bitti sayılır:** URDF'ten hesaplanan ayak konumları `hexapod_kinematics.forward` ile aynı (test); `check_urdf` hatasız; RViz'de robot doğru görünüyor.
+#### G3 — URDF modeli 🔄
+- **Bekler:** G2; son kontrol (RViz, `check_urdf`) için G4 · **Açar:** G5
+- Bitenler:
+  - CAD'den kütle/atalet/çarpışma verisi (`tools/cad_sim_model.py`, `robot.yaml` → `simulation`).
+  - URDF üreticisi (`hexapod_description.urdf`, `python tools/make_urdf.py`); görsel mesh'ler `meshes.yaml`'dan.
+  - Test: URDF zincirindeki ayak konumları IK ile 300 rastgele pozda aynı; eksen yönleri kalibrasyon sözleşmesiyle uyumlu (`tests/test_urdf.py`).
+  - ROS'suz önizleme (`python tools/preview_urdf.py`): parçalar eklemlerde doğru oturuyor.
+  - RViz için `ros2 launch hexapod_description display.launch.py` (yazıldı, ROS kurulunca denenecek).
+- Kalan: ROS kurulunca (G4) paketi derleyip RViz'de açmak ve `check_urdf`.
+- **Bitti sayılır:** RViz'de robot doğru görünüyor, eklem kaydırıcıları bacakları doğru yönde oynatıyor; `check_urdf` hatasız.
 
-### G4 — WSL'e ROS 2 + Gazebo kurulumu ⬜
-- **Bekler:** — · **Açar:** G5
-- Ubuntu 26.04 (WSL2) üzerine ROS 2 Lyrical + Gazebo Jetty (`ros-lyrical-desktop`). Kurulum komutları tek tek verilecek; `sudo` şifresini Görkem kendisi girer.
-- **Bitti sayılır:** `gz sim` açılıyor; `ros2 run demo_nodes_cpp talker` çalışıyor.
+#### G4 — ROS 2 + Gazebo kurulumu 🔄
+- **Bekler:** — · **Açar:** G3, G5
+- WSL2 Ubuntu 26.04'e ROS 2 Lyrical + Gazebo. Hepsini tek betik yapar: WSL terminalinde depo klasöründen `bash tools/wsl/ros_kurulum.sh`. `sudo` şifresini betik bir kez sorar, Görkem kendisi girer.
+- **Bitti sayılır:** betik "KURULUM TAMAM" diyor; `gz sim shapes.sdf` pencere açıyor.
 
-### G5 — Gazebo dünyası + ROS 2 kontrol ⏸
-- **Bekler:** G3, G4 · **Açar:** G6, G8, G9
-- Robot düz zeminde doğar; 18 eklem pozisyon kontrollü (`gz_ros2_control`); IMU ve ayak temas sensörleri ROS 2 konularına yayınlanır. Bu arayüz, G8'deki gerçek sürücüyle aynı olacak şekilde tasarlanır.
-- **Bitti sayılır:** bir komutla robot simülasyonda ayağa kalkıp duruyor; IMU ve temas verisi `ros2 topic echo` ile görülüyor.
+#### G5 — Gazebo dünyası + eklem komut arayüzü ⏸
+- **Bekler:** G3, G4 · **Açar:** S3, S4, S5, G6
+- Robot düz zeminde doğar; 18 eklem pozisyon kontrollü (`gz_ros2_control`); IMU ve ayak temas sensörleri ROS 2 konularına yayınlanır.
+- **Eklem komut arayüzünü bu görev tanımlar:** hangi konu, hangi mesaj, hangi sıra, hangi birim. Samet'in tripod'u (S3), gerçek sürücüsü (S4) ve Görkem'in politika düğümü (G8) aynı arayüzü konuşur; simülasyondan robota geçişte yalnızca karşı taraf değişir. Arayüz bir belge olarak yazılır ve Samet'le birlikte gözden geçirilir.
+- **Bitti sayılır:** tek komutla robot simülasyonda doğup duruyor; eklemler arayüzden komut alıyor; IMU ve temas verisi `ros2 topic echo` ile görülüyor; arayüz belgesi depoda.
 
-### G6 — Tripod yürüyüş (simülasyon) ⏸
-- **Bekler:** G5 · **Açar:** G9, S9
-- `hexapod_gait` paketi, IK üzerinden. RL için hem karşılaştırma ölçütü hem yedek.
-- **Bitti sayılır:** simülasyonda düz zeminde devrilmeden en az 1 dakika ileri yürüyor; hız ve adım parametreleri config'den.
+#### G6 — RL ortamı ⏸
+- **Bekler:** G5, S3 · **Açar:** G7
+- Gymnasium ortamı, ros_gz üzerinden. Gözlem: IMU + eklem açıları + ayak temasları. Eylem: eklem hedefleri ya da tripod parametre düzeltmeleri (S3'ün üstüne). Ödül: ileri hız − enerji − devrilme cezası (TÜBİTAK başvurusundaki tanım).
+- **Bitti sayılır:** rastgele politikayla bir bölüm uçtan uca koşuyor; tripod'un ödülü aynı ortamda ölçülüp kaydedildi.
 
-### G7 — Kablolamayı `robot.yaml`'a işle ⏸
-- **Bekler:** S3 (kart adresleri), S4 (kanal haritası) · **Açar:** S5
-- `map_channels.py` bacakları fiziksel bant numarasıyla (1–6) veriyor; bunlar `robot.yaml`'daki bacak kimliklerine çevrilip `joints[*].driver/channel` ve `drivers[*].address` doldurulur. Eşleme tablosu: PROJE_DEVIR §5.5.
-- **Bitti sayılır:** `python tools/hwcheck.py` ve `calibrate.py --dry-run` kablolama eksiği bildirmiyor; commit atıldı.
+#### G7 — PPO eğitimi ⏸
+- **Bekler:** G6, S5 (zeminler), S6 (ölçüm) · **Açar:** G8
+- Stable-Baselines3 PPO. Alan rastgeleleştirme: zemin, sürtünme, kütle, itme, gecikme. Eğitim şimdilik geçici eklem limitleri (±90°) ve CAD'den 2,13 kg kütle tahminiyle yapılır; gerçek değerlerle yeniden eğitim donanım vardiyasında (D10).
+- **Bitti sayılır:** politika S6'nın ölçümünde tripod'u geçiyor; eğim, engebe ve kaygan zeminde ayrı ayrı ölçüldü.
 
-### G8 — ROS 2 sürücü düğümü ⏸
-- **Bekler:** G5 · **Açar:** S9, G11
-- `hexapod_driver`'ın ROS 2 sarmalayıcısı: eklem komutlarını `ServoBus.set_angle`'a taşır. Çekirdek saf Python kalır. `--dry-run` ile robotsuz yazılır ve test edilir.
-- **Bitti sayılır:** simülasyonla aynı komut arayüzü; dry-run'da 18 eklem doğru kanala doğru darbeyi yazıyor (test).
+#### G8 — Politika çalıştırma düğümü ⏸
+- **Bekler:** G7, S4 · **Açar:** donanım vardiyası (D11)
+- Eğitilmiş politikayı ROS 2 düğümü olarak çalıştırır: sensörleri okur, eklem komutu yayınlar. Önce simülasyonda; Pi 4'te gerçek zamanlı çalışabilecek kadar hafif (CPU, ONNX ya da düz PyTorch; ölçülür).
+- **Bitti sayılır:** simülasyonda politika bu düğümle yürüyor; çıkarım süresi Pi 4 için tahmin edildi.
 
-### G9 — RL ortamı ⏸
-- **Bekler:** G5, G6 · **Açar:** G10
-- Gymnasium ortamı, ros_gz üzerinden. Gözlem: IMU + eklem açıları + ayak temasları. Eylem: eklem hedefleri ya da tripod parametre düzeltmeleri. Ödül: ileri hız − enerji − devrilme cezası (TÜBİTAK başvurusundaki tanım).
-- **Bitti sayılır:** rastgele politikayla bir bölüm uçtan uca koşuyor; tripod yürüyüşün ödülü ölçülüp kaydedildi.
+### Samet'in görevleri
 
-### G10 — PPO eğitimi ⏸
-- **Bekler:** G9, S5 (gerçek limitler), S6 (gerçek kütle) · **Açar:** G11
-- Stable-Baselines3 PPO. Alan rastgeleleştirme: zemin, sürtünme, kütle, itme, gecikme. Senaryolar hangi zorlukları kapsarsa politika onları çözer.
-- **Bitti sayılır:** eğitilmiş politika simülasyonda tripod yürüyüşünü ödülde geçiyor; eğim, engebe ve kaygan zeminde ayrı ayrı ölçüldü.
+#### S1 — Geliştirme ortamı ⬜
+- **Bekler:** — · **Açar:** S3, S4, S5
+- Depoyu klonla; `python -m pytest -q` ile 73 testin geçtiğini gör. ROS 2 + Gazebo: Windows'ta WSL2 + Ubuntu 26.04 kur, sonra `bash tools/wsl/ros_kurulum.sh` (Görkem'in kullandığı betiğin aynısı). Linux'ta aynı betik doğrudan çalışır.
+- **Bitti sayılır:** testler geçiyor; betik "KURULUM TAMAM" diyor.
 
-### G11 — Pi 4'e aktarma ⏸
-- **Bekler:** G10, G8, S3, S8 · **Açar:** S10
-- Politika + ROS 2 düğümleri Pi'de; gerçek IMU ve servolarla kapalı döngü.
-- **Bitti sayılır:** politika Pi'de gerçek zamanlı çalışıyor, robot düz zeminde yürüyor.
+#### S2 — Tripod yürüyüş çekirdeği (saf Python) ⬜
+- **Bekler:** G2 ✅ · **Açar:** S3
+- Yeni paket `hexapod_gait`, `hexapod_driver`/`hexapod_kinematics` gibi ROS'suz çekirdek. Tripod adım döngüsü (iki üçlü grup), destek ve salınım fazında ayak yörüngeleri, hedef gövde hızından (ileri, yan, dönüş) ayak hedeflerine, oradan `HexapodKinematics.inverse` ile eklem açılarına. Hız, adım yüksekliği, adım süresi, duruş genişliği parametre.
+- Dikkat: IK erişilemeyen hedefte `ReachError` fırlatır, kırpmaz; yörünge erişim alanında kalmalı.
+- **Bitti sayılır:** ROS'suz testler geçiyor: bütün yörünge boyunca her ayak erişim alanında; destek fazındaki ayaklar dünyada sabit; bir döngüde gövde hedef mesafeyi alıyor; her an en az üç ayak yerde.
 
-## Samet'in görevleri
+#### S3 — Tripod yürüyüş simülasyonda ⏸
+- **Bekler:** S1, S2, G5 · **Açar:** G6, S6, donanım vardiyası (D9)
+- S2'yi G5'in eklem komut arayüzüne bağlayan ROS 2 düğümü; hız komutu (`geometry_msgs/Twist`) alır.
+- **Bitti sayılır:** Gazebo'da düz zeminde devrilmeden en az 1 dakika ileri yürüyor; yana ve yerinde dönüş çalışıyor.
 
-> Kablo ve güç işlerinde güvenlik notları: [docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md) §4.4. Özellikle: PCA9685'in VCC'si Pi'nin **3.3 V**'una (pin 1), 5 V'a değil. Servolar voltaj düşürücüden **~6 V** ile beslenir (dolu 2S LiPo 8.4 V verir, MG996R en fazla 7.2 V kaldırır).
+#### S4 — Gerçek robot sürücü düğümü ⏸
+- **Bekler:** S1, G5 (arayüz) · **Açar:** G8, donanım vardiyası (D9)
+- `hexapod_driver`'ın ROS 2 sarmalayıcısı: G5'teki eklem komut arayüzünü dinler, `ServoBus.set_angle`'a taşır, eklem durumunu yayınlar. Çekirdek saf Python kalır (CLAUDE.md'deki ayrım). Robot olmadan `--dry-run` ile yazılır ve test edilir.
+- **Bitti sayılır:** dry-run'da 18 eklem doğru kanala doğru darbeyi yazıyor (test); simülasyonla aynı komut arayüzü.
 
-### S1 — Etiketleme ve A0 lehimi ⬜
-- **Bekler:** — · **Açar:** S2, S4
-- İki bacak arasına "ÖN" bandı; yukarıdan bakınca saat yönünde bacaklara 1–6 (1 sol ön, 2 sağ ön, 3 sağ orta, 4 sağ arka, 5 sol arka, 6 sol orta). Hangi tarafın ön olduğu fark etmez, robot simetrik.
-- İki PCA9685'ten birinin **A0** lehim noktasını birleştir (adresi 0x40'tan 0x41'e geçer; ikisi aynı adreste kalırsa kanal haritası yanlış çıkar).
-- **Bitti sayılır:** bantlar yapıştırıldı, bir kartın A0'ı lehimli; fotoğrafı paylaşıldı.
+#### S5 — Zemin / dünya üreteci ⏸
+- **Bekler:** S1, G5 · **Açar:** G7, S6
+- RL eğitimi ve ölçüm için Gazebo dünyaları: eğim (açı ayarlı), engebe (yükseklik haritası, pürüzlülük ayarlı), basamak, kaygan zemin (sürtünme ayarlı). Parametreyle ve rastgele tohumla üretilebilir olmalı; aynı tohum aynı dünyayı verir.
+- **Bitti sayılır:** her zemin türü parametreyle üretiliyor ve robot o dünyada doğuyor; birkaç örnek dünyanın görüntüsü depoda.
 
-### S2 — Kablolama ve güç hattı ⏸
-- **Bekler:** S1 · **Açar:** S3, S6
-- PCA9685 → Pi: VCC→pin 1 (3.3 V), SDA→pin 3, SCL→pin 5, GND→pin 6. Servolar kartlara, sıra fark etmez.
-- Servo beslemesi buck'tan; **bağlamadan önce** çıkışı multimetreyle ~6 V'a ayarla. Pi ayrı beslemeden (5 V USB regülatör). Topraklar ortak. Sigorta nerede, not et.
-- **Bitti sayılır:** her şey bağlı; buck çıkışı ölçüldü ve değeri yazıldı; servo ve Pi beslemesinin ayrı, toprağın ortak olduğu kontrol edildi.
+#### S6 — Yürüyüş ölçüm aracı ⏸
+- **Bekler:** S3, S5 · **Açar:** G7
+- Bir yürüyüş denetleyicisini (tripod ya da RL politikası) seçilen zeminlerde N kez koşturup ölçen betik: ileri hız, enerji (Σ |tork × açısal hız|), devrilme sayısı, düşmeden gidilen mesafe. Sonuçlar bir tabloya.
+- **Bitti sayılır:** tripod'un her zemindeki ölçümü tablo olarak depoda; RL için aynı komutla çalışıyor.
 
-### S3 — Pi kurulumu ⏸
-- **Bekler:** S2 · **Açar:** S4, S7, G7, G11
-- Ubuntu Server 26.04 arm64; depoyu `git clone`; I2C açık mı (`ls /dev/i2c-1`), kullanıcı `i2c` grubunda mı (`sudo usermod -aG i2c $USER`).
-- `python3 tools/hwcheck.py` çalıştır, çıktısını Görkem'e ilet.
-- **Bitti sayılır:** `hwcheck.py` iki PCA9685'i (0x40, 0x41) ve IMU'yu görüyor; çıktı paylaşıldı.
+#### S7 — Sensör sürücüleri (saf Python) ⬜
+- **Bekler:** — · **Açar:** donanım vardiyası (D8, D11)
+- `hexapod_driver` ile aynı desende, donanımsız test edilebilir: VL53L0X'leri XSHUT ile sırayla uyandırıp yeniden adresleme (üçü de 0x29'da doğar; BNO055 de 0x29'da olabilir, çakışmaya dikkat), BNO055'ten yönelim ve ivme okuma. `DryRunBackend` ile testler. Gerçek donanımda denemesi vardiyada.
+- **Bitti sayılır:** veri sayfalarına göre yazmaç düzeyinde testler robotsuz geçiyor.
 
-### S4 — Kanal haritası ⏸
-- **Bekler:** S1, S3 · **Açar:** G7
-- Robot kutunun üstünde, bacaklar havada (servo ilk sinyalde orta konuma zıplar). `python3 tools/map_channels.py`: araç her kanaldaki servoyu kıpırdatır, hangi bacağın hangi eklemi olduğunu yazarsın (`1c` = bacak 1 coxa, `3f` femur, `6t` tibia).
-- **Bitti sayılır:** 18 eklemin tamamı eşlendi; aracın bastığı harita Görkem'e iletildi.
+---
 
-### S5 — Kalibrasyon ⏸
-- **Bekler:** G7 · **Açar:** G10, S9
-- `python3 tools/calibrate.py`; her eklem için sırayla: `c` (merkez = sıfır duruşu) → `dir` → `span` → `limit min` / `limit max`. Sıfır duruşu ve yönlerin tanımı aracın yardım metninde (`?`) ve [CLAUDE.md](CLAUDE.md)'de. Aynı anda tek servo beslenir.
-- **Bitti sayılır:** `config/calibration.yaml` 18 eklem için dolu ve commit'lendi; `limits` çıktısı `robot.yaml`'a işlendi.
+## Donanım vardiyası (⏸ durduruldu)
 
-### S6 — Tartım ve elektronik envanteri ⏸
-- **Bekler:** S2 · **Açar:** G10
-- Robotu tart (bataryalar takılı, yürüyeceği hâliyle). Robotun üstünde kaç batarya, kaç buck var; gövde kapağı takılı mı; Pi, kartlar ve batarya nerede duruyor.
-- **Bitti sayılır:** `robot.yaml` → `body.total_mass_kg` gerçek değerle, `measured: true`; elektronik listesi PROJE_DEVIR'e ya da bir issue'ya yazıldı. (Simülasyon şu an 2,13 kg tahminle çalışıyor.)
+Donanım işleri şimdilik yapılmıyor. Yazılım aşaması gerçek robotta denenecek bir şey üretince ayrı bir vardiya olarak topluca yapılır.
 
-### S7 — Sensör montaj bilgisi ⏸
-- **Bekler:** S3 · **Açar:** S8
-- IMU (BNO055) nerede ve hangi yöne bakıyor; I2C adresi (0x28 ya da 0x29). Üç VL53L0X'in her birinin XSHUT'u hangi GPIO'ya bağlı, hangi yöne bakıyor.
-- **Bitti sayılır:** `robot.yaml` → `sensors` bölümündeki boş alanlar dolu.
+- **Önerilen başlama şartı:** S3 (tripod simülasyonda yürüyor) ve S4 (gerçek sürücü düğümü) bitmiş olsun. D1–D8 yazılımı beklemez; ekip isterse vardiyayı daha erken de açabilir.
+- **Sahipler vardiya başlarken atanır.** Robotu kuran kişi montaj, kablolama ve kalibrasyonu yapar. Görkem robotu kurmadığı için ona D5 ve D10 gibi yazılım tarafındaki işler düşer.
+- **Güvenlik:** [docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md) §4.4. Özellikle: PCA9685'in VCC'si Pi'nin **3.3 V**'una (pin 1), 5 V'a değil. Servolar voltaj düşürücüden **~6 V** ile beslenir (dolu 2S LiPo 8.4 V verir, MG996R en fazla 7.2 V kaldırır).
 
-### S8 — Sensör sürücüleri ⏸
-- **Bekler:** S7 · **Açar:** G11
-- `hexapod_driver` ile aynı desende saf Python: VL53L0X'leri XSHUT ile sırayla uyandırıp yeniden adresleme (üçü de 0x29'da doğar; BNO055 de 0x29'da olabilir, çakışmaya dikkat), BNO055 okuma. Donanımsız testler için DryRunBackend.
-- **Bitti sayılır:** üç mesafe sensörü ve IMU aynı anda okunuyor; testler robotsuz geçiyor.
+```mermaid
+flowchart LR
+    classDef hw fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d
+    classDef sw fill:#e5e7eb,stroke:#4b5563,color:#1f2937
 
-### S9 — Gerçek robotta tripod ⏸
-- **Bekler:** S5, G6, G8 · **Açar:** —
-- Önce robot havadayken, sonra yerde. Simülasyondan farkları not et: ayak sapması, servo ısınması, besleme çökmesi (Pi resetlenirse brownout'tur, yazılım hatası değil).
-- **Bitti sayılır:** robot düz zeminde yürüyor; farklar raporlandı. Bu rapor G10'daki rastgeleleştirme aralıklarını belirlemeye yarar.
+    D1[D1 Etiket + A0]:::hw --> D2[D2 Kablolama + güç]:::hw --> D3[D3 Pi + hwcheck]:::hw
+    D1 --> D4[D4 Kanal haritası]:::hw
+    D3 --> D4
+    D3 --> D5[D5 Kablolamayı config'e işle]:::hw
+    D4 --> D5 --> D6[D6 Kalibrasyon]:::hw
+    D2 --> D7[D7 Tartım + envanter]:::hw
+    D3 --> D8[D8 Sensör montajı + sürücü testi]:::hw
+    S7[S7 Sensör sürücüleri]:::sw --> D8
+    D6 --> D9[D9 Gerçek robotta tripod]:::hw
+    S3[S3 Tripod sim]:::sw --> D9
+    S4[S4 Sürücü düğümü]:::sw --> D9
+    D6 --> D10[D10 Gerçek değerlerle yeniden eğitim]:::hw
+    D7 --> D10
+    G7[G7 PPO]:::sw --> D10
+    D10 --> D11[D11 Pi'ye aktarma]:::hw
+    G8[G8 Politika düğümü]:::sw --> D11
+    D8 --> D11
+    D9 --> D11
+    D11 --> D12[D12 Saha denemesi]:::hw
+```
 
-### S10 — Saha denemesi ⏸
-- **Bekler:** G11 · **Açar:** —
-- TÜBİTAK planındaki "simülasyondaki en iyi sonuçlarla gerçek arazide deneme": eğim, engebe, kum, kaygan zemin. Video ve ölçüm (hız, devrilme sayısı).
-- **Bitti sayılır:** her zemin için kayıt ve kısa rapor.
+| Kimlik | Görev | Bekler | Bitti sayılır |
+|---|---|---|---|
+| D1 | "ÖN" bandı + bacak numaraları; bir PCA9685'in A0 lehimi | — | Bantlar yapıştırıldı (yukarıdan saat yönünde 1–6: 1 sol ön, 2 sağ ön, 3 sağ orta, 4 sağ arka, 5 sol arka, 6 sol orta; hangi tarafın ön olduğu fark etmez). Bir kartın A0'ı lehimli (0x40 → 0x41). Fotoğraf paylaşıldı. |
+| D2 | Kablolama ve güç hattı | D1 | PCA9685 → Pi: VCC→pin 1 (3.3 V), SDA→3, SCL→5, GND→6. Servolar kartlara (sıra fark etmez). Buck çıkışı **bağlamadan önce** multimetreyle ~6 V'a ayarlanıp ölçüldü. Pi ayrı beslemede, topraklar ortak, sigortanın yeri not edildi. |
+| D3 | Pi kurulumu + `hwcheck.py` | D2 | Ubuntu Server 26.04 arm64, depo klonlu, I2C açık (`/dev/i2c-1`, kullanıcı `i2c` grubunda). `python3 tools/hwcheck.py` iki PCA9685'i (0x40, 0x41) ve IMU'yu görüyor. |
+| D4 | Kanal haritası (`map_channels.py`) | D1, D3 | Robot kutu üstünde, bacaklar havada. 18 eklemin tamamı eşlendi (`1c` = bacak 1 coxa, `3f` femur, `6t` tibia); harita paylaşıldı. |
+| D5 | Kablolamayı `robot.yaml`'a işle | D3, D4 | Bant numaraları robot.yaml bacak kimliklerine çevrildi (PROJE_DEVIR §5.5), `drivers[*].address` ve `joints[*].driver/channel` dolu; `calibrate.py --dry-run` eksik bildirmiyor. |
+| D6 | 18 eklemin kalibrasyonu (`calibrate.py`) | D5 | Her eklem: `c` → `dir` → `span` → `limit min/max`. `config/calibration.yaml` dolu ve commit'li; `limits` çıktısı robot.yaml'a işlendi (URDF artık gerçek limitleri kullanır). |
+| D7 | Tartım ve elektronik envanteri | D2 | Robot yürüyeceği hâliyle tartıldı → `body.total_mass_kg`, `measured: true`. Üstündeki batarya/buck sayısı, kapak takılı mı yazıldı; `simulation.mass_inputs` düzeltilip `tools/cad_sim_model.py` yeniden çalıştırıldı. |
+| D8 | Sensör montaj bilgisi + S7'nin donanım testi | D3, S7 | IMU adresi ve montaj yönü, üç VL53L0X'in XSHUT GPIO'ları ve bakış yönleri robot.yaml → `sensors`'ta. Üç mesafe sensörü ve IMU aynı anda okunuyor. |
+| D9 | Gerçek robotta tripod | D6, S3, S4 | Önce havada, sonra yerde yürüyor. Simülasyondan farklar raporlandı: ayak sapması, servo ısınması, besleme çökmesi (Pi resetlenirse brownout'tur, yazılım hatası değil). |
+| D10 | Gerçek limit ve kütleyle yeniden eğitim | D6, D7, G7 | G7 gerçek eklem limitleri ve ölçülen kütleyle tekrarlandı; D9'daki farklar rastgeleleştirme aralıklarına yansıtıldı. |
+| D11 | Pi 4'e aktarma | D10, G8, D8, D9 | Politika + ROS 2 düğümleri Pi'de, gerçek IMU ve servolarla kapalı döngü; robot düz zeminde yürüyor. |
+| D12 | Saha denemesi | D11 | TÜBİTAK planındaki gerçek arazi denemesi: eğim, engebe, kum, kaygan zemin. Her zemin için video, hız ve devrilme sayısı. |

@@ -6,7 +6,7 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa
 > özetidir; çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-24** (2. oturum) · Son kod commit'i: `0f3e56d` · Testler: **63/63**
+> Son güncelleme: **2026-09-24** (2. oturum) · Testler: **73/73**
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -40,9 +40,10 @@
 e-postası `gorkemmutlu227@gmail.com`. Proje bir üniversite kulübü takım
 projesi (TÜBİTAK Milli Teknoloji Kulüpler Birliği, Kulüp Geliştirme
 Desteği başvurusu). Görkem yazılım tarafını Claude ile yürütüyor.
-Takım arkadaşı **Samet** robotun başındaki işleri (kablolama, Pi kurulumu,
-kalibrasyon, tartım, sensörler, gerçek robotta denemeler) üstleniyor.
-Bu bir varsayım; görev sahipleri [GOREVLER.md](../GOREVLER.md)'de.
+Takım arkadaşı **Samet** de yazılım tarafında: yazılım görevleri Görkem
+ile Samet arasında bölüşüldü (2026-09-24, kullanıcının kararı). Donanım
+işleri **durduruldu** ve ayrı bir donanım vardiyasına taşındı. Görev
+sahipleri ve bağımlılıklar [GOREVLER.md](../GOREVLER.md)'de.
 
 **Önemli:** Görkem robotu **kendisi monte etmedi**. Donanım, lehim, kablo
 ve terminal işlerinde deneyimli değil ve bu tür işler istenince bunalıyor
@@ -122,17 +123,18 @@ artık geçersiz ya da güncellendi:
 | 1 | Servo sürücü katmanı (`hexapod_driver`) | ✅ bitti, testli |
 | 1b | Kalibrasyon, kanal haritası, donanım kontrolü, CAD çıkarım araçları | ✅ bitti |
 | 2 | Ters/düz kinematik + gövde pozu (`hexapod_kinematics`) | ✅ bitti, testli |
-| 3 | **URDF modeli** (robot.yaml'dan, STL'ler görsel mesh) | 🔄 **SÜRÜYOR** — veri katmanı bitti, XML üretimi kaldı (§14) |
+| 3 | **URDF modeli** (robot.yaml'dan, STL'ler görsel mesh) | 🔄 URDF üretiliyor ve testli; yalnız RViz kontrolü ROS kurulumunu bekliyor (§14) |
 | 4 | Gazebo dünyası + ROS 2 kontrol arayüzü | ⛔ |
 | 5 | Klasik yürüyüş (tripod) — RL için referans ve yedek | ⛔ |
 | 6 | RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminler | ⛔ |
 | 7 | Pi 4'e aktarma: politika + ROS 2 düğümleri + gerçek sürücü | ⛔ |
 
-**Görev dağılımı:** [GOREVLER.md](../GOREVLER.md). Aşamalar oradaki G (Görkem)
-ve S (Samet) görevlerine bölündü; her görev hangi görevi beklediğini ve
-hangisini açtığını söyler. Bir görev bittiğinde durumunu orada güncelle.
+**Görev dağılımı:** [GOREVLER.md](../GOREVLER.md). İki bölüm: şimdiki
+**yazılım aşaması** (G = Görkem, S = Samet) ve **⏸ durdurulmuş donanım
+vardiyası** (D1–D12). Her görev hangi görevi beklediğini ve hangisini
+açtığını söyler. Bir görev bittiğinde durumunu orada güncelle.
 
-**Henüz yapılmamış donanım işleri (Samet'in, S1–S8):** bkz. §13.
+**Durdurulmuş donanım işleri:** bkz. §13.2 ve GOREVLER.md D1–D12.
 
 ---
 
@@ -405,7 +407,7 @@ hexapod/
 │       ├── hexapod_description/
 │       │   ├── model.py    RobotModel: kütle/atalet/çarpışma/limit, SI birimleri
 │       │   └── meshes.yaml görsel mesh yerleşimi (cad_sim_model.py üretir)
-│       └── meshes/         STL kopyaları (git'te değil; --copy-meshes)
+│       └── meshes/         STL kopyaları (cad_sim_model.py --copy-meshes üretir)
 ├── tools/                  komut satırı araçları
 │   ├── map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 │   ├── calibrate.py        etkileşimli servo kalibrasyonu
@@ -425,12 +427,12 @@ hexapod/
 │   └── test_description.py    7 test
 ├── conftest.py             src/ paketlerini sys.path'e ekler (ROS'suz test için)
 ├── pytest.ini, .gitignore, .gitattributes
-└── cad/                    CAD ve baskı dosyaları (yerelde; git'te yalnız lisans PDF'i)
+└── cad/                    CAD ve baskı dosyaları (depoda, ~345 MB)
     ├── Hexapod/            STEP/3MF/F3Z/STL + 606030-*.pdf (Printables lisans/atıf)
     └── Baskı Dosyaları/    basılan STL'ler
 
-Yerelde durup git'e GİRMEYENLER: cad/ altındaki STEP/3MF/F3Z/STL,
-faturalar, ekran görüntüleri.
+Git'e GİRMEYENLER: faturalar, ekran görüntüleri (kişisel veri), Python
+önbellekleri. CAD 2026-09-24'ten beri depoda (§10).
 ```
 
 ### 7.4 `hexapod_driver`
@@ -479,7 +481,7 @@ faturalar, ekran görüntüleri.
 ### 7.6 Testler
 
 ```bash
-python -m pytest -q          # depo kökünden; 63 test, ~2 sn, donanım gerekmez
+python -m pytest -q          # depo kökünden; 73 test, ~2.5 sn, donanım gerekmez
 ```
 
 Öne çıkan testler: eksik değerde `MissingValue`; PCA9685 prescale (50 Hz
@@ -491,8 +493,25 @@ tanımlı, üçgen eşitsizliği); aynalı bacakta y'nin çevrilmesi.
 
 ### 7.7 `hexapod_description`
 
-Simülasyon modelinin veri katmanı; URDF üreticisi (henüz yok) ve ileride
-Gazebo/RL ortamı sayıları buradan alacak.
+Simülasyon modeli: veri katmanı (`model.py`) + URDF üreticisi (`urdf.py`).
+Gazebo/RL ortamı da sayıları buradan alacak.
+
+- `build_urdf(model, meshes=None)`: URDF metni. Ağaç: `base_link` (ataletsiz;
+  KDL ataletli kökü desteklemiyor) → sabit `body` (gövde kütlesi) ve her
+  bacak için `leg{i}_coxa|femur|tibia` + sabit `leg{i}_foot` (yalnız
+  çerçeve). Eklemler `leg{i}_coxa_joint` vb. Ayak küresi tibia linkinde.
+  `meshes` yoksa görseller çarpışma kutularından.
+- `MeshSet.load(uri_prefix)`: `meshes.yaml` + `package://...` ya da `file://...`.
+- CLI: `python tools/make_urdf.py -o x.urdf [--meshes none|package|file]`
+  (ROS'ta `ros2 run hexapod_description make_urdf`).
+- `launch/display.launch.py`: robot_state_publisher + eklem kaydırıcıları
+  + RViz; URDF açılışta robot.yaml'dan üretilir. **Henüz denenmedi** (ROS yok).
+- `tests/test_urdf.py`: URDF'i üreticiden bağımsız bir zincir hesaplayıcıyla
+  okur; ayak konumları `hexapod_kinematics.forward` ile 300 pozda 1e-9 m
+  içinde aynı. Kasıtlı bozulmalar (eksen ters, tibia +1 mm) yakalanıyor.
+
+Veri katmanı:
+
 
 - `RobotModel.from_config(config)`: SI birimlerinde (m, kg, kg·m², rad).
   Geometri ve bacak montajları **doğrudan `HexapodKinematics`'ten**; robot.yaml
@@ -505,7 +524,7 @@ Gazebo/RL ortamı sayıları buradan alacak.
   `provisional_joints()` hangilerinin geçici olduğunu söyler.
 - `effort` / `velocity`: MG996R katalog (6 V).
 - `meshes.yaml`: görsel mesh yerleşimi, `tools/cad_sim_model.py` üretir.
-  STL'ler git'te değil; `--copy-meshes` ile `meshes/` altına kopyalanır.
+  STL'ler `--copy-meshes` ile `meshes/` altına kopyalanır (depoda).
 - Link çerçeveleri (URDF ile aynı olacak): coxa = bacak çerçevesi; femur
   orijini J2'de, +x femur boyunca; tibia orijini J3'te, tibia −z boyunca.
   Femur ve tibia eksenleri **−y** (femur + = yukarı, tibia + = ayak dışarı).
@@ -567,6 +586,20 @@ gövdesi bacakla döner; Coxa_top gövdeye bağlı). ~8 sn.
 Her iki CAD aracı da ortak kodu `tools/cadlib/`'den alır (STEP
 ayrıştırma, montaj ağacı, dönüşümler, STL/kütle, çerçeveler).
 
+### `make_urdf.py` ve `preview_urdf.py` — URDF
+`make_urdf.py` robot.yaml'dan URDF yazar (ROS'suz). `preview_urdf.py`
+URDF'i okuyup STL'leri link konumlarına yerleştirerek PNG çizer (numpy +
+matplotlib; tek görünüş ~1 dk, `--collision` ~1 sn). RViz'in yerini
+tutmaz; mesh yerleşimini gözle kontrol etmek için.
+
+### `wsl/ros_kurulum.sh` — ROS 2 kurulumu (G4)
+WSL Ubuntu 26.04'e ROS 2 Lyrical + Gazebo + ros2_control + RViz eklem
+kaydırıcılarını kurar. Adımlar resmi belgeden (ros2_documentation,
+`lyrical` dalı, Ubuntu-Install-Debs.rst; docs.ros.org bot korumasıyla
+erişimi engelliyor). Paketlerin resolute deposunda var olduğu doğrulandı.
+sudo'yu bir kez sorar, tekrar çalıştırmak güvenli, sonunda kendini test
+eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
+
 ---
 
 ## 9. Çalışma ortamı
@@ -581,7 +614,11 @@ ayrıştırma, montaj ağacı, dönüşümler, STL/kütle, çerçeveler).
   geliyor. (İlk taslakta Jazzy/24.04 varsayılmıştı; PC'de 26.04 olduğu
   için değiştirildi.)
 - **2026-09-24 itibarıyla WSL'de ROS 2 ve Gazebo KURULU DEĞİL.** WSL'de
-  Python 3.14, 955 GB boş disk var.
+  Python 3.14, 955 GB boş disk, 8 çekirdek, 7 GB RAM (PC'nin yarısı) var.
+  Kurulum betiği hazır: `bash tools/wsl/ros_kurulum.sh` (G4).
+- **colcon derlemesini OneDrive klasöründe yapma**: `build/ install/ log/`
+  OneDrive'a senkronlanır ve /mnt/c yavaştır. Çalışma alanı WSL'in kendi
+  diskinde (ör. `~/hexapod_ws`) olmalı, kaynaklar depodan bağlanmalı.
 - **PC:** Windows 11 Pro, Intel i5-10300H (8 thread), 16 GB RAM, NVIDIA
   GTX 1650 + Intel UHD. Gazebo ve PPO eğitimi için yeterli.
 - **Depo yolu (Windows):** `C:\Users\gorke\OneDrive\Masaüstü\hexapod`
@@ -616,9 +653,12 @@ ayrıştırma, montaj ağacı, dönüşümler, STL/kütle, çerçeveler).
   `!cad/Hexapod/606030-3d-printed-hexapod-*.pdf`. **Bu kuralı gevşetme.**
   Paylaşılabilir bir PDF eklenecekse açık bir `!` istisnası yaz ve önce
   içinde kişisel veri olmadığından emin ol.
-- **CAD binary'leri** (`*.step`, `*.f3z`, `*.3mf`, `*.stl`, toplam 344 MB)
-  git'te değil; yerelde `cad/Hexapod/` ve `cad/Baskı Dosyaları/` altında. Yoksa
-  Printables 606030'dan indirilebilir.
+- **CAD binary'leri** (`*.step`, `*.f3z`, `*.3mf`, `*.stl`, toplam 345 MB)
+  **2026-09-24'ten beri depoda** (`cad/`). Depo gizli olduğu ve iki kişi
+  aynı dosyalarla çalışacağı için kullanıcı istedi. En büyük iki STEP 85 ve
+  67 MB: GitHub 50 MB'ın üstünü uyarıyla kabul ediyor, 100 MB'ı reddediyor.
+  Depo herkese açılacaksa (TÜBİTAK: açık kaynak) lisans (CC BY-SA 4.0)
+  uygun ama Git LFS düşünülmeli. Faturalar İSE HÂLÂ depoya girmez.
 - **`config/calibration.yaml` git'te TUTULMALI** (brifteki risk:
   kalibrasyon kayıt altına alınmazsa her seferinde sıfırdan başlanır).
   Yalnızca `.tmp` hâli yoksayılıyor.
@@ -656,7 +696,9 @@ ayrıştırma, montaj ağacı, dönüşümler, STL/kütle, çerçeveler).
 | 09-24 | Tibia çarpışması iki kutu + ayak küresi (r = 5.1 mm) | Tek kutu, tibia ~25°'den fazla eğilince ayaktan önce yere değiyordu |
 | 09-24 | Aynalı bacaklarda simülasyon kütlesi y'de çevrilir; görsel mesh çevrilmez | URDF mesh yansıtamaz; fark yalnız görünüşte |
 | 09-24 | Klasör düzeni: `docs/` (devir, brif, `malzeme/`), `cad/` (yerel CAD), `tools/cadlib/` | Kullanıcı istedi: kök dağınıktı, kütüphane kodu script'lerin içindeydi |
-| 09-24 | Görev dağılımı GOREVLER.md'de: Görkem yazılım (G), Samet donanım (S), bağımlılıklarla | Kullanıcı istedi; Samet'in donanımı üstlendiği varsayıldı |
+| 09-24 | Görev dağılımı GOREVLER.md'de, bağımlılıklarla (ilk hâli: Görkem yazılım, Samet donanım) | Kullanıcı istedi |
+| 09-24 | **Donanım durduruldu, ayrı vardiyaya (D1–D12) taşındı; yazılım Görkem (G) ve Samet (S) arasında bölüşüldü** | Kullanıcı istedi. Vardiya için önerilen başlama şartı: S3 (tripod sim) + S4 (sürücü düğümü) |
+| 09-24 | CAD (~345 MB) ve mesh'ler depoya alındı; faturalar hâlâ dışarıda | Depo gizli, iki kişi aynı dosyalarla çalışacak; kullanıcı istedi |
 
 ---
 
@@ -720,11 +762,12 @@ ayrıştırma, montaj ağacı, dönüşümler, STL/kütle, çerçeveler).
   `map_channels.py` çıkarır.
 - `joints[*].limits_deg.min/max` (36) — `calibrate.py` içinde `span` +
   `limit` ile bulunur. Simülasyon şimdilik `simulation.provisional_joint_
-  limits_deg` (±90°) kullanıyor; **RL eğitiminden (G10) önce gerçek
-  limitler şart**, coxa ±90'da komşu bacağa girer.
+  limits_deg` (±90°) kullanıyor. İlk RL eğitimi (G7) bununla yapılır;
+  **gerçek limitlerle yeniden eğitim şart** (D10), coxa ±90'da komşu
+  bacağa girer.
 - `body.standing_height` — ölçüm değil, IK/gait çalışınca seçilecek
   hedef.
-- `body.total_mass_kg` — terazi (S6). Simülasyon şimdilik CAD tahmini
+- `body.total_mass_kg` — terazi (D7, donanım vardiyası). Simülasyon şimdilik CAD tahmini
   kullanıyor: 2.13 kg (`simulation.links`). Tartım gelince doluluk oranı
   ve elektronik kütlesi (`simulation.mass_inputs`) buna göre düzeltilip
   `tools/cad_sim_model.py` yeniden çalıştırılır.
@@ -732,7 +775,7 @@ ayrıştırma, montaj ağacı, dönüşümler, STL/kütle, çerçeveler).
   `sensors.range_finders.devices[*]` (XSHUT GPIO, adres, bakış yönü) —
   otonomi katmanında gerekecek.
 
-### 13.2 Donanım tarafı (Samet'in işi; GOREVLER.md S1–S8)
+### 13.2 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)
 
 1. Bacaklara "ÖN" + 1–6 bandı (§5.5).
 2. Kartlardan birinin A0'ını lehimle.
@@ -748,15 +791,10 @@ ayrıştırma, montaj ağacı, dönüşümler, STL/kütle, çerçeveler).
 
 ## 14. Sıradaki iş için hazır plan: URDF + Gazebo
 
-**Durum (2. oturum sonu):** 1, 3, 4 ve 5 bitti. `src/hexapod_description`
-paketi var; kütle/atalet/çarpışma/limit verisi `RobotModel`'de, mesh
-yerleşimi `meshes.yaml`'da. **Sıradaki: 2 ve 6** — `RobotModel`'den URDF
-XML'i üreten modül (`hexapod_description/urdf.py`) ve URDF FK = IK testi.
-Adlandırma önerisi: `base_link`, `leg{i}_coxa|femur|tibia|foot` linkleri,
-`leg{i}_coxa_joint` vb. eklemler (calibration.yaml anahtarı `leg0_coxa`
-ile uyumlu). Ayak küresi tibia linkine konsun (Gazebo, ataletsiz linkleri
-sabit eklemle birleştirirken çarpışmasını kaybedebilir); `leg{i}_foot`
-yalnızca çerçeve. Mesh'siz modda görseller çarpışma kutularından.
+**Durum (2. oturum sonu):** 1–6 bitti (§7.7). URDF üretiliyor, FK = IK
+testi geçiyor, mesh'ler önizlemede doğru. Kalan: ROS kurulunca (G4)
+paketi derleyip RViz'de açmak (`display.launch.py`, denenmedi) ve
+`check_urdf`. **Sonra 7 (Gazebo, G5).**
 
 Asıl plan:
 
@@ -850,14 +888,15 @@ servo karşılaştırması (25 kg·cm). **DS3225 alınmadı**, robot MG996R ile.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   63 test geçmeli.
-3. CAD yerelde var mı bak: `cad/Hexapod/leg/leg-v2-v20.step`. Yoksa ve
-   gerekiyorsa kullanıcıdan istemek yerine Printables 606030'dan
-   indirilebileceğini söyle (yine de indirme işlemi için izin al).
+   73 test geçmeli.
+3. CAD depoda (`cad/Hexapod/`). Eksikse `git status` ile bak; yine yoksa
+   Printables 606030'dan indirilebileceğini söyle (indirme için izin al).
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının olabilir;
    dokunmadan incele (§12, madde 7–8).
-5. Kullanıcı başka bir şey istemediyse **sıradaki iş §14: G3'ün kalanı
-   (URDF XML üreticisi + FK testi).** Hangi işin kimde olduğu ve neyi
-   beklediği GOREVLER.md'de.
+5. Kullanıcı başka bir şey istemediyse: ROS kurulu mu bak
+   (`wsl -e bash -lc "ls /opt/ros"`). Değilse kullanıcıdan
+   `bash tools/wsl/ros_kurulum.sh`'ı çalıştırmasını iste (G4). Kuruluysa
+   G3'ün son kontrolü (colcon build + RViz), sonra G5 (Gazebo). Hangi işin
+   kimde olduğu ve neyi beklediği GOREVLER.md'de.
    Kullanıcıdan donanım/ölçüm işi isteme.
 6. Önemli bir karar ya da biten aşama olduğunda bu belgeyi güncelle.

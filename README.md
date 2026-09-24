@@ -15,15 +15,17 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Servo sürücü katmanı | ✅ yazıldı, testli |
 | Kalibrasyon aracı | ✅ yazıldı, çalışıyor |
 | Ters kinematik (IK) + gövde pozu | ✅ yazıldı, testli |
-| URDF modeli | 🔄 veri katmanı bitti, XML üretimi sürüyor |
+| URDF modeli | ✅ üretiliyor, testli (RViz kontrolü ROS kurulumunu bekliyor) |
 | Gazebo simülasyonu | ⛔ |
 | Gait motoru (tripod) | ⛔ |
 | RL (PPO) | ⛔ |
 | Pi 4'e aktarma | ⛔ |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.
-Kablolama ve kalibrasyon robotu kuran kişi tarafından sonra yapılacak;
-yazılımın önünde engel değil, sadece config'e girilecek değerler.
+Yazılım işi Görkem ve Samet arasında bölüşüldü; kablolama, kalibrasyon ve
+gerçek robotta denemeler şimdilik durduruldu, ayrı bir donanım vardiyasında
+yapılacak ([GOREVLER.md](GOREVLER.md)). Yazılımın önünde engel değiller,
+sadece config'e sonradan girilecek değerler.
 
 ## Kurulum
 
@@ -52,6 +54,8 @@ src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
     body.py           #   altı bacak, gövde çerçevesi, gövde pozu
   hexapod_description/  # simülasyon modeli (URDF'in girdisi)
     model.py          #   kütle/atalet/çarpışma/limitler, SI birimlerinde
+    urdf.py           #   RobotModel -> URDF
+    launch/, rviz/    #   RViz'de görüntüleme
     meshes.yaml       #   görsel mesh yerleşimi (cad_sim_model.py üretir)
 tools/                # komut satırı araçları
   map_channels.py     # hangi servo hangi kanalda — servoları kıpırdatıp sorar
@@ -59,14 +63,17 @@ tools/                # komut satırı araçları
   hwcheck.py          # I2C tarama + robot.yaml karşılaştırma
   cad_extract.py      # CAD'den geometri türetme (sayıların kaynağı)
   cad_sim_model.py    # CAD'den kütle, atalet, çarpışma kutuları
+  make_urdf.py        # robot.yaml -> URDF (ROS'suz)
+  preview_urdf.py     # URDF'i PNG'ye çizer (ROS'suz önizleme)
+  wsl/ros_kurulum.sh  # WSL'e ROS 2 Lyrical + Gazebo kurulumu
   cadlib/             # iki CAD aracının ortak kütüphanesi (STEP, STL, çerçeveler)
 tests/
 docs/
   PROJE_DEVIR.md      # projenin bütün bağlamı, kararlar, dersler
   hexapod-proje-brifi.md
   malzeme/            # malzeme listeleri (güvenilmez; faturalar esas)
-cad/                  # CAD ve baskı dosyaları — git'te DEĞİL, yerelde durur
-  Hexapod/            #   STEP/STL (Printables 606030); yalnız lisans PDF'i git'te
+cad/                  # CAD ve baskı dosyaları (depoda, ~345 MB)
+  Hexapod/            #   STEP/STL/3MF/F3Z (Printables 606030) + lisans PDF'i
   Baskı Dosyaları/    #   basılan STL'ler
 ```
 
@@ -127,7 +134,7 @@ python tools/cad_extract.py
 
 `robot.yaml`'daki coxa=50, femur=80, tibia=126.6, yarıçap=100 değerlerinin
 STEP assembly'si ve basılan STL'lerden türetilmesini yeniden çalıştırır.
-CAD dosyaları depoda yok (344 MB); yerelde `cad/Hexapod/` klasörüne konmalı. Kendi tutarlılık
+CAD dosyaları `cad/Hexapod/` altında (depoda). Kendi tutarlılık
 kontrolünü yapar (altı bacak da aynı yarıçapta çıkmalı).
 
 ## Simülasyon verisi
@@ -141,6 +148,25 @@ Basılan parçaların STL'lerinden link başına kütle, ağırlık merkezi, ata
 yerleşimini yazar. Robot tartılmadığı için bunlar **tahmin**: PETG yoğunluğu ×
 doluluk oranı + katalog servo kütlesi. Tartım yapılınca girdiler düzeltilip araç
 yeniden çalıştırılır.
+
+## URDF
+
+```bash
+python tools/make_urdf.py -o hexapod.urdf
+python tools/preview_urdf.py
+```
+
+URDF elle yazılmaz; her seferinde `robot.yaml`'dan üretilir. Eklem zinciri IK
+ile birebir aynı (test). `preview_urdf.py` ROS olmadan robotun bir resmini
+`onizleme.png`'ye çizer. ROS kurulunca: `ros2 launch hexapod_description display.launch.py`.
+
+## ROS 2 kurulumu (WSL)
+
+WSL terminalinde, depo klasöründen:
+
+```bash
+bash tools/wsl/ros_kurulum.sh
+```
 
 ## Testler
 
