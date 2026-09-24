@@ -1,6 +1,13 @@
 # CLAUDE.md
 
+> **Yeni bir oturumdaysan önce [PROJE_DEVIR.md](PROJE_DEVIR.md)'yi baştan
+> sona oku.** Projenin bütün bağlamı orada: kullanıcının çalışma tarzı ve
+> git tercihleri (Türkçe detaylı commit, **Claude imzası yok**), alınan
+> kararlar ve gerekçeleri, bulunan hatalar, donanım özeti, açık işler ve
+> sıradaki adımın planı. Bu dosya onun kısa özetidir.
+
 Bu depoda çalışırken bilmen gerekenler. Ayrıntılı bağlam:
+[PROJE_DEVIR.md](PROJE_DEVIR.md), ilk brif:
 [hexapod-proje-brifi.md](hexapod-proje-brifi.md), kullanım: [README.md](README.md).
 
 ## Proje

@@ -1,6 +1,7 @@
 # Hexapod
 
-Altı bacaklı robotun yazılımı. Bağlam ve kararlar için [hexapod-proje-brifi.md](hexapod-proje-brifi.md).
+Altı bacaklı robotun yazılımı. Projenin tüm bağlamı, kararları ve durumu:
+[PROJE_DEVIR.md](PROJE_DEVIR.md). İlk brif: [hexapod-proje-brifi.md](hexapod-proje-brifi.md).
 
 Hedef mimari, TÜBİTAK Kulüp Geliştirme Desteği başvurusunda tanımlanan yön:
 **ROS 2 + Gazebo**, üzerine pekiştirmeli öğrenme (Stable-Baselines3 / PPO) ile
