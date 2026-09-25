@@ -11,6 +11,11 @@ gerçek robottaki komut hızıyla aynı (interface.COMMAND_RATE_HZ).
 
 Paralel ortamlar için make_env() kullanın (her süreç kendi Gazebo'sunu
 kurar): SubprocVecEnv([make_env(i) for i in range(8)]).
+
+Alan rastgeleleştirme (TaskConfig.randomization, varsayılan kapalı): her
+bölüm başında servo gücü/sertliği ve komut gecikmesi çekilir; bölüm boyunca
+rastgele aralıklarla gövde yandan itilir; gözlemdeki IMU değerlerine gürültü
+eklenir. Çekilen değerler reset()'in info'sunda ("dynamics").
 """
 
 from __future__ import annotations
@@ -71,9 +76,12 @@ class HexapodEnv(gym.Env):
         self._steps = 0
         self._prev_action = [0.0] * ACTION_SIZE
         self._vel = VelocityFilter(self.dt, self.task.vel_filter_s)
+        self._next_push = math.inf
+        self.dynamics: dict[str, float] = {}
 
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
+        self._randomize_dynamics()
         state = self.sim.reset()
         for _ in range(int(round(self.task.settle_s / self.dt))):  # duruşa yerleş
             state = self.sim.step(self.default)
@@ -86,12 +94,15 @@ class HexapodEnv(gym.Env):
         self._steps = 0
         self._prev_action = [0.0] * ACTION_SIZE
         self._vel.reset()
+        self._next_push = self._push_gap()
         self._state = state
-        return self._obs(), {"command": self._command}
+        return self._obs(), {"command": self._command, "dynamics": dict(self.dynamics)}
 
     def step(self, action):
         action = [float(a) for a in np.asarray(action, dtype=np.float64).reshape(-1)]
         targets = action_to_targets(action, self.default, self.task.action_scale, self.limits)
+        if self._steps >= self._next_push:
+            self._push()
         state = self.sim.step(targets)
         self._steps += 1
         self._phase = (self._phase + self.task.gait_hz * self.dt) % 1.0
@@ -106,8 +117,44 @@ class HexapodEnv(gym.Env):
         return self._obs(), float(r), fell, self._steps >= self.max_steps, info
 
     def _obs(self) -> np.ndarray:
-        return np.asarray(observation(self._state, self._command, self._phase, self.default,
-                                      self.task.action_scale), dtype=np.float32)
+        obs = np.asarray(observation(self._state, self._command, self._phase, self.default,
+                                     self.task.action_scale), dtype=np.float32)
+        r = self.task.randomization
+        if r is not None:   # IMU gürültüsü: yerçekimi yönü [0:3], jiroskop [3:6]
+            obs[0:3] += self.np_random.normal(0.0, r.gravity_noise, 3).astype(np.float32)
+            obs[3:6] += self.np_random.normal(0.0, r.gyro_noise, 3).astype(np.float32)
+        return obs
+
+    # -- alan rastgeleleştirme -------------------------------------------------
+
+    def _randomize_dynamics(self) -> None:
+        r = self.task.randomization
+        if r is None:
+            self.sim.set_servo(1.0, 1.0)
+            self.sim.latency_steps = 0
+            self.dynamics = {}
+            return
+        u = self.np_random.uniform
+        strength, stiffness = float(u(*r.servo_strength)), float(u(*r.servo_stiffness))
+        self.sim.set_servo(strength, stiffness)
+        latency = int(round(u(*r.latency_ms) / 1000.0 / self.sim.physics_step))
+        self.sim.latency_steps = min(latency, self.sim.steps_per_action - 1)
+        self.dynamics = {"servo_strength": strength, "servo_stiffness": stiffness,
+                         "latency_ms": self.sim.latency_steps * self.sim.physics_step * 1000.0}
+
+    def _push_gap(self) -> float:
+        """Bir sonraki itmeye kadar kontrol adımı (rastgeleleştirme kapalıysa hiç)."""
+        r = self.task.randomization
+        if r is None or r.push_force_n[1] <= 0:
+            return math.inf
+        return self._steps + round(float(self.np_random.uniform(*r.push_every_s)) / self.dt)
+
+    def _push(self) -> None:
+        r = self.task.randomization
+        force = float(self.np_random.uniform(*r.push_force_n))
+        angle = float(self.np_random.uniform(0.0, 2.0 * math.pi))
+        self.sim.push((force * math.cos(angle), force * math.sin(angle), 0.0), r.push_s)
+        self._next_push = self._push_gap()
 
 
 def make_env(rank: int, task: TaskConfig | None = None, physics_step: float = 0.002):

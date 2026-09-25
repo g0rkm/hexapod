@@ -178,7 +178,8 @@ def test_izleme_suzulmus_hiza_bakar():
     assert anlik["yaw_rate"] < 0.01 and anlik["lin_vel"] < 0.01
     assert suzulmus["yaw_rate"] == pytest.approx(cfg.w["yaw_rate"])
     assert suzulmus["lin_vel"] == pytest.approx(cfg.w["lin_vel"])
-    assert suzulmus["progress"] == anlik["progress"]          # progress anlık kalır
+    # v5: progress da süzülmüş hıza bakar (anlık 0.3 komutla kırpılıp tam puan alırdı)
+    assert suzulmus["progress"] == pytest.approx(cfg.w["progress"] * 0.1)
 
 
 def test_hiz_suzgeci_ortalamaya_yakinsar_ve_titresimi_bastirir():
@@ -195,3 +196,35 @@ def test_hiz_suzgeci_ortalamaya_yakinsar_ve_titresimi_bastirir():
     assert abs(f.value[2]) < 0.03
     with pytest.raises(ValueError):
         VelocityFilter(dt=0.02, tau=0.0)
+
+
+# --- ödül v5 ve alan rastgeleleştirme -------------------------------------------
+
+
+def test_hedefi_asmak_progress_kazandirmaz():
+    """v5: süzülmüş hız komutu aşınca progress artmaz, lin_vel düşer; yani hedefi
+    aşmak toplamda kaybettirir."""
+    cfg = TaskConfig()
+    cmd = (0.1, 0.0, 0.0)
+    _, tam = reward(state(), [0.0] * 18, [0.0] * 18, cmd, cfg, False, tracked=(0.1, 0.0, 0.0))
+    _, asan = reward(state(), [0.0] * 18, [0.0] * 18, cmd, cfg, False, tracked=(0.13, 0.0, 0.0))
+    assert asan["progress"] == tam["progress"]
+    assert asan["lin_vel"] < tam["lin_vel"]
+
+
+def test_enerji_artik_pahali():
+    """v5: 5 W fazladan güç (PPO v4 ile tripod farkı) adım başı en az 0.2 kaybettirmeli."""
+    cfg = TaskConfig()
+    effort, vel = [1.0] + [0.0] * 17, [5.0] + [0.0] * 17      # 1 N·m x 5 rad/s = 5 W
+    _, r = reward(state(effort=effort, vel=vel), [0.0] * 18, [0.0] * 18, (0.1, 0.0, 0.0),
+                  cfg, False)
+    assert r["power"] <= -0.2
+
+
+def test_rastgelelestirme_varsayilanda_kapali():
+    from hexapod_rl.task import Randomization
+    assert TaskConfig().randomization is None
+    r = Randomization()
+    for lo, hi in (r.servo_strength, r.servo_stiffness, r.latency_ms, r.push_force_n,
+                   r.push_every_s):
+        assert 0 <= lo <= hi

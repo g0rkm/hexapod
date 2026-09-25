@@ -140,3 +140,57 @@ def test_simulasyon_yurumeye_izin_veriyor(sim):
     expected = step_mm / 1000 / (0.5 / hz)
     assert speed > 0.7 * expected, f"{speed:.3f} m/s, beklenen {expected:.3f}"
     assert abs(s.base_pos[2] - height / 1000) < 0.005
+
+
+# --- alan rastgeleleştirme düğmeleri (G7) ----------------------------------------
+
+
+@pytest.fixture
+def ayakta(sim):
+    """Ayakta duran robot; test sonunda düğmeler varsayılana döner."""
+    sim.reset()
+    run(sim, stand_targets(sim), 1.5)
+    yield sim
+    sim.set_servo(1.0, 1.0)
+    sim.latency_steps = 0
+
+
+def test_gecikme_hedefi_geciktirir(ayakta):
+    """Gecikmeli komutta eklem bir kontrol adımında daha az yol alır."""
+    sim, stand = ayakta, stand_targets(ayakta)
+    moved = []
+    for latency in (0, sim.steps_per_action - 1):
+        sim.reset()
+        run(sim, stand, 1.5)
+        sim.latency_steps = latency
+        before = sim.step(stand).joint_pos[0]
+        target = list(stand)
+        target[0] += 0.3                                  # bacak 0 coxa
+        after = sim.step(target)
+        moved.append(after.joint_pos[0] - before)
+        assert after.joint_target[0] == pytest.approx(target[0])   # adım sonunda uygulanmış
+    assert moved[1] < 0.5 * moved[0]
+    sim.latency_steps = sim.steps_per_action
+    with pytest.raises(ValueError):
+        sim.step(stand)
+
+
+def test_zayif_servo_torku_sinirli(ayakta, model):
+    sim = ayakta
+    sim.set_servo(strength=0.5)
+    target = list(stand_targets(sim))
+    target[1] += 0.8                                      # bacak 0 femur, büyük adım
+    s = sim.step(target)
+    assert max(abs(e) for e in s.joint_effort) <= 0.5 * model.effort + 1e-9
+    with pytest.raises(ValueError):
+        sim.set_servo(strength=0.0)
+
+
+def test_itme_govdeyi_kaydirir(ayakta):
+    sim, stand = ayakta, stand_targets(ayakta)
+    y0 = sim.step(stand).base_pos[1]
+    sim.push((0.0, 15.0, 0.0), 0.1)                       # +y yönünde
+    s = run(sim, stand, 0.2)
+    assert s.base_pos[1] - y0 > 0.002
+    s2 = run(sim, stand, 0.5)                             # itme bitti, yeni kuvvet yok
+    assert s2.base_lin_vel[1] == pytest.approx(0.0, abs=0.05)

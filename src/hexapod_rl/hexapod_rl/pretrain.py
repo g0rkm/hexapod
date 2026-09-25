@@ -32,7 +32,7 @@ import numpy as np
 
 from .demo import TripodDemo
 from .evaluate import evaluate, format_result
-from .task import ACTION_SIZE, OBS_SIZE
+from .task import ACTION_SIZE, OBS_SIZE, Randomization, TaskConfig
 
 
 def demo_for(env) -> TripodDemo:
@@ -58,8 +58,8 @@ def _collect(job) -> list[dict]:
     """Bir işçi süreç: kendi Gazebo'suyla verilen tohumlardaki bölümleri koşar."""
     from .env import HexapodEnv
 
-    seeds, noise, gamma, tail = job
-    env = HexapodEnv()
+    seeds, noise, gamma, tail, task = job
+    env = HexapodEnv(task=task)
     demo = demo_for(env)
     episodes = []
     for seed in seeds:
@@ -160,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--batch", type=int, default=1024)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--randomize", action="store_true",
+                        help="veriyi alan rastgeleleştirme açık topla (kritik aynı ortamı öğrensin)")
     args = parser.parse_args(argv)
 
     out = args.out / args.name
@@ -175,7 +177,8 @@ def main(argv: list[str] | None = None) -> int:
     gamma = PPO_KWARGS["gamma"]
     tail = int(round(3 / (1 - gamma)))    # getirinin %95'i bu kadar adımda birikir
     seeds = [args.seed * 1000 + i for i in range(args.episodes)]
-    jobs = [(seeds[i::args.workers], args.noise, gamma, tail) for i in range(args.workers)]
+    task = TaskConfig(randomization=Randomization()) if args.randomize else TaskConfig()
+    jobs = [(seeds[i::args.workers], args.noise, gamma, tail, task) for i in range(args.workers)]
     t0 = time.time()
     with multiprocessing.get_context("fork").Pool(args.workers) as pool:
         episodes = [ep for part in pool.map(_collect, jobs) for ep in part]
@@ -183,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     steps = sum(len(ep["rew"]) for ep in episodes)
     log(f"veri: {len(episodes)} bölüm, {steps} adım, {time.time() - t0:.0f} s; "
         f"gürültü {args.noise}; devrilen {sum(ep['fell'] for ep in episodes)}; "
+        f"rastgeleleştirme {'açık' if args.randomize else 'kapalı'}; "
         f"gösterimin adım başı ödülü {sum(sum(ep['rew']) for ep in episodes) / steps:.3f}")
 
     val = set(range(len(episodes))[::10])          # her 10 bölümden biri doğrulama

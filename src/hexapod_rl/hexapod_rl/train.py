@@ -2,11 +2,13 @@
 
     python -m hexapod_rl.train --steps 1000000 --envs 8 --name deneme1
     python -m hexapod_rl.train --steps 5000000 --name v3 --init-from models/tork_v2_10M/model.zip
+    python -m hexapod_rl.train --steps 10000000 --name v5 --init-from ~/hexapod_runs/bc/model.zip --randomize
 
 --init-from: sıfırdan değil, eğitilmiş bir modelin ağırlıklarından devam
 eder (ödül değişince yeniden öğrenmek yerine uyum sağlasın diye). PPO'nun
 ayarları o modelden gelir; yalnızca ortam ve günlük yeni. Taklit ile
-başlatılmış model de böyle verilir (pretrain.py).
+başlatılmış model de böyle verilir (pretrain.py). --randomize: alan
+rastgeleleştirme açık (task.Randomization; servo, gecikme, itme, IMU gürültüsü).
 
 Çıktılar ~/hexapod_runs/<ad>/ altında (OneDrive'a senkronlanmasın diye
 depoda değil): model.zip, ara kayıtlar (checkpoints/), progress.csv
@@ -40,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 
     from .env import make_env
+    from .task import Randomization, TaskConfig
 
     parser = argparse.ArgumentParser(description="Hexapod PPO eğitimi")
     parser.add_argument("--steps", type=int, default=1_000_000)
@@ -47,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--name", default=time.strftime("%Y%m%d-%H%M%S"))
     parser.add_argument("--out", type=Path, default=Path.home() / "hexapod_runs")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--randomize", action="store_true", help="alan rastgeleleştirme")
     parser.add_argument("--init-from", type=Path, default=None,
                         help="eğitilmiş model.zip'ten devam et")
     args = parser.parse_args(argv)
@@ -55,7 +59,9 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(1)  # paralellik süreçlerde; torch'un iş parçacıkları yarışmasın
 
-    venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i) for i in range(args.envs)],
+    task = TaskConfig(randomization=Randomization()) if args.randomize else TaskConfig()
+    venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task)
+                                     for i in range(args.envs)],
                                     start_method="fork"))
     if args.init_from:
         model = PPO.load(args.init_from, env=venv, device="cpu", seed=args.seed)

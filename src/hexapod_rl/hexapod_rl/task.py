@@ -55,6 +55,20 @@ düz yürüyüşten DAHA ÇOK ödüllendiriyordu (adım başı 0.98'e 0.63). Dü
     salınım değil. 0.1 gürültüde gösterim 2.23, dönen politika 1.90 alıyor.
   - progress anlık kalır (doğrusal; gürültü ortalamada kaybolur).
   - politika taklitle başlatılır (pretrain.py), keşif std'si küçük başlar.
+
+Ödül v5 (PPO v4 sonrası, models/ppo_v4_4M): politika gürültüye dayanıklı ama
+gürültüsüz düz zeminde tripod'un 3-4 katı enerji harcıyor ve hedef hızı
+%10-20 aşıyordu. Düzeltmeler:
+  - progress da süzülmüş hıza bakar. Anlık hız adım içinde salınıyor;
+    komutla kırpılınca ortalaması ancak ortalama hız komutu aşınca komuta
+    ulaşıyordu, yani hedefi aşmak ödüllendiriliyordu.
+  - güç cezası -0.02 -> -0.05 /W: v4'te 7 W adım başı 0.14'e mal oluyordu,
+    enerji neredeyse bedavaydı (TÜBİTAK tanımı: en az enerjiyle).
+
+Alan rastgeleleştirme (G7): Randomization, bölüm başında env.py çeker;
+TaskConfig.randomization None ise kapalı (değerlendirmenin varsayılanı).
+Zemin ve sürtünme S5'in (Samet) dünyalarıyla gelecek; kütle dünyanın
+yeniden kurulmasını gerektirdiği için henüz yok.
 """
 
 from __future__ import annotations
@@ -94,13 +108,33 @@ class TaskConfig:
         "yaw_rate": 1.0,       # dönüş hızını izleme (exp); v3'te 0.2 -> 1.0
         "orientation": -2.0,   # gövdenin yatması
         "height": -20.0,       # yükseklik sapması (m^2)
-        "power": -0.02,        # mekanik güç, W (enerji)
+        "power": -0.05,        # mekanik güç, W (enerji); v5'te -0.02 -> -0.05
         "action_rate": -0.01,  # sarsıntı
         "fall": -10.0,         # devrilince bir kez
     })
     lin_vel_sigma: float = 0.05    # m/s; v3'te 0.10 -> 0.05
     yaw_rate_sigma: float = 0.2    # rad/s; v3'te 0.5 -> 0.2
     vel_filter_s: float = 0.5      # s; v4: izleme terimleri bu ortalamaya bakar
+    randomization: "Randomization | None" = None   # None: kapalı
+
+
+@dataclass(frozen=True)
+class Randomization:
+    """Alan rastgeleleştirme aralıkları; her bölüm başında düzgün dağılımdan çekilir.
+
+    Değerler TAHMİN: gerçek robotun ne kadar farklı olacağı bilinmiyor, aralık
+    bu belirsizliği kapsasın diye geniş tutuldu. Donanım vardiyasında (D9, D10)
+    ölçülen farklara göre daraltılır.
+    """
+
+    servo_strength: tuple[float, float] = (0.8, 1.1)   # durma torku çarpanı (akü, servo farkı)
+    servo_stiffness: tuple[float, float] = (0.7, 1.3)  # Kp çarpanı (Kp zaten TAHMİN)
+    latency_ms: tuple[float, float] = (0.0, 18.0)      # komutun servoya ulaşması
+    push_force_n: tuple[float, float] = (0.0, 4.0)     # yatay itme; 2.1 kg'da 0.2 s -> <0.4 m/s
+    push_s: float = 0.2                                # itme süresi
+    push_every_s: tuple[float, float] = (2.0, 5.0)     # itmeler arası
+    gyro_noise: float = 0.05       # rad/s, gözlemdeki jiroskop gürültüsü (std)
+    gravity_noise: float = 0.02    # gözlemdeki yerçekimi yönü, bileşen başına (std)
 
 
 class VelocityFilter:
@@ -178,15 +212,15 @@ def reward(state: SimState, action, prev_action, command: tuple[float, float, fl
            cfg: TaskConfig, fell: bool, phase: float = 0.0,
            groups=((0, 2, 4), (1, 3, 5)),
            tracked: tuple[float, float, float] | None = None) -> tuple[float, dict[str, float]]:
-    """tracked: izleme terimlerinin baktığı (vx, vy, wz) — v4'te VelocityFilter
-    çıktısı; verilmezse anlık hız (v3 davranışı)."""
+    """tracked: lin_vel, yaw_rate ve (v5'ten beri) progress'in baktığı (vx, vy,
+    wz) — ortamda VelocityFilter çıktısı; verilmezse anlık hız."""
     vx, vy, _ = state.lin_vel_in_base()
     tx, ty, twz = tracked if tracked is not None else (vx, vy, state.ang_vel_in_base()[2])
     g = state.gravity_in_base()
     ex, ey = command[0] - tx, command[1] - ty
     terms = {
         "lin_vel": math.exp(-(ex * ex + ey * ey) / cfg.lin_vel_sigma ** 2),
-        "progress": _progress(vx, vy, command),
+        "progress": _progress(tx, ty, command),
         "gait": gait_score(state.foot_contact, phase, groups),
         "yaw_rate": math.exp(-((command[2] - twz) ** 2) / cfg.yaw_rate_sigma ** 2),
         "orientation": g[0] ** 2 + g[1] ** 2,

@@ -39,6 +39,12 @@ tripod duruşu ikisinde de 0.6 N·m'de bile çökmüyor; sorun dinamikti.
 ROS'lu simülasyon (sim.launch.py) hâlâ hız modelini kullanıyor; açık iş
 (PROJE_DEVIR §13).
 
+Alan rastgeleleştirme düğmeleri (G7; bölüm başında env.py çeker):
+set_servo() durma torkunu ve sertliği ölçekler (akü gerilimi, servo farkı,
+TAHMİN olan Kp), latency_steps yeni hedefin servoya kaç fizik adımı sonra
+ulaştığı (I2C + PCA9685 + servo tepkisi), push() gövdeye bir süre yatay
+kuvvet uygular (itme, darbe).
+
 Bu modül ROS'a bağımlı değil ama gz.sim Python bağlarına bağımlı; onlar ROS 2
 Lyrical kurulumuyla geliyor (source /opt/ros/lyrical/setup.bash).
 """
@@ -92,7 +98,14 @@ class HexapodSim:
         self._vmax = model.velocity
         self.initial_targets = tuple(0.0 for _ in self.names)  # sıfır duruşu
         self._targets = list(self.initial_targets)
+        self._pending: list[float] | None = None   # gecikmedeki yeni hedefler
         self._effort = [0.0] * len(self.names)
+        self._strength = 1.0                        # durma torku çarpanı
+        self._stiffness = 1.0                       # sertlik (Kp) çarpanı
+        self.latency_steps = 0                      # fizik adımı; < steps_per_action
+        self._push: tuple[float, float, float] | None = None
+        self._push_left = 0
+        self._k = 0                                 # kontrol adımı içindeki fizik adımı
 
         self._dir = Path(workdir) if workdir else Path(tempfile.mkdtemp(prefix="hexapod_rl_"))
         self._dir.mkdir(parents=True, exist_ok=True)
@@ -134,14 +147,32 @@ class HexapodSim:
         else:
             raise RuntimeError("Gazebo sıfırlaması 5 adımda gerçekleşmedi")
         self._targets = list(self.initial_targets)
+        self._pending = None
         self._effort = [0.0] * len(self.names)
+        self._push, self._push_left = None, 0
         return self._advance(self.steps_per_action)
+
+    def set_servo(self, strength: float = 1.0, stiffness: float = 1.0) -> None:
+        """Servo modelini ölçekle: durma torku x strength, sertlik x stiffness."""
+        if strength <= 0 or stiffness <= 0:
+            raise ValueError(f"çarpanlar pozitif olmalı: {strength}, {stiffness}")
+        self._strength, self._stiffness = strength, stiffness
+
+    def push(self, force: Sequence[float], seconds: float) -> None:
+        """Gövdeye dünya çerçevesinde force (N) kuvvetini seconds boyunca uygula."""
+        if len(force) != 3:
+            raise ValueError("kuvvet 3 bileşenli olmalı")
+        self._push = (float(force[0]), float(force[1]), float(force[2]))
+        self._push_left = max(1, round(seconds / self.physics_step))
 
     def step(self, targets: Sequence[float]) -> SimState:
         """18 eklem hedefi (rad, interface sırası) ver, bir kontrol adımı ilerle."""
         if len(targets) != len(self.names):
             raise ValueError(f"{len(self.names)} hedef bekleniyordu, {len(targets)} geldi")
-        self._targets = [min(max(t, lim.lower), lim.upper)
+        if not 0 <= self.latency_steps < self.steps_per_action:
+            raise ValueError(f"gecikme 0..{self.steps_per_action - 1} fizik adımı olmalı, "
+                             f"{self.latency_steps} verildi")
+        self._pending = [min(max(t, lim.lower), lim.upper)
                          for t, lim in zip(targets, self._limits)]
         return self._advance(self.steps_per_action)
 
@@ -154,6 +185,7 @@ class HexapodSim:
     def _advance(self, iterations: int) -> SimState:
         self._state = None
         self._left = iterations
+        self._k = 0
         self._server.run(True, iterations, False)
         if self._state is None:
             raise RuntimeError("simülasyon adımı durum üretmedi")
@@ -164,7 +196,14 @@ class HexapodSim:
             return
         if self._joints is None:
             self._bind(ecm)
-        kp, kd, tau_s, w0 = self._kp, self._kd, self._tau, self._vmax
+        if self._pending is not None and self._k >= self.latency_steps:
+            self._targets, self._pending = self._pending, None
+        self._k += 1
+        if self._push_left > 0:
+            self._base.add_world_force(ecm, gz.math.Vector3d(*self._push))
+            self._push_left -= 1
+        kp, kd = self._kp * self._stiffness, self._kd
+        tau_s, w0 = self._tau * self._strength, self._vmax
         for i, joint in enumerate(self._joints):
             q = joint.position(ecm)
             w = joint.velocity(ecm)

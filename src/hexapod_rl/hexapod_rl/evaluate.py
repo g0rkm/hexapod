@@ -4,6 +4,7 @@
     python -m hexapod_rl.evaluate ~/hexapod_runs/AD/checkpoints/ppo_2000000_steps.zip --vx 0.1
     python -m hexapod_rl.evaluate tripod --vx 0.1      # karşılaştırma: Samet'in tripod'u
     python -m hexapod_rl.evaluate tripod --noise 0.1   # eyleme gürültü: dayanıklılık
+    python -m hexapod_rl.evaluate tripod --randomize   # alan rastgeleleştirme açık
 
 Politika deterministik koşturulur; alınan yol, ortalama hız, devrilme,
 yön sapması, adım başı ödül, ortalama mekanik güç, tripod ritmine uyum ve
@@ -27,12 +28,12 @@ def _yaw(q) -> float:
 
 
 def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123,
-             noise: float = 0.0) -> dict:
+             noise: float = 0.0, task=None) -> dict:
     import numpy as np
 
     from .env import HexapodEnv
 
-    env = HexapodEnv()
+    env = HexapodEnv(task=task)
     obs, _ = env.reset(seed=seed, options={"command": (vx, 0.0, 0.0)})
     if hasattr(model, "reset"):   # iç durumu olan denetleyici (baseline.TripodPolicy)
         model.reset()
@@ -80,13 +81,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--vx", type=float, default=0.1)
     parser.add_argument("--seconds", type=float, default=10.0)
     parser.add_argument("--noise", type=float, default=0.0, help="eyleme gürültü (std)")
+    parser.add_argument("--randomize", action="store_true", help="alan rastgeleleştirme açık")
+    parser.add_argument("--seed", type=int, default=123)
     args = parser.parse_args(argv)
     if args.model == "tripod":
         from .baseline import TripodPolicy
         model = TripodPolicy()
     else:
         model = PPO.load(Path(args.model), device="cpu")
-    print(format_result(evaluate(model, args.seconds, args.vx, noise=args.noise)))
+    from .task import Randomization, TaskConfig
+    task = TaskConfig(randomization=Randomization()) if args.randomize else None
+    print(format_result(evaluate(model, args.seconds, args.vx, seed=args.seed,
+                                 noise=args.noise, task=task)))
     return 0
 
 

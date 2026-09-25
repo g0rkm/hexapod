@@ -92,3 +92,29 @@ def test_gosterim_duz_yurur(env):
     assert env._state.base_pos[0] - x0 > 0.7 * cmd[0] * 4.0
     assert abs(math.degrees(yaw1 - yaw0)) < 5.0
     assert yaw_terms / n > 0.9 * env.task.w["yaw_rate"]
+
+
+def test_alan_rastgelelestirme(tmp_path_factory):
+    from hexapod_rl.task import Randomization, TaskConfig
+
+    r = Randomization()
+    e = HexapodEnv(task=TaskConfig(randomization=r), workdir=tmp_path_factory.mktemp("dr"))
+    try:
+        seen = []
+        for seed in (3, 4, 3):
+            _, info = e.reset(seed=seed)
+            d = info["dynamics"]
+            assert r.servo_strength[0] <= d["servo_strength"] <= r.servo_strength[1]
+            assert r.servo_stiffness[0] <= d["servo_stiffness"] <= r.servo_stiffness[1]
+            assert 0.0 <= d["latency_ms"] <= r.latency_ms[1] + 1.0
+            seen.append(d)
+        assert seen[0] == seen[2] and seen[0] != seen[1]    # tohum aynı -> aynı dinamik
+        e.reset(seed=5)
+        pushes = 0
+        for _ in range(int(round(6.0 / e.dt))):             # 6 s: en az bir itme gelmeli
+            before = e._next_push
+            e.step(np.zeros(18, dtype=np.float32))
+            pushes += e._next_push != before
+        assert pushes >= 1
+    finally:
+        e.close()
