@@ -7,9 +7,12 @@ başı 2.76, politika 1.82 alıyor: ödül doğru, politika yerel bir tepeye
 takılmış. Politika önce bunu taklit etmeyi öğrenirse (pretrain.py) PPO dümdüz
 yürüyen bir başlangıçtan iyileştirir.
 
-Bu Samet'in tripod'u (GOREVLER.md S2) DEĞİL: parametreleri sabit, geri
-beslemesiz, en basit yörünge; yalnızca RL'ye başlangıç noktası. S2 gelince
-gösterim onunla değiştirilebilir.
+Bu Samet'in tripod'u (GOREVLER.md S2, hexapod_gait) DEĞİL: parametreleri
+sabit, geri beslemesiz, en basit yörünge; yalnızca RL'ye başlangıç noktası.
+RL ortamında ikisi neredeyse aynı ölçülüyor (baseline.TripodPolicy ile,
+2026-09-25). Taklit için bu tutuldu, çünkü eylemi yalnız adım saatine ve
+hız komutuna bağlı (iç durumu yok); taklit edilen şeyin gözlemden
+çıkarılabilmesi gerekir. TripodGait ise dünya çerçevesinde çapa tutar.
 
 Yörünge: adım saati ortamınkiyle aynı; saatin ilk yarısında groups[0]
 havada, groups[1] yerde (task.gait_score ile aynı sözleşme). Destek fazında

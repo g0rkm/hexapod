@@ -7,7 +7,8 @@ env.py       Gymnasium ortamı
 demo.py      taklit için gösterim tripod'u (saf Python)
 pretrain.py  taklit ile başlatma (behavior cloning)
 train.py     PPO eğitimi
-evaluate.py  eğitilmiş modeli ölçme
+evaluate.py  eğitilmiş modeli (ya da tripod'u) ölçme
+baseline.py  Samet'in tripod'u (hexapod_gait) politika arayüzüyle
 math3d.py    saf Python yardımcılar
 
 Eğitilen politika gerçek robotta ROS arayüzü üzerinden çalışır (docs/ARAYUZ.md,

@@ -2,9 +2,11 @@
 
     python -m hexapod_rl.evaluate ~/hexapod_runs/AD/model.zip
     python -m hexapod_rl.evaluate ~/hexapod_runs/AD/checkpoints/ppo_2000000_steps.zip --vx 0.1
+    python -m hexapod_rl.evaluate tripod --vx 0.1      # karşılaştırma: Samet'in tripod'u
 
 Politika deterministik koşturulur; alınan yol, ortalama hız, devrilme,
-tripod ritmine uyum ve ayakların havada kalma oranı yazılır. Ayrıntılı
+yön sapması, adım başı ödül, ortalama mekanik güç, tripod ritmine uyum ve
+ayakların havada kalma oranı yazılır. Ayrıntılı
 ölçüm aracı Samet'in işi (GOREVLER.md S6); bu yalnızca hızlı bir bakış.
 """
 
@@ -26,15 +28,19 @@ def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123) -> 
 
     env = HexapodEnv()
     obs, _ = env.reset(seed=seed, options={"command": (vx, 0.0, 0.0)})
+    if hasattr(model, "reset"):   # iç durumu olan denetleyici (baseline.TripodPolicy)
+        model.reset()
     x0, y0 = env._state.base_pos[0], env._state.base_pos[1]
     yaw0 = _yaw(env._state.base_quat)
     steps = int(round(seconds / env.dt))
-    fell, gait, airborne, n = False, 0.0, 0.0, 0
+    fell, gait, airborne, total, power, n = False, 0.0, 0.0, 0.0, 0.0, 0
     info = {"base_pos": env._state.base_pos}
     for _ in range(steps):
         action, _ = model.predict(obs, deterministic=True)
-        obs, _, terminated, _, info = env.step(action)
+        obs, r, terminated, _, info = env.step(action)
         n += 1
+        total += r
+        power += info["reward_terms"]["power"] / env.task.w["power"]
         gait += info["reward_terms"]["gait"] / env.task.w["gait"]
         airborne += sum(not c for c in info["foot_contact"]) / 6
         if terminated:
@@ -48,6 +54,7 @@ def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123) -> 
     return {"komut_vx": vx, "sure_s": n * env.dt, "alinan_yol_m": dx, "yana_kayma_m": dy,
             "ortalama_hiz_m_s": dx / max(n * env.dt, 1e-9),
             "toplam_yol_m": math.hypot(dx, dy), "yon_sapmasi_derece": turned, "devrildi": fell,
+            "adim_basi_odul": total / max(n, 1), "ortalama_guc_w": power / max(n, 1),
             "ritim_uyumu": gait / max(n, 1), "havadaki_ayak_orani": airborne / max(n, 1)}
 
 
@@ -60,11 +67,15 @@ def main(argv: list[str] | None = None) -> int:
     from stable_baselines3 import PPO
 
     parser = argparse.ArgumentParser(description="Politikayı değerlendir")
-    parser.add_argument("model", type=Path)
+    parser.add_argument("model", help="model.zip yolu ya da 'tripod'")
     parser.add_argument("--vx", type=float, default=0.1)
     parser.add_argument("--seconds", type=float, default=10.0)
     args = parser.parse_args(argv)
-    model = PPO.load(args.model, device="cpu")
+    if args.model == "tripod":
+        from .baseline import TripodPolicy
+        model = TripodPolicy()
+    else:
+        model = PPO.load(Path(args.model), device="cpu")
     print(format_result(evaluate(model, args.seconds, args.vx)))
     return 0
 
