@@ -18,7 +18,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | URDF modeli | ✅ üretiliyor, testli, RViz'de açılıyor |
 | Gazebo simülasyonu | ✅ robot doğuyor, ayağa kalkıyor; sensörler yayında |
 | Gait motoru (tripod) | ⛔ |
-| RL (PPO) | 🔄 Gymnasium ortamı ve PPO eğitimi çalışıyor (8 paralel ortam, ~10x gerçek zaman) |
+| RL (PPO) | 🔄 ilk yürüyen politika ([models/](models/README.md)); hız ve yön izleme ayarlanıyor |
 | Pi 4'e aktarma | ⛔ |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.

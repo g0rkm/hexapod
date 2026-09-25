@@ -721,6 +721,8 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-25 | Ödül v2 ile 10M eğitim 5.75M'de DURDURULDU | Robot ritmi öğrendi (%93) ama yerinde saydı (10 s'de 0.7 cm). Sebep servo modeli çıktı (alttaki satır); o fizikle eğitmek boşa |
 | 09-25 | **RL simi tork tabanlı servo: tork = Kp·hata − Kd·hız, DC motor tork-hız doğrusuyla sınırlı (Kp 20, Kd 0.05, TAHMİN)** | Hız komutlu model (gz_ros2_control'ünki) ile elle yazılmış tripod bile beklenenin %12'siyle yürüyordu (ayaklar kayıyor); tork modeliyle aynı 1.08 N·m'de %94–97. Hareketsiz tripod iki modelde de 0.6 N·m'de sağlam: sorun dinamik |
 | 09-25 | Enerji cezası artık gerçek mekanik güç Σ\|τ·ω\| (W) | Tork modeliyle tork biliniyor; TÜBİTAK'taki "en az enerji" tanımına uygun |
+| 09-25 | **İlk yürüyen politika** (tork modeli + ödül v2, 10M adım, 8.1 sa): ~0.087 m/s, hiç devrilmiyor; hız komutunu yok sayıyor, ~12°/s sağa dönüyor | Model depoda (`models/tork_v2_10M/`). Sıradaki ödül v3: dönüş izleme ağırlığı/toleransı ve hız toleransı |
+| 09-25 | Kayda değer eğitilmiş modeller depoda `models/<ad>/` (zip ~0.5 MB); tam eğitim çıktıları depoda değil | Samet ve politika düğümü (G8) aynı modeli kullanabilsin |
 
 ---
 
