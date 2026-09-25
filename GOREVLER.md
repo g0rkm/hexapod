@@ -35,17 +35,17 @@ flowchart LR
 
     G1[G1 Servo katmanı + araçlar]:::done
     G2[G2 Ters kinematik]:::done
-    G3[G3 URDF modeli]:::gorkem
-    G4[G4 ROS 2 + Gazebo kurulumu]:::gorkem
-    G5[G5 Gazebo dünyası + eklem arayüzü]:::gorkem
-    G6[G6 RL ortamı]:::gorkem
+    G3[G3 URDF modeli]:::done
+    G4[G4 ROS 2 + Gazebo kurulumu]:::done
+    G5[G5 Gazebo dünyası + eklem arayüzü]:::done
+    G6[G6 RL ortamı]:::done
     G7[G7 PPO eğitimi]:::gorkem
     G8[G8 Politika düğümü]:::gorkem
 
-    S1[S1 Geliştirme ortamı]:::samet
-    S2[S2 Tripod çekirdeği]:::samet
-    S3[S3 Tripod simülasyonda]:::samet
-    S4[S4 Gerçek sürücü düğümü]:::samet
+    S1[S1 Geliştirme ortamı]:::done
+    S2[S2 Tripod çekirdeği]:::done
+    S3[S3 Tripod simülasyonda]:::done
+    S4[S4 Gerçek sürücü düğümü]:::done
     S5[S5 Zemin üreteci]:::samet
     S6[S6 Ölçüm aracı]:::samet
     S7[S7 Sensör sürücüleri]:::samet
@@ -93,8 +93,8 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | G3 | URDF modeli | Görkem | G2 (son kontrol: G4) | G5 | ✅ |
 | G4 | ROS 2 Lyrical + Gazebo kurulumu (Görkem'in PC'si) | Görkem | — | G3, G5 | ✅ |
 | G5 | Gazebo dünyası + eklem komut arayüzü + sanal sensörler | Görkem | G3, G4 | S3, S4, S5, G6 | ✅ |
-| G6 | RL ortamı (Gymnasium) | Görkem | G5, S3 | G7 | 🔄 |
-| G7 | PPO eğitimi + alan rastgeleleştirme | Görkem | G6, S5, S6 | G8 | ⏸ |
+| G6 | RL ortamı (Gymnasium) | Görkem | G5 ✅, S3 ✅ | G7 | ✅ |
+| G7 | PPO eğitimi + alan rastgeleleştirme | Görkem | G6 ✅, S5, S6 | G8 | 🔄 |
 | G8 | Politika çalıştırma düğümü (ROS 2) | Görkem | G7, S4 | (vardiya) | ⏸ |
 | S1 | Geliştirme ortamı (ROS 2 + Gazebo, depo, testler) | Samet | — | S3, S4, S5 | ✅ |
 | S2 | Tripod yürüyüş çekirdeği (saf Python) | Samet | G2 ✅ | S3 | ✅ |
@@ -105,7 +105,7 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
 
 **Şu an başlanabilecekler:**
-- **Görkem:** S3 bitti — G6'nın "bitti" şartı (tripod'u ortamda ölçüp kaydetmek) artık tamamlanabilir. `ros2 run hexapod_teleop teleop` ile tripod `/cmd_vel` dinliyor.
+- **Görkem:** G6 bitti (2026-09-26; tripod RL ortamında ölçüldü). G7 düz zeminde sürüyor: ödül v4 + taklit ile başlatma; alan rastgeleleştirmenin S5'e bağlı olmayan kısmı (servo gücü, gecikme, itme) yapılabilir. Zeminli eğitim ve "bitti" ölçümü S5 + S6'yı bekler.
 - **Samet:** S1, S2, S3, S4 bitti (2026-09-25). Sıradaki: S5 (zemin üreteci) ya da S7 (sensör sürücüleri) — ikisi de kimseyi beklemiyor. S6 (ölçüm aracı) yalnızca S5'i bekliyor. G8 (Görkem) için S4 hazır, G7'yi bekliyor.
 - Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S4'ün ROS düğümü) tekrar çalıştırılmalı.
 
@@ -158,20 +158,23 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 - **Eklem komut arayüzünü bu görev tanımlar:** hangi konu, hangi mesaj, hangi sıra, hangi birim. Samet'in tripod'u (S3), gerçek sürücüsü (S4) ve Görkem'in politika düğümü (G8) aynı arayüzü konuşur; simülasyondan robota geçişte yalnızca karşı taraf değişir. Arayüz bir belge olarak yazılır ve Samet'le birlikte gözden geçirilir.
 - **Bitti sayılır:** tek komutla robot simülasyonda doğup duruyor; eklemler arayüzden komut alıyor; IMU ve temas verisi `ros2 topic echo` ile görülüyor; arayüz belgesi depoda.
 
-#### G6 — RL ortamı 🔄
-- **Bekler:** G5 ✅, S3 · **Açar:** G7
+#### G6 — RL ortamı ✅
+- **Bekler:** G5 ✅, S3 ✅ · **Açar:** G7
 - Bitenler: `hexapod_rl.sim.HexapodSim` — ROS'suz, süreç içi Gazebo (gz.sim). Aynı URDF, aynı fizik, ros2_control ile aynı servo modeli. Tek süreç 2 ms adımda gerçek zamanın 4.5 katı, 8 paralel süreç toplam ~21 katı (50 Hz'de 1 milyon adım ~16 dk). Testli (Linux'ta 6 Gazebo testi: ayakta duruş, 100 mm'ye kalkış, sıfırlama, aynı komut = aynı sonuç, limit kırpma).
 - Bitenler (2): `hexapod_rl.env.HexapodEnv` (Gymnasium) — gözlem yalnız gerçek robotta da olanlar (IMU, son komutlar, hız komutu, adım saati), eylem ayakta duruş + düzeltme, ödül TÜBİTAK tanımına göre (`hexapod_rl.task`). SB3'ün `check_env` denetiminden geçiyor. `python -m hexapod_rl.train` ile 8 paralel ortamda PPO: ~500 adım/s (gerçek zamanın ~10 katı). Kurulum: `bash tools/wsl/rl_kurulum.sh` (venv; torch CPU, SB3, Gymnasium).
-- Kalan: tripod'u (S3) aynı ortamda ölçüp kaydetmek ("bitti" şartı); tripod'a dayanan eylem modu (S3'ün üstüne düzeltme).
+- **Tripod aynı ortamda ölçüldü (2026-09-26, "bitti" şartı):** `hexapod_rl.baseline.TripodPolicy` Samet'in `TripodGait`'ini SB3 modeliyle aynı arayüzle sarar; `python -m hexapod_rl.evaluate tripod --vx 0.1 [--noise 0.1]`. Ödül v4, düz zemin, 10 s: 0.05/0.10/0.15 m/s komutunda gerçek hız 0.049/0.098/0.146 m/s, yön sapması <0.4°, adım başı ödül 2.83/3.20/3.60, mekanik güç 1.5/1.9/2.6 W. Eyleme 0.1 gürültü eklenince 0.044/0.067/0.098 m/s, ödül 1.88/1.99/2.11 (açık döngü; titreşimde hız kaybediyor). Karşılaştırma tablosu: [models/README.md](models/README.md).
+- Tripod'a dayanan eylem modu (S3'ün üstüne düzeltme) yapılmadı; yerine politika tripod benzeri bir gösterimle taklit yoluyla başlatılıyor (G7).
 - **Önemli düzeltme (2026-09-25):** RL simülasyonunun servo modeli tork tabanlı oldu. Eski (hız komutlu) modelde elle yazılmış tripod bile beklenen hızın %12'siyle yürüyordu; yeni modelde aynı katalog torkunda %94–97. **Samet için (S2/S3): tripod'unu `hexapod_rl.sim` ile de dene; ROS'lu simülasyon (sim.launch.py) hâlâ eski servo modelini kullanıyor, orada ayaklar kayar.**
 - **Hız ölçümü (G5 sonrası), tasarımı belirliyor:** tam simülasyon (ROS + ros2_control + sensörler + köprü) sınırsız modda bile gerçek zamanın ~1.3 katı; 50 Hz'de 1 milyon adım ~4 saat. ROS'suz yalın Gazebo ~3–5 kat. `gz.sim` Python bağları kurulu (Python 3.14). Öneri: eğitim ortamı ROS'u aradan çıkarıp Gazebo'yu süreç içinden adımlasın, 8 çekirdekte paralel ortam; ROS arayüzü (docs/ARAYUZ.md) yalnız politika düğümünde (G8) kalır. Başka simülatöre geçmek TÜBİTAK başvurusundan sapma olur, önerilmiyor.
 - Gymnasium ortamı, ros_gz üzerinden. Gözlem: IMU + eklem açıları + ayak temasları. Eylem: eklem hedefleri ya da tripod parametre düzeltmeleri (S3'ün üstüne). Ödül: ileri hız − enerji − devrilme cezası (TÜBİTAK başvurusundaki tanım).
 - **Bitti sayılır:** rastgele politikayla bir bölüm uçtan uca koşuyor; tripod'un ödülü aynı ortamda ölçülüp kaydedildi.
 
-#### G7 — PPO eğitimi ⏸
+#### G7 — PPO eğitimi 🔄
 - **İlk deneme (G6 duman testi, 2026-09-24):** 1M adım, 8 ortam, 34 dk. Ödül ~550'den ~810'a çıktı ama değerlendirmede robot yerinde durdu (vx 0.1 m/s istendi, 10 s'de -1.5 cm), devrilmedi. Yorum: ödül yerinde durmayı fazla ödüllendiriyor; sıfırdan yürümek için 1M az. Sıradaki: ödül düzeltmesi + uzun eğitim; S3 gelince tripod'un üstüne öğrenme.
 - **İlk yürüyen politika (2026-09-25):** tork tabanlı servo modeli + ödül v2, 10M adım, 8.1 saat. Kararlı yürüyor (~0.087 m/s), 10M adım boyunca hiç devrilmedi. Ama hız komutunu yok sayıyor (0.05/0.10/0.15 m/s'de aynı hız) ve saniyede ~12° sağa dönüyor. Model ve tablo: [models/](models/README.md). Sıradaki: ödül v3 (dönüş izleme ve hız izleme güçlenecek).
-- **Bekler:** G6, S5 (zeminler), S6 (ölçüm) · **Açar:** G8
+- **Ödül v3 başarısız, v4 + taklit ile başlatma (2026-09-25/26):** v3 (dönüş izleme ağırlığı 1.0, dar tolerans) ile ilk yürüyen politikadan 2.5M adım devam: dönme hiç düzelmedi. Sebep: v3'ün izleme terimleri anlık gövde hızına bakıyordu; PPO'nun keşif gürültüsünde gövde sallandığı için bu terimler, eğitim sırasında dönen politikayı düz yürüyüşten daha çok ödüllendiriyordu (0.98'e 0.63). v4: izleme terimleri gövde hızının 0.5 s'lik ortalamasına bakıyor. Politika önce simetrik bir gösterim tripod'unu taklit ederek başlatılıyor (`hexapod_rl.pretrain`); bu başlangıç hız komutunu %95–100 izliyor, yön sapması <3°.
+- **PPO v4 (taklitten, 4M adım; 5M planlıydı, bilgisayar kapatılınca durdu):** eylem gürültüsü altında tripod'u açık farkla geçiyor (0.10 m/s: 0.108'e 0.067 m/s, ödül 2.64'e 1.99). Gürültüsüz düz zeminde ise tripod biraz önde (ödül 3.11'e 3.20) ve politika 3–4 kat enerji harcıyor; 0.15 m/s'de yön sapması −33°. Sıradaki: ödül v5 (enerji cezası güçlü, hedef hızı aşma teşviki yok) + S5'e bağlı olmayan alan rastgeleleştirme. Tablo: [models/README.md](models/README.md).
+- **Bekler:** G6 ✅, S5 (zeminler), S6 (ölçüm) · **Açar:** G8
 - Stable-Baselines3 PPO. Alan rastgeleleştirme: zemin, sürtünme, kütle, itme, gecikme. Eğitim şimdilik geçici eklem limitleri (±90°) ve CAD'den 2,13 kg kütle tahminiyle yapılır; gerçek değerlerle yeniden eğitim donanım vardiyasında (D10).
 - **Bitti sayılır:** politika S6'nın ölçümünde tripod'u geçiyor; eğim, engebe ve kaygan zeminde ayrı ayrı ölçüldü.
 

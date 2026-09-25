@@ -193,7 +193,8 @@ donanım bilgileri config'e sonradan girilir.
 4. ✅ Gazebo dünyası + eklem komut arayüzü (`hexapod_gazebo`, docs/ARAYUZ.md)
 5. ✅ Klasik yürüyüş (tripod) — çekirdek (`hexapod_gait`) + ROS düğümü
    (`hexapod_teleop`), Gazebo'da doğrulandı
-6. RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminlerle
+6. 🔄 RL ortamı (Gymnasium, ✅) + PPO eğitimi (düz zeminde yürüyor,
+   `models/`), değişken zeminler S5'i bekliyor
 7. Pi 4'e aktarma: eğitilmiş politika + ROS 2 düğümleri + gerçek sürücü
 
 Gerçekçi beklenti: RL politikası eğitimde gördüğü zorluk türlerine karşı
