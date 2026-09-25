@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hexapod_gait</name>
+  <version>0.1.0</version>
+  <description>
+    Hexapod tripod yürüyüş çekirdeği: gövde hız komutundan eklem açısına.
+    Saf Python, ROS'a bağımlı değil; ROS düğümü ayrı (GOREVLER.md S3).
+  </description>
+  <maintainer email="sametoruc74@gmail.com">hexapod takımı</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>hexapod_kinematics</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
