@@ -70,6 +70,12 @@ def main(argv: list[str] | None = None) -> int:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
+    except Exception:
+        # Ctrl+C / SIGTERM rclpy bağlamını kapatır; spin bu sırada Lyrical'da
+        # KeyboardInterrupt değil ExternalShutdownException ya da RCLError ile çıkar.
+        # Bağlam kapandıysa bu normal çıkıştır, değilse gerçek hatadır.
+        if rclpy.ok():
+            raise
     finally:
         node.destroy_node()
         rclpy.try_shutdown()
