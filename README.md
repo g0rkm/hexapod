@@ -18,6 +18,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | URDF modeli | ✅ üretiliyor, testli, RViz'de açılıyor |
 | Gazebo simülasyonu | ✅ robot doğuyor, ayağa kalkıyor; sensörler yayında |
 | Gait motoru (tripod) | ✅ çekirdek ([hexapod_gait](src/hexapod_gait)) + ROS düğümü ([hexapod_teleop](src/hexapod_teleop)); Gazebo'da 65 sn devrilmeden yürüdü, yana ve yerinde dönüş çalışıyor |
+| Gerçek robot sürücü düğümü | ✅ dry-run'da çalışıyor ([hexapod_hardware](src/hexapod_hardware)); gerçek donanımda denenmedi, kablolama bekliyor |
 | RL (PPO) | 🔄 ilk yürüyen politika ([models/](models/README.md)); hız ve yön izleme ayarlanıyor |
 | Pi 4'e aktarma | ⛔ |
 
@@ -57,6 +58,9 @@ src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
   hexapod_teleop/     # /cmd_vel -> hexapod_gait -> eklem komut arayüzü (ROS 2 düğümü)
     controller.py     #   ROS'suz çekirdek: hız sınırlama, zaman aşımı, ReachError yakalama
     node.py           #   ince rclpy kabuğu (ros2 run hexapod_teleop teleop)
+  hexapod_hardware/   # gerçek robot sürücü düğümü: eklem komutu -> servo darbesi (dry-run destekli)
+    controller.py     #   ROS'suz çekirdek: komutu doğrular, ServoBus.set_angles ile hep-ya-da-hiç gönderir
+    node.py           #   ince rclpy kabuğu (ros2 run hexapod_hardware driver)
   hexapod_description/  # simülasyon modeli (URDF'in girdisi)
     model.py          #   kütle/atalet/çarpışma/limitler, SI birimlerinde
     urdf.py           #   RobotModel -> URDF
@@ -170,23 +174,117 @@ ile birebir aynı (test). `preview_urdf.py` ROS olmadan robotun bir resmini
 Simülasyon, gerçek robot, yürüyüş ve RL politikası aynı konuları konuşur:
 [docs/ARAYUZ.md](docs/ARAYUZ.md). Kod: `hexapod_description.interface`.
 
-## Gazebo (ROS kurulduktan sonra)
+## Simülasyonu çalıştırma (WSL)
 
-Önce paketleri derle (WSL, depo klasöründen):
+Gazebo ve ROS Windows'a değil, WSL'in içindeki Ubuntu'ya kurulur. Windows'un
+Başlat menüsünde "Gazebo" diye bir uygulama yoktur; her şey Ubuntu terminalinden
+açılır. Gazebo'nun penceresi ise (WSLg sayesinde) normal bir Windows penceresi
+gibi masaüstünde belirir.
+
+**Bir kez, kurulumda** (sırayla; ilki `sudo` şifresi sorar):
+
+```bash
+bash tools/wsl/ros_kurulum.sh
+```
 
 ```bash
 bash tools/wsl/derle.sh
 ```
 
-Sonra:
-
 ```bash
-ros2 launch hexapod_gazebo sim.launch.py
+bash tools/wsl/rl_kurulum.sh
 ```
 
+**Her seferinde:**
+
+1. Windows'ta herhangi bir terminal aç (Windows Terminal, PowerShell, cmd) ve Ubuntu'ya gir:
+
+   ```bash
+   wsl -d Ubuntu-26.04
+   ```
+
+   (Dağıtım adı farklıysa `wsl -l -v` ile bak.) ROS ortamı her yeni terminalde
+   kendiliğinden yüklenir, elle `source` yazmak gerekmez.
+
+2. Depo klasörüne git. Windows'taki `C:\Users\<kullanıcı>\...\hexapod`
+   klasörü Ubuntu'da `/mnt/c/Users/<kullanıcı>/.../hexapod` olarak görünür:
+
+   ```bash
+   cd /mnt/c/Users/<kullanıcı>/OneDrive/Desktop/hexapod
+   ```
+
+3. **Terminal 1** — Gazebo'yu robotla aç (bu terminali kapatma, simülasyon burada çalışır):
+
+   ```bash
+   ros2 launch hexapod_gazebo sim.launch.py
+   ```
+
+   Pencere istemiyorsan (testler, RL için): `ros2 launch hexapod_gazebo sim.launch.py gui:=false`
+
+4. **Terminal 2** (yeni sekme/pencere, yine `wsl -d Ubuntu-26.04` ve `cd`) — ne yapsın?
+
+   Sadece ayağa kalksın:
+
+   ```bash
+   ros2 run hexapod_gazebo stand
+   ```
+
+   Ya da tripod yürüyüş düğümü çalışsın (`/cmd_vel` dinler):
+
+   ```bash
+   ros2 run hexapod_teleop teleop
+   ```
+
+5. **Terminal 3** (yürüyüş düğümünü çalıştırdıysan) — robota hız komutu ver. Komut
+   `-r 20` ile saniyede 20 kez tekrarlanır; durdurmak için `Ctrl+C`:
+
+   ```bash
+   ros2 topic pub -r 20 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.08}}"
+   ```
+
+   | Ne olsun | Komutun sonu |
+   |---|---|
+   | İleri | `"{linear: {x: 0.08}}"` |
+   | Yana | `"{linear: {y: 0.06}}"` |
+   | Yerinde dön | `"{angular: {z: 0.4}}"` |
+   | Dur | `Ctrl+C` (komut kesilince 0.5 sn içinde kendisi durur) |
+
+   Hızlar `vx ±0.15`, `vy ±0.08` m/s ve `wz ±0.5` rad/s'ye kırpılır. Yürüyüş
+   ayarları: `ros2 run hexapod_teleop teleop --ros-args -p cycle_hz:=1.5 -p cmd_timeout_s:=0.5`.
+
+6. Kapatmak için her terminalde `Ctrl+C`, en son Gazebo'nun terminalinde.
+
+**Bilmen gerekenler:**
+
+- `sim.launch.py` hâlâ eski (hız komutlu) servo modelini kullanıyor; orada
+  ayaklar kayar ve yürüyüş komutun yaklaşık %70-85'i hızında gider. RL için
+  kullanılan `hexapod_rl.sim` (tork modeli) çok daha gerçekçi (%97-98).
+- Robotun dünyadaki konumunu okumak için (Gazebo açıkken, ayrı terminalde):
+  `gz topic -e -t /world/flat/pose/info -n 1` ("hexapod" modelinin x, y, z değerleri).
+- Python dosyalarını değiştirince yeniden derlemeye gerek yok (`--symlink-install`).
+  Yeni paket ya da yeni dosya eklersen `bash tools/wsl/derle.sh`'yi tekrar çalıştır.
+- RViz'de robotu görmek için: `ros2 launch hexapod_description display.launch.py`.
+
+## Gerçek robot sürücüsü (dry-run)
+
+Simülasyondaki kontrolcünün yerine geçer: aynı komut konusunu dinler
+(`/leg_controller/commands`), servoya darbe yazar, `/joint_states` yayınlar.
+Robot olmadan `dry_run` ile denenir (donanıma hiçbir şey yazılmaz):
+
 ```bash
-ros2 run hexapod_gazebo stand
+ros2 run hexapod_hardware driver --ros-args -p dry_run:=true
 ```
+
+Kablolama (`config/robot.yaml` kart adresleri, kanallar, limitler) ve kalibrasyon
+girilmemişse düğüm **bilerek** başlamaz ve eksik alanları listeler. Yani şu an gerçek
+config ile bu komut hata verir; kablolama yapılınca çalışır. Denemek için başka bir
+dosya verilebilir:
+
+```bash
+ros2 run hexapod_hardware driver --ros-args -p dry_run:=true -p config:=/yol/robot.yaml -p calibration:=/yol/calibration.yaml
+```
+
+Robotta (Pi) `dry_run` verilmez. Düğüm kapanınca servolar serbest kalır (tork kesilir).
 
 ## RL eğitimi (WSL)
 
@@ -215,6 +313,17 @@ bash tools/wsl/ros_kurulum.sh
 ```
 
 ## Testler
+
+```bash
+python -m pytest -q
+```
+
+Windows'ta Gazebo gerektiren testler atlanır (`skipped`). Hepsini çalıştırmak
+için WSL'de, RL ortamı açıkken:
+
+```bash
+source ~/hexapod_venv/bin/activate
+```
 
 ```bash
 python -m pytest -q

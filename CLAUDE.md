@@ -99,6 +99,7 @@ src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
 src/hexapod_kinematics/   ters/düz kinematik + gövde pozu, saf Python
 src/hexapod_gait/         tripod yürüyüş çekirdeği (gövde hızı -> eklem açısı), saf Python
 src/hexapod_teleop/       /cmd_vel -> hexapod_gait -> eklem komut arayüzü, ROS 2 düğümü
+src/hexapod_hardware/     gerçek robot sürücü düğümü: eklem komutu -> ServoBus (dry-run destekli)
 src/hexapod_description/  simülasyon modeli, URDF, eklem arayüzü (interface.py)
 src/hexapod_gazebo/       Gazebo dünyaları, sim.launch.py, stand komutu
 src/hexapod_rl/           RL: süreç içi Gazebo (sim), Gymnasium ortamı (env, task), PPO (train)
