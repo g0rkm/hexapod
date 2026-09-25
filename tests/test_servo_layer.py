@@ -384,3 +384,45 @@ def test_limit_alanlari_kaydedilip_geri_okunuyor(tmp_path):
     assert again.limit_min_us == 1000
     assert again.limit_max_us == 2000
     assert again.us_per_deg == pytest.approx(10.0)
+
+
+# ---------------------------------------------------------------------------
+# set_angles: hep ya da hiç
+# ---------------------------------------------------------------------------
+
+
+def _calibrated_two_joints() -> Calibration:
+    cal = Calibration.empty()
+    for key in ("leg0_coxa", "leg0_femur"):
+        cal.set_center(key, 1500)
+        cal.set_direction(key, 1)
+        cal.get(key).us_per_deg = 10.0
+    return cal
+
+
+def test_set_angles_hepsini_gonderiyor(tmp_path):
+    bus, backend = make_bus(wired_config(tmp_path), _calibrated_two_joints())
+    backend.writes.clear()
+    pulses = bus.set_angles({(0, "coxa"): 30.0, (0, "femur"): -20.0})
+    assert pulses == {(0, "coxa"): 1800, (0, "femur"): 1300}
+    assert len(backend.writes) == 2
+    bus.stop()
+
+
+def test_set_angles_biri_limit_disiysa_hicbiri_gitmiyor(tmp_path):
+    bus, backend = make_bus(wired_config(tmp_path), _calibrated_two_joints())
+    backend.writes.clear()
+    with pytest.raises(LimitError):
+        bus.set_angles({(0, "coxa"): 30.0, (0, "femur"): 75.0})  # femur limit dışı (±60)
+    assert backend.writes == [], "yarım uygulanmamalı: coxa da gitmemeli"
+    assert bus.active_joints() == []
+    bus.stop()
+
+
+def test_set_angles_biri_kalibresizse_hicbiri_gitmiyor(tmp_path):
+    bus, backend = make_bus(wired_config(tmp_path), _calibrated_two_joints())
+    backend.writes.clear()
+    with pytest.raises(MissingValue):
+        bus.set_angles({(0, "coxa"): 10.0, (1, "coxa"): 10.0})  # bacak 1 kalibre değil
+    assert backend.writes == []
+    bus.stop()

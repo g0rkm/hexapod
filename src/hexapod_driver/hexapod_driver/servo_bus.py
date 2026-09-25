@@ -12,7 +12,7 @@ Katmanın iki giriş kapısı var:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from .backends import DryRunBackend, I2CBackend, SMBusBackend
 from .calibration import Calibration
@@ -100,22 +100,17 @@ class ServoBus:
         Dönen değer, gerçekten gönderilen (kırpılmamış) darbedir.
         """
         spec = self.config.joint(leg, joint)
-        us = int(round(microseconds))
-        lo, hi = self.config.pulse_us_min, self.config.pulse_us_max
-        if not lo <= us <= hi:
-            raise LimitError(
-                f"{spec}: {us} us, güvenlik aralığının ({lo}-{hi} us) dışında. "
-                "Bu sınırlar config/robot.yaml -> servo.pulse_us_hard_limits."
-            )
+        us = self._checked_pulse(spec, microseconds)
         board, channel = self._resolve(spec)
         board.set_pulse_us(channel, us)
         self._state[spec.key] = JointState(pulse_us=us)
         return us
 
-    def set_angle(self, leg: int, joint: str, degrees: float) -> int:
-        """Eklem açısı gönder. Kalibrasyon tamamlanmamışsa hata verir.
+    def pulse_for_angle(self, leg: int, joint: str, degrees: float) -> int:
+        """Açının karşılığı darbeyi hesapla ve doğrula; HİÇBİR ŞEY göndermez.
 
-        0 derece = calibration.yaml içindeki center_us konumu.
+        set_angle ile aynı denetimler (kalibrasyon, eklem limiti, mutlak
+        darbe sınırı) burada yapılır; set_angles önce hepsini buradan geçirir.
         """
         spec = self.config.joint(leg, joint)
         cal = self.calibration.get(spec.key)
@@ -128,7 +123,34 @@ class ServoBus:
                 f"{spec}: {degrees:.1f} derece, eklem limitlerinin "
                 f"({lo:.1f} .. {hi:.1f}) dışında."
             )
-        return self.set_pulse_us(leg, joint, center + direction * degrees * us_per_deg)
+        return self._checked_pulse(spec, center + direction * degrees * us_per_deg)
+
+    def set_angle(self, leg: int, joint: str, degrees: float) -> int:
+        """Eklem açısı gönder. Kalibrasyon tamamlanmamışsa hata verir.
+
+        0 derece = calibration.yaml içindeki center_us konumu.
+        """
+        return self.set_pulse_us(leg, joint, self.pulse_for_angle(leg, joint, degrees))
+
+    def set_angles(self, angles: Mapping[tuple[int, str], float]) -> dict[tuple[int, str], int]:
+        """Birden çok eklemi HEP YA DA HİÇ gönder. Anahtar: (bacak, eklem), değer: derece.
+
+        Önce hepsi doğrulanır (kalibrasyon, limit, mutlak darbe sınırı, kart/kanal
+        tanımı); herhangi biri reddedilirse hiçbir servoya darbe gitmez. Yarım
+        uygulanan bir komut (bir bacak yeni pozda, öteki eski pozda) robotu
+        sıçratır; 18 eklemli bir hedefte bu yüzden tek tek set_angle çağırmak yerine bu.
+        Dönen değer: gönderilen darbeler (us).
+
+        Doğrulamayı geçtikten sonra oluşan I2C hataları (BackendError) yine de
+        yazmanın ortasında olabilir; onu bu katman öngöremez.
+        """
+        pulses = {}
+        for (leg, joint), degrees in angles.items():
+            pulses[(leg, joint)] = self.pulse_for_angle(leg, joint, degrees)
+            self._resolve(self.config.joint(leg, joint))  # kart/kanal yoksa şimdi patla
+        for (leg, joint), us in pulses.items():
+            self.set_pulse_us(leg, joint, us)
+        return pulses
 
     def release(self, leg: int, joint: str) -> None:
         """Tek eklemi serbest bırak (darbe kes, servo tork uygulamaz)."""
@@ -157,6 +179,17 @@ class ServoBus:
         return [k for k, v in self._state.items() if v.pulse_us is not None]
 
     # -- iç işler ---------------------------------------------------------
+
+    def _checked_pulse(self, spec: JointSpec, microseconds: float) -> int:
+        """Darbeyi tam sayıya yuvarla, mutlak güvenlik aralığında mı bak."""
+        us = int(round(microseconds))
+        lo, hi = self.config.pulse_us_min, self.config.pulse_us_max
+        if not lo <= us <= hi:
+            raise LimitError(
+                f"{spec}: {us} us, güvenlik aralığının ({lo}-{hi} us) dışında. "
+                "Bu sınırlar config/robot.yaml -> servo.pulse_us_hard_limits."
+            )
+        return us
 
     def _resolve(self, spec: JointSpec) -> tuple[PCA9685, int]:
         if not self._started:
