@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hexapod_hardware</name>
+  <version>0.1.0</version>
+  <description>
+    Gerçek robot sürücü düğümü: eklem komut arayüzünü dinler, hexapod_driver
+    ServoBus ile servoları sürer, /joint_states yayınlar (GOREVLER.md S4).
+    Robot olmadan dry_run:=true ile çalışır.
+  </description>
+  <maintainer email="sametoruc74@gmail.com">hexapod takımı</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>hexapod_driver</exec_depend>
+  <exec_depend>hexapod_description</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
