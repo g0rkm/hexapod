@@ -5,7 +5,8 @@
 
 --init-from: sıfırdan değil, eğitilmiş bir modelin ağırlıklarından devam
 eder (ödül değişince yeniden öğrenmek yerine uyum sağlasın diye). PPO'nun
-ayarları o modelden gelir; yalnızca ortam ve günlük yeni.
+ayarları o modelden gelir; yalnızca ortam ve günlük yeni. Taklit ile
+başlatılmış model de böyle verilir (pretrain.py).
 
 Çıktılar ~/hexapod_runs/<ad>/ altında (OneDrive'a senkronlanmasın diye
 depoda değil): model.zip, ara kayıtlar (checkpoints/), progress.csv
@@ -22,6 +23,13 @@ import time
 from pathlib import Path
 
 from .evaluate import evaluate, format_result
+
+# Sıfırdan eğitimin PPO ayarları; pretrain.py de modelini bunlarla kurar.
+PPO_KWARGS = dict(
+    n_steps=256, batch_size=512, n_epochs=5, learning_rate=3e-4,
+    gamma=0.99, gae_lambda=0.95, clip_range=0.2, ent_coef=0.0,
+    policy_kwargs={"net_arch": [128, 128]},
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -54,12 +62,7 @@ def main(argv: list[str] | None = None) -> int:
         (out / "baslangic.txt").write_text(str(args.init_from.resolve()) + "\n",
                                            encoding="utf-8")
     else:
-        model = PPO(
-            "MlpPolicy", venv, device="cpu", seed=args.seed, verbose=0,
-            n_steps=256, batch_size=512, n_epochs=5, learning_rate=3e-4,
-            gamma=0.99, gae_lambda=0.95, clip_range=0.2, ent_coef=0.0,
-            policy_kwargs={"net_arch": [128, 128]},
-        )
+        model = PPO("MlpPolicy", venv, device="cpu", seed=args.seed, verbose=0, **PPO_KWARGS)
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
     t0 = time.time()

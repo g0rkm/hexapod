@@ -42,6 +42,19 @@ neredeyse aynı puanlıyordu. Düzeltmeler:
     (12°/s dönüş artık adım başı ~0.67 kaybettiriyor)
   - hız izleme toleransı 0.10 -> 0.05 m/s (0.087 m/s yürürken 0.15 komutu
     artık ~%80 puan kaybettiriyor)
+
+Ödül v4 (v3 ile 2M adım devam eğitimi dönmeyi düzeltmedi): v3'ün izleme
+terimleri ANLIK gövde hızına bakıyordu. Eyleme küçük bir titreşim bile
+gövdeyi sallar; 0.1'lik eylem gürültüsünde dümdüz yürüyen gösterimin
+(demo.py) dönüş puanı 0.98'den 0.19'a düşüyor. PPO eğitimde eyleme ~0.35
+std'lik keşif gürültüsü eklediği için v3, eğitim sırasında dönen politikayı
+düz yürüyüşten DAHA ÇOK ödüllendiriyordu (adım başı 0.98'e 0.63). Düzeltme:
+  - hız ve dönüş izleme (lin_vel, yaw_rate) gövde hızının üstel ortalamasına
+    bakar (VelocityFilter, zaman sabiti vel_filter_s = 0.5 s, yürüyüş
+    periyodunun ~%75'i). Önemli olan ortalama yön ve hız; adım içindeki
+    salınım değil. 0.1 gürültüde gösterim 2.23, dönen politika 1.90 alıyor.
+  - progress anlık kalır (doğrusal; gürültü ortalamada kaybolur).
+  - politika taklitle başlatılır (pretrain.py), keşif std'si küçük başlar.
 """
 
 from __future__ import annotations
@@ -87,6 +100,29 @@ class TaskConfig:
     })
     lin_vel_sigma: float = 0.05    # m/s; v3'te 0.10 -> 0.05
     yaw_rate_sigma: float = 0.2    # rad/s; v3'te 0.5 -> 0.2
+    vel_filter_s: float = 0.5      # s; v4: izleme terimleri bu ortalamaya bakar
+
+
+class VelocityFilter:
+    """Gövde çerçevesinde (vx, vy, wz) üstel ortalaması; ödül v4'ün izleme terimleri için.
+
+    Bölüm başında robot durduğu için sıfırdan başlar.
+    """
+
+    def __init__(self, dt: float, tau: float) -> None:
+        if dt <= 0 or tau <= 0:
+            raise ValueError(f"dt ve tau pozitif olmalı: dt={dt}, tau={tau}")
+        self.alpha = min(1.0, dt / tau)
+        self.value = (0.0, 0.0, 0.0)
+
+    def reset(self) -> None:
+        self.value = (0.0, 0.0, 0.0)
+
+    def update(self, state: SimState) -> tuple[float, float, float]:
+        vx, vy, _ = state.lin_vel_in_base()
+        now = (vx, vy, state.ang_vel_in_base()[2])
+        self.value = tuple(f + self.alpha * (c - f) for f, c in zip(self.value, now))
+        return self.value
 
 
 def action_to_targets(action, default: list[float], scale: float,
@@ -140,16 +176,19 @@ def gait_score(contact, phase: float, groups) -> float:
 
 def reward(state: SimState, action, prev_action, command: tuple[float, float, float],
            cfg: TaskConfig, fell: bool, phase: float = 0.0,
-           groups=((0, 2, 4), (1, 3, 5))) -> tuple[float, dict[str, float]]:
+           groups=((0, 2, 4), (1, 3, 5)),
+           tracked: tuple[float, float, float] | None = None) -> tuple[float, dict[str, float]]:
+    """tracked: izleme terimlerinin baktığı (vx, vy, wz) — v4'te VelocityFilter
+    çıktısı; verilmezse anlık hız (v3 davranışı)."""
     vx, vy, _ = state.lin_vel_in_base()
-    wz = state.ang_vel_in_base()[2]
+    tx, ty, twz = tracked if tracked is not None else (vx, vy, state.ang_vel_in_base()[2])
     g = state.gravity_in_base()
-    ex, ey = command[0] - vx, command[1] - vy
+    ex, ey = command[0] - tx, command[1] - ty
     terms = {
         "lin_vel": math.exp(-(ex * ex + ey * ey) / cfg.lin_vel_sigma ** 2),
         "progress": _progress(vx, vy, command),
         "gait": gait_score(state.foot_contact, phase, groups),
-        "yaw_rate": math.exp(-((command[2] - wz) ** 2) / cfg.yaw_rate_sigma ** 2),
+        "yaw_rate": math.exp(-((command[2] - twz) ** 2) / cfg.yaw_rate_sigma ** 2),
         "orientation": g[0] ** 2 + g[1] ** 2,
         "height": (state.base_pos[2] - cfg.stand_height_mm / 1000.0) ** 2,
         "power": sum(abs(t * v) for t, v in zip(state.joint_effort, state.joint_vel)

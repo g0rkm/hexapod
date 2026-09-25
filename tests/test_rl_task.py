@@ -160,3 +160,38 @@ def test_farkli_hizlar_ayirt_ediliyor():
     _, tam = reward(state(lin=(0.15, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False)
     _, yavas = reward(state(lin=(0.087, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False)
     assert yavas["lin_vel"] < 0.3 * tam["lin_vel"]
+
+
+# --- ödül v4 --------------------------------------------------------------------
+
+from hexapod_rl.task import VelocityFilter  # noqa: E402
+
+
+def test_izleme_suzulmus_hiza_bakar():
+    """v4: anlık sarsıntı izleme terimlerini düşürmemeli; ortalama doğruysa tam puan."""
+    cfg = TaskConfig()
+    cmd = (0.1, 0.0, 0.0)
+    sarsilan = state(lin=(0.3, 0.1, 0.0), ang=(0.0, 0.0, 0.8))
+    _, anlik = reward(sarsilan, [0.0] * 18, [0.0] * 18, cmd, cfg, False)
+    _, suzulmus = reward(sarsilan, [0.0] * 18, [0.0] * 18, cmd, cfg, False,
+                         tracked=(0.1, 0.0, 0.0))
+    assert anlik["yaw_rate"] < 0.01 and anlik["lin_vel"] < 0.01
+    assert suzulmus["yaw_rate"] == pytest.approx(cfg.w["yaw_rate"])
+    assert suzulmus["lin_vel"] == pytest.approx(cfg.w["lin_vel"])
+    assert suzulmus["progress"] == anlik["progress"]          # progress anlık kalır
+
+
+def test_hiz_suzgeci_ortalamaya_yakinsar_ve_titresimi_bastirir():
+    f = VelocityFilter(dt=0.02, tau=0.5)
+    ileri = state(lin=(0.1, 0.0, 0.0), ang=(0.0, 0.0, 0.2))
+    first = f.update(ileri)
+    assert first == pytest.approx((0.1 * 0.04, 0.0, 0.2 * 0.04))
+    for _ in range(500):
+        f.update(ileri)
+    assert f.value == pytest.approx((0.1, 0.0, 0.2), abs=1e-6)
+    f.reset()
+    for k in range(500):                      # ±0.5 rad/s titreşim, ortalama 0
+        f.update(state(ang=(0.0, 0.0, 0.5 if k % 2 else -0.5)))
+    assert abs(f.value[2]) < 0.03
+    with pytest.raises(ValueError):
+        VelocityFilter(dt=0.02, tau=0.0)

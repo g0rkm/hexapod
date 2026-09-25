@@ -67,3 +67,28 @@ def test_bolum_suresi_dolunca_kesilir(env):
     env._steps = env.max_steps - 1
     *_, truncated, _ = env.step(np.zeros(18, dtype=np.float32))
     assert truncated
+
+
+def test_gosterim_duz_yurur(env):
+    """Taklit edilen gösterim (demo.py) ortamda gerçekten dümdüz yürümeli;
+    ödül v4'te izleme terimlerinin çoğunu almalı."""
+    import math
+
+    from hexapod_rl.pretrain import demo_for
+
+    demo = demo_for(env)
+    cmd = (0.1, 0.0, 0.0)
+    env.reset(seed=2, options={"command": cmd})
+    x0 = env._state.base_pos[0]
+    q = env._state.base_quat
+    yaw0 = math.atan2(2 * (q[0] * q[3] + q[1] * q[2]), 1 - 2 * (q[2] ** 2 + q[3] ** 2))
+    yaw_terms, n = 0.0, int(round(4.0 / env.dt))
+    for _ in range(n):
+        _, _, terminated, _, info = env.step(np.asarray(demo.action(env._phase, cmd)))
+        assert not terminated
+        yaw_terms += info["reward_terms"]["yaw_rate"]
+    q = env._state.base_quat
+    yaw1 = math.atan2(2 * (q[0] * q[3] + q[1] * q[2]), 1 - 2 * (q[2] ** 2 + q[3] ** 2))
+    assert env._state.base_pos[0] - x0 > 0.7 * cmd[0] * 4.0
+    assert abs(math.degrees(yaw1 - yaw0)) < 5.0
+    assert yaw_terms / n > 0.9 * env.task.w["yaw_rate"]

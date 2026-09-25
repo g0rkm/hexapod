@@ -31,6 +31,7 @@ from .task import (
     ACTION_SIZE,
     OBS_SIZE,
     TaskConfig,
+    VelocityFilter,
     action_to_targets,
     fallen,
     observation,
@@ -69,6 +70,7 @@ class HexapodEnv(gym.Env):
         self._phase = 0.0
         self._steps = 0
         self._prev_action = [0.0] * ACTION_SIZE
+        self._vel = VelocityFilter(self.dt, self.task.vel_filter_s)
 
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
@@ -83,6 +85,7 @@ class HexapodEnv(gym.Env):
         self._phase = 0.0
         self._steps = 0
         self._prev_action = [0.0] * ACTION_SIZE
+        self._vel.reset()
         self._state = state
         return self._obs(), {"command": self._command}
 
@@ -94,7 +97,8 @@ class HexapodEnv(gym.Env):
         self._phase = (self._phase + self.task.gait_hz * self.dt) % 1.0
         fell = fallen(state, self.task)
         r, terms = reward(state, action, self._prev_action, self._command, self.task, fell,
-                          phase=self._phase, groups=self.groups)
+                          phase=self._phase, groups=self.groups,
+                          tracked=self._vel.update(state))
         self._prev_action = action
         self._state = state
         info = {"reward_terms": terms, "command": self._command,
