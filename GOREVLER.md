@@ -239,11 +239,13 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 - **Bekler:** S1, G5 · **Açar:** G7, S6
 - RL eğitimi ve ölçüm için Gazebo dünyaları: eğim (açı ayarlı), engebe (yükseklik haritası, pürüzlülük ayarlı), basamak, kaygan zemin (sürtünme ayarlı). Parametreyle ve rastgele tohumla üretilebilir olmalı; aynı tohum aynı dünyayı verir.
 - **Bitti sayılır:** her zemin türü parametreyle üretiliyor ve robot o dünyada doğuyor; birkaç örnek dünyanın görüntüsü depoda.
+- **Görkem'den entegrasyon notu (2026-09-26):** RL eğitimi ROS'lu simi değil süreç içi Gazebo'yu (`hexapod_rl.sim.HexapodSim`) kullanıyor. Zemin oraya `HexapodSim(model, terrain_sdf=...)` ile girer: düz zeminin (`_FLAT_GROUND`) yerine geçen, `<model>...</model>` biçiminde, `<static>true</static>` bir SDF parçası (dünya dosyasının tamamı değil). Böylece üreteç iki simde de kullanılabilir: ROS'lu sim için aynı parçayı bir dünya dosyasına gömmek yeterli. Sürtünme zeminin `<collision><surface><friction>`'ında; "kaygan zemin" ve G7'nin sürtünme rastgeleleştirmesi buradan gelir. Robot orijinde, ayaklar yerin 1 cm üstünde doğuyor (`SPAWN_CLEARANCE_M`): orijin çevresi (~0.5 m) düz ya da robotun basabileceği yükseklikte olmalı. Önerilen arayüz: `terrain.slope(deg, seed) -> str`, `terrain.rough(height_m, seed) -> str`... saf Python, gz'siz test edilebilir.
 
 #### S6 — Yürüyüş ölçüm aracı ⏸
 - **Bekler:** S3, S5 · **Açar:** G7
 - Bir yürüyüş denetleyicisini (tripod ya da RL politikası) seçilen zeminlerde N kez koşturup ölçen betik: ileri hız, enerji (Σ |tork × açısal hız|), devrilme sayısı, düşmeden gidilen mesafe. Sonuçlar bir tabloya.
 - **Bitti sayılır:** tripod'un her zemindeki ölçümü tablo olarak depoda; RL için aynı komutla çalışıyor.
+- **Görkem'den not (2026-09-26):** ölçümün çekirdeği hazır, üstüne kurulabilir: `hexapod_rl.evaluate.evaluate(model, seconds, vx, seed, noise, task)` hız, yön sapması, adım başı ödül, ortalama mekanik güç (W, Σ|τ·ω|), devrilme, ritim uyumu veriyor; `model` bir SB3 modeli ya da `hexapod_rl.baseline.TripodPolicy()` (senin tripod'un, aynı arayüzle). Eksik olan: zemin seçimi (S5'in `terrain_sdf`'i `HexapodEnv`'e geçirilmeli), N tekrar ve tablo. Politikayı ROS'suz koşturduğu için hızlı (~10x gerçek zaman).
 
 #### S7 — Sensör sürücüleri (saf Python) ⬜
 - **Bekler:** — · **Açar:** donanım vardiyası (D8, D11)
