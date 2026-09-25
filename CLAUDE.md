@@ -98,6 +98,7 @@ config/calibration.yaml   servo merkez/yön/limit — calibrate.py üretir
 src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
 src/hexapod_kinematics/   ters/düz kinematik + gövde pozu, saf Python
 src/hexapod_gait/         tripod yürüyüş çekirdeği (gövde hızı -> eklem açısı), saf Python
+src/hexapod_teleop/       /cmd_vel -> hexapod_gait -> eklem komut arayüzü, ROS 2 düğümü
 src/hexapod_description/  simülasyon modeli, URDF, eklem arayüzü (interface.py)
 src/hexapod_gazebo/       Gazebo dünyaları, sim.launch.py, stand komutu
 src/hexapod_rl/           RL: süreç içi Gazebo (sim), Gymnasium ortamı (env, task), PPO (train)
@@ -189,8 +190,8 @@ donanım bilgileri config'e sonradan girilir.
 2. ✅ Ters/düz kinematik + gövde pozu (`hexapod_kinematics`)
 3. ✅ URDF modeli (`hexapod_description`), RViz ve check_urdf'ten geçti
 4. ✅ Gazebo dünyası + eklem komut arayüzü (`hexapod_gazebo`, docs/ARAYUZ.md)
-5. 🔄 Klasik yürüyüş (tripod) — çekirdek bitti (`hexapod_gait`), ROS'a
-   bağlama (S3) sürüyor
+5. ✅ Klasik yürüyüş (tripod) — çekirdek (`hexapod_gait`) + ROS düğümü
+   (`hexapod_teleop`), Gazebo'da doğrulandı
 6. RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminlerle
 7. Pi 4'e aktarma: eğitilmiş politika + ROS 2 düğümleri + gerçek sürücü
 

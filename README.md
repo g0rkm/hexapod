@@ -17,7 +17,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Ters kinematik (IK) + gövde pozu | ✅ yazıldı, testli |
 | URDF modeli | ✅ üretiliyor, testli, RViz'de açılıyor |
 | Gazebo simülasyonu | ✅ robot doğuyor, ayağa kalkıyor; sensörler yayında |
-| Gait motoru (tripod) | 🔄 çekirdek yazıldı, testli, gerçek fizikte %97-98 hız doğruluğuyla yürüyor ([hexapod_gait](src/hexapod_gait)); ROS'a bağlama (S3) sürüyor |
+| Gait motoru (tripod) | ✅ çekirdek ([hexapod_gait](src/hexapod_gait)) + ROS düğümü ([hexapod_teleop](src/hexapod_teleop)); Gazebo'da 65 sn devrilmeden yürüdü, yana ve yerinde dönüş çalışıyor |
 | RL (PPO) | 🔄 ilk yürüyen politika ([models/](models/README.md)); hız ve yön izleme ayarlanıyor |
 | Pi 4'e aktarma | ⛔ |
 
@@ -54,6 +54,9 @@ src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
     body.py           #   altı bacak, gövde çerçevesi, gövde pozu
   hexapod_gait/       # tripod yürüyüş çekirdeği (gövde hızı -> eklem açısı)
     tripod.py         #   iki üçlü grup, çapa tabanlı destek/salınım yörüngesi
+  hexapod_teleop/     # /cmd_vel -> hexapod_gait -> eklem komut arayüzü (ROS 2 düğümü)
+    controller.py     #   ROS'suz çekirdek: hız sınırlama, zaman aşımı, ReachError yakalama
+    node.py           #   ince rclpy kabuğu (ros2 run hexapod_teleop teleop)
   hexapod_description/  # simülasyon modeli (URDF'in girdisi)
     model.py          #   kütle/atalet/çarpışma/limitler, SI birimlerinde
     urdf.py           #   RobotModel -> URDF

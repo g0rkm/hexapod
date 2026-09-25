@@ -98,16 +98,16 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | G8 | Politika çalıştırma düğümü (ROS 2) | Görkem | G7, S4 | (vardiya) | ⏸ |
 | S1 | Geliştirme ortamı (ROS 2 + Gazebo, depo, testler) | Samet | — | S3, S4, S5 | ✅ |
 | S2 | Tripod yürüyüş çekirdeği (saf Python) | Samet | G2 ✅ | S3 | ✅ |
-| S3 | Tripod yürüyüş simülasyonda | Samet | S1 ✅, S2 ✅, G5 ✅ | G6, S6, (vardiya) | ⬜ |
+| S3 | Tripod yürüyüş simülasyonda | Samet | S1 ✅, S2 ✅, G5 ✅ | G6, S6, (vardiya) | ✅ |
 | S4 | Gerçek robot sürücü düğümü (ROS 2, dry-run) | Samet | S1, G5 | G8, (vardiya) | ⏸ |
 | S5 | Zemin / dünya üreteci | Samet | S1, G5 | G7, S6 | ⏸ |
 | S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3, S5 | G7 | ⏸ |
 | S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
 
 **Şu an başlanabilecekler:**
-- **Görkem:** G6'nın tripod'a bağlı olmayan kısmı bitmişti; S2 de bitti, artık G6'nın "bitti" şartı (tripod'u ortamda ölçüp kaydetmek) için gereken her şey hazır.
-- **Samet:** S1 ve S2 bitti (2026-09-25). Sıradaki: S3 (tripod'u Gazebo'ya ROS düğümüyle bağlamak — arayüz: [docs/ARAYUZ.md](docs/ARAYUZ.md)), paralelde S4 ve S7 de başlayabilir. S3, S4, S5 artık kimseyi beklemiyor.
-- Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S3'ün ROS düğümü) tekrar çalıştırılmalı.
+- **Görkem:** S3 bitti — G6'nın "bitti" şartı (tripod'u ortamda ölçüp kaydetmek) artık tamamlanabilir. `ros2 run hexapod_teleop teleop` ile tripod `/cmd_vel` dinliyor.
+- **Samet:** S1, S2, S3 bitti (2026-09-25). Sıradaki: S4 (gerçek sürücü düğümü, dry-run), S5 (zemin üreteci) ya da S7 (sensör sürücüleri) — üçü de kimseyi beklemiyor. S3 bittiği için S6 (ölçüm aracı) da artık yalnızca S5'i bekliyor.
+- Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S4'ün ROS düğümü) tekrar çalıştırılmalı.
 
 **İki kişinin birbirini beklediği yerler:**
 1. **G5 → S3, S4, S5:** Samet'in simülasyon işleri Görkem'in Gazebo dünyasını ve eklem komut arayüzünü bekler. Samet o sırada S2 (tripod çekirdeği) ve S7 (sensör sürücüleri) ile meşgul olur, boşta kalmaz.
@@ -197,11 +197,17 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 - **Gerçek fizikte doğrulandı (`tests/test_tripod_gait_physics.py`, Görkem'in G6 notundaki isteği üzerine):** `hexapod_rl.sim` (gz.sim, tork tabanlı servo modeli) üzerinde 0.05–0.15 m/s aralığında komutun **%97–98'i** gerçek hız, yanal kayma 6 saniyede <0.5 cm, yükseklik 98–99 mm (hedef 100). Görkem'in elle yazdığı açık döngü yörüngeden (%94–97) biraz daha iyi. ROS'lu simülasyon (`sim.launch.py`) hâlâ eski hız-komutlu servo modelinde olduğu için orada ayaklar kayabilir (bilinen açık iş, PROJE_DEVIR §13.1b); S3 gerçek robota/ROS'a bağlarken bunu göz önünde bulundur.
 - **Bitti sayılır:** ROS'suz testler geçiyor: bütün yörünge boyunca her ayak erişim alanında; destek fazındaki ayaklar dünyada sabit; bir döngüde gövde hedef mesafeyi alıyor; her an en az üç ayak yerde. ✅
 
-#### S3 — Tripod yürüyüş simülasyonda ⬜
+#### S3 — Tripod yürüyüş simülasyonda ✅
 - **Bekler:** S1 ✅, S2 ✅, G5 ✅ · **Açar:** G6, S6, donanım vardiyası (D9)
-- S2'yi G5'in eklem komut arayüzüne bağlayan ROS 2 düğümü; hız komutu (`geometry_msgs/Twist`) alır.
+- Yeni paket `hexapod_teleop`. S2'yi G5'in eklem komut arayüzüne bağlayan ROS 2 düğümü; `/cmd_vel` (`geometry_msgs/Twist`) dinler, `TripodGait` ile eklem açısı üretip `/leg_controller/commands`'a yayınlar.
+- Mantık iki katmana ayrıldı (hexapod_rl'deki env.py/task.py ayrımıyla aynı desen): `controller.py` ROS'suz çekirdek (hız sınırlama, zaman aşımı/deadman, `ReachError` yakalama — testli, 8 test), `node.py` ince rclpy kabuğu.
+- Güvenlik: komut S2'de test edilen aralığa kırpılıyor (vx ±0.15, vy ±0.08, wz ±0.5 m/s|rad/s). 0.5 sn `/cmd_vel` gelmezse otomatik sıfır hıza döner (deadman) — komut veren taraf çökerse robot sonsuza kadar yürümez.
 - Not (S2'den): ROS'lu simülasyon (`sim.launch.py`) hâlâ eski hız-komutlu servo modelinde, orada tripod'un ayakları kayabilir (bkz. S2 notu, PROJE_DEVIR §13.1b). `hexapod_rl.sim` ile (tork modeli) test edilirse %97-98 hız doğruluğu ölçüldü.
-- **Bitti sayılır:** Gazebo'da düz zeminde devrilmeden en az 1 dakika ileri yürüyor; yana ve yerinde dönüş çalışıyor.
+- **Gazebo'da canlı doğrulandı** (`sim.launch.py gui:=false` + `ros2 run hexapod_teleop teleop`, 2026-09-25):
+  - İleri, 65 sn, vx=0.08 m/s: 0→4.38 m, dümdüz (65 sn'de 4.8 mm yana kayma), yükseklik hep 0.097-0.100 m — **devrilme yok**. Gerçek hız ~0.068 m/s (komutun %85'i — eski servo modeli yüzünden `hexapod_rl.sim`'deki %97-98'den düşük, beklenen).
+  - Yana, 10 sn, vy=0.06 m/s: 0.48 m yana gitti (%79), ileri yönde sürüklenme yok (0.1 mm).
+  - Yerinde dönüş, 10 sn, wz=0.4 rad/s: konum ~sabit (<1 mm), ~161° döndü (komutun %70'i).
+- **Bitti sayılır:** Gazebo'da düz zeminde devrilmeden en az 1 dakika ileri yürüyor; yana ve yerinde dönüş çalışıyor. ✅
 
 #### S4 — Gerçek robot sürücü düğümü ⏸
 - **Bekler:** S1, G5 (arayüz) · **Açar:** G8, donanım vardiyası (D9)
