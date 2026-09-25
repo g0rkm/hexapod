@@ -194,3 +194,11 @@ def test_itme_govdeyi_kaydirir(ayakta):
     assert s.base_pos[1] - y0 > 0.002
     s2 = run(sim, stand, 0.5)                             # itme bitti, yeni kuvvet yok
     assert s2.base_lin_vel[1] == pytest.approx(0.0, abs=0.05)
+
+
+def test_surec_ici_dunya_ayri_gz_bolumunde(sim):
+    """Eğitim dünyaları gz-transport'ta dışarıya (ROS'lu simülasyona) görünmemeli."""
+    import os
+
+    from hexapod_rl.sim import PARTITION_PREFIX
+    assert os.environ["GZ_PARTITION"] == f"{PARTITION_PREFIX}{os.getpid()}"

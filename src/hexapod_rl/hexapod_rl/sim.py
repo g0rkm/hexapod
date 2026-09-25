@@ -52,6 +52,7 @@ Lyrical kurulumuyla geliyor (source /opt/ros/lyrical/setup.bash).
 from __future__ import annotations
 
 import math
+import os
 import tempfile
 from pathlib import Path
 from typing import Sequence
@@ -70,6 +71,8 @@ from .state import SimState
 SPAWN_CLEARANCE_M = 0.01
 #: Ayak küresinin alt ucu yere bu kadar yakınsa "temas" sayılır.
 CONTACT_TOLERANCE_M = 0.002
+#: Her süreç kendi gz-transport bölümünde (GZ_PARTITION + süreç kimliği).
+PARTITION_PREFIX = "hexapod_rl_"
 
 
 class HexapodSim:
@@ -119,6 +122,12 @@ class HexapodSim:
         self._awaiting_reset = False
         self._state: SimState | None = None
 
+        # Süreç içi dünya gz-transport'ta görünmesin. Görünürse (2026-09-26'da
+        # oldu): eğitim sürerken açılan ROS'lu simülasyonun robot oluşturma
+        # isteği ("ros_gz_sim create") dünya listesini sorunca eğitimin "rl"
+        # dünyasını buldu ve isteği oraya gönderdi; ROS'lu simde robot hiç
+        # doğmadı. Ayrı bölümde ne dışarıdan istek gelir ne dışarı yayın gider.
+        os.environ["GZ_PARTITION"] = f"{PARTITION_PREFIX}{os.getpid()}"
         self._fixture = TestFixture(str(world))
         self._fixture.on_pre_update(self._pre)
         self._fixture.on_post_update(self._post)
