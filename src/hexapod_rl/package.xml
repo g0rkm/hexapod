@@ -15,6 +15,7 @@
   <exec_depend>hexapod_kinematics</exec_depend>
   <exec_depend>hexapod_gazebo</exec_depend>
   <exec_depend>hexapod_gait</exec_depend>  <!-- baseline.py: karşılaştırma için tripod -->
+  <exec_depend>hexapod_policy</exec_depend>  <!-- export.py: politika dosya biçimi -->
   <exec_depend>python3-numpy</exec_depend>
   <!-- gymnasium, stable-baselines3, torch: rosdep'te yok; tools/wsl/rl_kurulum.sh (venv) -->
   <!-- gz.sim / gz.math Python bağları -->

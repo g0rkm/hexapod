@@ -7,7 +7,7 @@ Simülasyon, gerçek robot, tripod yürüyüşü ve RL politikası **aynı konul
 | Gazebo + ros2_control | G5 (Görkem) | komutu dinler, eklemleri sürer |
 | Gerçek robot sürücü düğümü | S4 (Samet) | komutu dinler, `ServoBus.set_angle`'a taşır |
 | Tripod yürüyüş düğümü | S3 (Samet) | komut yayınlar |
-| RL politika düğümü | G8 (Görkem) | komut yayınlar |
+| RL politika düğümü | G8 (Görkem) | komut yayınlar (`hexapod_policy`; `/imu` + `/cmd_vel` dinler) |
 
 Sözleşmenin kodu: [`hexapod_description/interface.py`](../src/hexapod_description/hexapod_description/interface.py). Sabitleri ve dönüşümleri **oradan import edin**, kendi kodunuzda tekrar yazmayın. Testleri: `tests/test_interface.py`.
 

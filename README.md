@@ -19,7 +19,8 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Gazebo simülasyonu | ✅ robot doğuyor, ayağa kalkıyor; sensörler yayında |
 | Gait motoru (tripod) | ✅ çekirdek ([hexapod_gait](src/hexapod_gait)) + ROS düğümü ([hexapod_teleop](src/hexapod_teleop)); Gazebo'da 65 sn devrilmeden yürüdü, yana ve yerinde dönüş çalışıyor |
 | Gerçek robot sürücü düğümü | ✅ dry-run'da çalışıyor ([hexapod_hardware](src/hexapod_hardware)); gerçek donanımda denenmedi, kablolama bekliyor |
-| RL (PPO) | 🔄 ilk yürüyen politika ([models/](models/README.md)); hız ve yön izleme ayarlanıyor |
+| RL (PPO) | 🔄 düz zeminde yürüyor, gürültüde tripod'u geçiyor ([models/](models/README.md)); alan rastgeleleştirmeli eğitim sürüyor, zeminler S5'i bekliyor |
+| Politika düğümü | ✅ [hexapod_policy](src/hexapod_policy): torch'suz (numpy), ROS'lu Gazebo'da yürüdü |
 | Pi 4'e aktarma | ⛔ |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.
@@ -61,6 +62,10 @@ src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
   hexapod_hardware/   # gerçek robot sürücü düğümü: eklem komutu -> servo darbesi (dry-run destekli)
     controller.py     #   ROS'suz çekirdek: komutu doğrular, ServoBus.set_angles ile hep-ya-da-hiç gönderir
     node.py           #   ince rclpy kabuğu (ros2 run hexapod_hardware driver)
+  hexapod_policy/     # eğitilmiş RL politikasını çalıştıran düğüm (Pi'de torch'suz)
+    mlp.py            #   numpy MLP + politikanın eğitim sözleşmesi (.npz)
+    controller.py     #   ROS'suz çekirdek: IMU + hız komutu -> gözlem -> eklem hedefi, güvenlik
+    node.py           #   ince rclpy kabuğu (ros2 run hexapod_policy policy)
   hexapod_description/  # simülasyon modeli (URDF'in girdisi)
     model.py          #   kütle/atalet/çarpışma/limitler, SI birimlerinde
     urdf.py           #   RobotModel -> URDF
@@ -285,6 +290,29 @@ ros2 run hexapod_hardware driver --ros-args -p dry_run:=true -p config:=/yol/rob
 ```
 
 Robotta (Pi) `dry_run` verilmez. Düğüm kapanınca servolar serbest kalır (tork kesilir).
+
+## Politika düğümü (RL)
+
+Eğitilmiş modeli önce torch'suz biçime aktar (WSL, `~/hexapod_venv` açıkken):
+
+```bash
+python -m hexapod_rl.export models/ppo_v4_4M/model.zip
+```
+
+Simülasyon açıkken (ayrı terminalde `ros2 launch hexapod_gazebo sim.launch.py`):
+
+```bash
+ros2 run hexapod_policy policy --ros-args -p policy:=models/ppo_v4_4M/policy.npz -p use_sim_time:=true
+```
+
+Yürütmek için:
+
+```bash
+ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.1}}"
+```
+
+Politika yalnızca eğitildiği komutları yürür (şimdilik ileri 0.05–0.15 m/s). Komut kesilirse,
+IMU gelmezse ya da robot devrilirse ayakta duruşa geçer.
 
 ## RL eğitimi (WSL)
 

@@ -1,7 +1,8 @@
 # Eğitilmiş politikalar
 
 Her klasör bir PPO eğitiminin son modeli (`model.zip`, Stable-Baselines3) ve
-değerlendirmesi. Eğitimlerin tam çıktıları (ara kayıtlar, `progress.csv`)
+değerlendirmesi. `policy.npz`: aynı politikanın torch'suz hâli (robotta
+`hexapod_policy` düğümü okur; `python -m hexapod_rl.export <model.zip>` üretir). Eğitimlerin tam çıktıları (ara kayıtlar, `progress.csv`)
 eğitimi yapan makinede `~/hexapod_runs/<ad>/` altında; depoda yalnızca
 kayda değer modeller tutulur.
 

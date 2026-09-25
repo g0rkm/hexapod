@@ -127,7 +127,7 @@ artık geçersiz ya da güncellendi:
 | 4 | Gazebo dünyası + ROS 2 kontrol arayüzü | ✅ robot Gazebo'da doğuyor ve ayağa kalkıyor (G5) |
 | 5 | Klasik yürüyüş (tripod) — RL için referans ve yedek | ✅ Samet: `hexapod_gait` + `hexapod_teleop` (S2, S3), gerçek sürücü düğümü `hexapod_hardware` (S4) |
 | 6 | RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminler | 🔄 ortam bitti (G6); PPO düz zeminde yürüyor, gürültüde tripod'u geçiyor (G7, `models/`); zeminler S5'i bekliyor |
-| 7 | Pi 4'e aktarma: politika + ROS 2 düğümleri + gerçek sürücü | ⛔ |
+| 7 | Pi 4'e aktarma: politika + ROS 2 düğümleri + gerçek sürücü | 🔄 politika düğümü (`hexapod_policy`, G8) ve sürücü düğümü (`hexapod_hardware`, S4) yazıldı; Pi'de denenmedi (D11) |
 
 **Görev dağılımı:** [GOREVLER.md](../GOREVLER.md). İki bölüm: şimdiki
 **yazılım aşaması** (G = Görkem, S = Samet) ve **⏸ durdurulmuş donanım
@@ -730,6 +730,10 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-26 | Tripod RL ortamında ölçüldü (`hexapod_rl.baseline`, `evaluate tripod`), G6 bitti | G6'nın bitti şartı; G7'nin şartı politikanın bunu geçmesi |
 | 09-26 | Değerlendirme gürültüsüz ve eylem gürültüsüyle (`--noise 0.1`) ayrı ayrı | PPO stokastik politikayı eniyiler: v4'te gürültü altında tripod'u geçiyor (0.10 m/s'de ödül 2.64'e 1.99), gürültüsüzde biraz geride (3.11'e 3.20) ve 3–4 kat enerji harcıyor. İkisi de raporlanmalı |
 | 09-26 | PPO v4 5M yerine 4M'de bırakıldı (`models/ppo_v4_4M`) | Kullanıcı bilgisayarı acil kapattı; ara kayıt 250k'da bir, kayıp ~170k adım. Sıradaki eğitim ödül v5 ile yapılacağı için tamamlanmadı |
+| 09-26 | Ödül v5 (progress süzülmüş hıza, güç −0.05/W) + alan rastgeleleştirme (servo gücü/sertliği, 0–18 ms gecikme, itme, IMU gürültüsü; TAHMİN aralıklar), taklit yeniden (bc_v5), 10M eğitim (v5_dr) | v4 hedef hızı aşıyor ve 3–4 kat enerji harcıyordu; rastgeleleştirme açıkken v4 yön tutamıyordu (−21..−52°), tripod ve taklit tutuyordu |
+| 09-26 | **Politika düğümü torch'suz: aktör ağı + eğitim sözleşmesi .npz'de, numpy ile çıkarım** (`hexapod_policy`, `hexapod_rl.export`) | Pi'ye torch kurmak gereksiz ağırlık; ağ küçük (tick 44 µs PC'de). Sözleşme dosyada olunca eğitim ayarı değişse de eski politika doğru çalışır |
+| 09-26 | Politika düğümü eğitilmemiş komutta yürümez, ayakta bekler (komut yok/zaman aşımı, vx eğitim aralığının yarısının altında, IMU yok/bayat, >45° yatık) | Politika yalnız ileri 0.05–0.15 m/s gördü; geri/yana/dönüş komutunda ne yapacağı bilinmiyor |
+| 09-26 | **Süreç içi Gazebo her süreçte ayrı gz-transport bölümünde** (`GZ_PARTITION=hexapod_rl_<pid>`) | Eğitim sürerken açılan ROS'lu simin `ros_gz_sim create` isteği eğitimin "rl" dünyasına gitti, ROS'lu simde robot doğmadı (§12.22) |
 
 ---
 
@@ -842,6 +846,19 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
     dakika eğitim; başlangıç hemen dümdüz yürüyor. Taklitte gözlemdeki
     "son komutlar" gösterimi kopyalamaya izin verir; uygulanan eyleme
     gürültü ekleyip etiketi gürültüsüz tutmak bunu önler.
+22. **gz-transport ROS_DOMAIN_ID'yi bilmez; süreç içi Gazebo'lar da ağda.**
+    `hexapod_rl.sim`'in TestFixture dünyaları ("rl") gz-transport'ta tam bir
+    sunucu gibi görünür (`/gazebo/worlds`, `/world/rl/create`...). Eğitim
+    sürerken ROS'lu sim açılınca `ros_gz_sim create` dünya listesini sordu,
+    henüz yüklenmemiş "flat" yerine eğitimin "rl"sini buldu ve robotu oraya
+    göndermeye çalıştı ("Entity creation successful"); ROS'lu simde robot
+    hiç doğmadı, spawner sonsuza kadar controller_manager bekledi. Aynı adlı
+    robot zaten olduğu için eğitime zarar vermedi. Çözüm: süreç içi dünya
+    kendi bölümünde (`GZ_PARTITION`), ayrıca aynı anda iki Gazebo çalışacaksa
+    birine elle bölüm ver. Belirti: ROS'lu simde "Entity creation successful"
+    dünya yüklenmeden önce görünüyor ve `ros2 control list_controllers` takılıyor.
+    Ek not: `ros2 control` komutları servis yoksa sonsuza kadar bekler;
+    betiklerde `timeout` ile çağır.
 
 ---
 
@@ -876,11 +893,16 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
   özel bir GazeboSimSystem eklentisi (C++), ya da gz-sim JointPositionController
   (PID + kuvvet sınırı; tork-hız eğrisi yok). G8 (politika düğümü) simde
   denenmeden önce yapılmalı.
-- **RL (G7), 09-26 itibarıyla:** ödül v5 — progress anlık hızı komutla kırptığı
-  için hedef hızı aşmak ödülleniyor (süzülmüş hıza bağlanmalı); güç cezası
-  (−0.02/W) PPO'yu 3–4 kat enerjiye itiyor. Alan rastgeleleştirmenin S5'e
-  bağlı olmayan kısmı (servo gücü, gecikme, itme, kütle) yok. Zeminli eğitim
-  S5, "bitti" ölçümü S6 bekliyor. Karşılaştırma: `models/README.md`.
+- **ROS'lu simde politika düğümü (G8) komutun ~%71'iyle yürüyor** (0.1 m/s
+  komutta 0.071 m/s; tork modelli RL siminde %95+). Yukarıdaki servo modeli
+  farkı; ROS'lu simi politikanın gerçek davranışını görmek için
+  kullanacaksak bu iş öne alınmalı.
+- **RL (G7), 09-26 itibarıyla:** ödül v5 (progress süzülmüş hıza bağlı, güç
+  cezası −0.05/W) ve alan rastgeleleştirme (servo gücü/sertliği, gecikme,
+  itme, IMU gürültüsü) yazıldı; `v5_dr` 10M eğitimi gece sürüyor. Kütle ve
+  sürtünme rastgeleleştirmesi yok (dünyanın süreç başında yeniden kurulması
+  gerekiyor). Zeminli eğitim S5, "bitti" ölçümü S6 bekliyor.
+  Karşılaştırma: `models/README.md`.
 
 ### 13.2 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)
 

@@ -40,7 +40,7 @@ flowchart LR
     G5[G5 Gazebo dünyası + eklem arayüzü]:::done
     G6[G6 RL ortamı]:::done
     G7[G7 PPO eğitimi]:::gorkem
-    G8[G8 Politika düğümü]:::gorkem
+    G8[G8 Politika düğümü]:::done
 
     S1[S1 Geliştirme ortamı]:::done
     S2[S2 Tripod çekirdeği]:::done
@@ -95,7 +95,7 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | G5 | Gazebo dünyası + eklem komut arayüzü + sanal sensörler | Görkem | G3, G4 | S3, S4, S5, G6 | ✅ |
 | G6 | RL ortamı (Gymnasium) | Görkem | G5 ✅, S3 ✅ | G7 | ✅ |
 | G7 | PPO eğitimi + alan rastgeleleştirme | Görkem | G6 ✅, S5, S6 | G8 | 🔄 |
-| G8 | Politika çalıştırma düğümü (ROS 2) | Görkem | G7, S4 | (vardiya) | ⏸ |
+| G8 | Politika çalıştırma düğümü (ROS 2) | Görkem | G7, S4 ✅ | (vardiya) | ✅ |
 | S1 | Geliştirme ortamı (ROS 2 + Gazebo, depo, testler) | Samet | — | S3, S4, S5 | ✅ |
 | S2 | Tripod yürüyüş çekirdeği (saf Python) | Samet | G2 ✅ | S3 | ✅ |
 | S3 | Tripod yürüyüş simülasyonda | Samet | S1 ✅, S2 ✅, G5 ✅ | G6, S6, (vardiya) | ✅ |
@@ -106,7 +106,7 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 
 **Şu an başlanabilecekler:**
 - **Görkem:** G6 bitti (2026-09-26; tripod RL ortamında ölçüldü). G7 düz zeminde sürüyor: ödül v4 + taklit ile başlatma; alan rastgeleleştirmenin S5'e bağlı olmayan kısmı (servo gücü, gecikme, itme) yapılabilir. Zeminli eğitim ve "bitti" ölçümü S5 + S6'yı bekler.
-- **Samet:** S1, S2, S3, S4 bitti (2026-09-25). Sıradaki: S5 (zemin üreteci) ya da S7 (sensör sürücüleri) — ikisi de kimseyi beklemiyor. S6 (ölçüm aracı) yalnızca S5'i bekliyor. G8 (Görkem) için S4 hazır, G7'yi bekliyor.
+- **Samet:** S1, S2, S3, S4 bitti (2026-09-25). Sıradaki: S5 (zemin üreteci) ya da S7 (sensör sürücüleri) — ikisi de kimseyi beklemiyor. S6 (ölçüm aracı) yalnızca S5'i bekliyor.
 - Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S4'ün ROS düğümü) tekrar çalıştırılmalı.
 
 **İki kişinin birbirini beklediği yerler:**
@@ -178,8 +178,15 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 - Stable-Baselines3 PPO. Alan rastgeleleştirme: zemin, sürtünme, kütle, itme, gecikme. Eğitim şimdilik geçici eklem limitleri (±90°) ve CAD'den 2,13 kg kütle tahminiyle yapılır; gerçek değerlerle yeniden eğitim donanım vardiyasında (D10).
 - **Bitti sayılır:** politika S6'nın ölçümünde tripod'u geçiyor; eğim, engebe ve kaygan zeminde ayrı ayrı ölçüldü.
 
-#### G8 — Politika çalıştırma düğümü ⏸
-- **Bekler:** G7, S4 · **Açar:** donanım vardiyası (D11)
+#### G8 — Politika çalıştırma düğümü ✅
+- **Bekler:** G7 (son politika), S4 ✅ · **Açar:** donanım vardiyası (D11)
+- **Yapıldı (2026-09-26):** yeni paket `hexapod_policy` (Samet'in teleop/hardware deseni: `controller.py` ROS'suz çekirdek, `node.py` ince kabuk). `ros2 run hexapod_policy policy --ros-args -p policy:=models/<ad>/policy.npz`. `/imu` + `/cmd_vel` → `/leg_controller/commands`, 50 Hz.
+  - **Torch'suz:** politika `python -m hexapod_rl.export models/<ad>/model.zip` ile `.npz`'ye aktarılır (aktör ağı + eğitim sözleşmesi: eylem ölçeği, varsayılan duruş, adım saati, komut hızı, eğitimdeki komut aralıkları). Aktarım, SB3'ün çıktısıyla karşılaştırılarak doğrulanır (fark < 1e-5). Pi'de yalnız numpy gerekir.
+  - **Gözlem eğitimdekiyle birebir:** test, düğümün gözlemini `hexapod_rl.task.observation` ile karşılaştırır (eğik/dönük gövde, ilerlemiş saat).
+  - **Güvenlik:** komut yok / zaman aşımı (0.5 s), ileri hız eğitim aralığının yarısının altında (dur; geri, yana, yerinde dönüş eğitilmedi), IMU yok / bayat (0.2 s), gövde 45°'den fazla yatık → politika koşmaz, ayakta duruş yayınlanır, adım saati sıfırlanır. Aralık dışı komut aralığa kırpılır ve uyarı yazılır.
+  - **Doğrulama:** (1) kapalı döngü, süreç içi Gazebo (tork modeli): taklit_bc_v4 politikası düğüm çekirdeğiyle 4 s'de >0.28 m, yön <5° (test). (2) Gerçek süreç olarak düğüm (ROS): komutsuz ayakta duruş, IMU + /cmd_vel ile yürüyüş, SIGTERM'de çıkış 0, politika dosyası yoksa çıkış 2 (test). (3) **ROS'lu Gazebo'da canlı** (`sim.launch.py` + düğüm, 30 s, vx 0.1): 21.3 s sim zamanında 1.52 m (~0.071 m/s), yön 0.4°, yana 9 mm, yükseklik 100 mm, komut kesilince "komut zaman aşımı". Hızın düşük olması ROS'lu simin eski hız komutlu servo modeli yüzünden (ayak kayması; tripod da orada %85'teydi; PROJE_DEVIR §13.1b).
+  - **Çıkarım süresi:** PC'de (i5-10300H, eğitim sürerken) tick başına 44 µs, yalnız MLP 18 µs. Pi 4 bundan ~5–10 kat yavaş varsayılsa bile <0.5 ms; 20 ms'lik bütçenin çok altında (tahmin; D11'de ölçülecek).
+  - Kalan: G7'nin son politikasıyla yeniden aktarma ve deneme (düğüm modelden bağımsız, yalnız dosya değişir); IMU montaj dönüşü (S7/D8) sürücüde uygulanacak, düğüm `/imu`'yu `base_link` yöneliminde bekler (docs/ARAYUZ.md).
 - Eğitilmiş politikayı ROS 2 düğümü olarak çalıştırır: sensörleri okur, eklem komutu yayınlar. Önce simülasyonda; Pi 4'te gerçek zamanlı çalışabilecek kadar hafif (CPU, ONNX ya da düz PyTorch; ölçülür).
 - **Bitti sayılır:** simülasyonda politika bu düğümle yürüyor; çıkarım süresi Pi 4 için tahmin edildi.
 
