@@ -13,6 +13,11 @@ Neden: demo.py açıklaması (dönerek yürüme yerel tepesi). Adımlar:
    PPO'nun değer tahmini sıfırdan başlar, ilk güncellemeler aktörü bozar.
    Süreyle kesilen bölümün son adımları dışarıda (getirileri eksik kalır).
 4. Politikanın std'si --std'ye kurulur: PPO'nun keşif gürültüsü.
+   --sde: keşif gSDE ile (durum bağımlı, zamanda düzgün gürültü; SB3
+   use_sde). Neden (2026-09-26): bağımsız adım gürültüsünde PPO ortalama
+   eylemi "gürültüyle uygulanacak" diye ayarlıyor; gürültüsüz koşunca hedef
+   hızı aşıyor ve fazla enerji harcıyor (ppo_v4_4M, v5_dr). gSDE'de gürültü
+   bir kaç yüz ms boyunca aynı kalır, titreşim olmaz.
 
 Model train.py'nin sıfırdan kurduğu PPO ayarlarıyla (PPO_KWARGS) kaydedilir;
 çıktılar ~/hexapod_runs/<ad>/: model.zip, ozet.txt (veri, kayıp,
@@ -103,6 +108,30 @@ def _spaces_only_env():
     return SpacesOnly()
 
 
+#: gSDE gürültüsünün yeniden çekilme aralığı (kontrol adımı): 16 x 20 ms ~ yarım adım döngüsü.
+SDE_SAMPLE_FREQ = 16
+
+
+def set_exploration_std(model, obs: np.ndarray, std: float) -> float:
+    """Keşif gürültüsünü eylem biriminde ~std'ye kur; gerçekleşen ortalama std'yi döndür.
+
+    Normal politikada log_std doğrudan std'dir. gSDE'de (use_sde) gürültü aktör
+    ağının son gizli katmanına bağlı: eylem std'si = sqrt(sum_i h_i^2 s_ij^2),
+    tek tip s için s x |h|. s = std / ortalama |h| (verilen gözlemlerde).
+    """
+    import torch
+
+    p = model.policy
+    with torch.no_grad():
+        if not getattr(p, "use_sde", False):
+            p.log_std.fill_(math.log(std))
+            return std
+        t = torch.as_tensor(np.asarray(obs), dtype=torch.float32)
+        latent = p.mlp_extractor.forward_actor(p.extract_features(t, p.pi_features_extractor))
+        p.log_std.fill_(math.log(std / float(latent.norm(dim=1).mean())))
+        return float(p.get_distribution(t).distribution.stddev.mean())
+
+
 def fit(model, data: dict, epochs: int, lr: float, batch: int, log) -> dict:
     """Aktörü gösterim eylemine, kritiği getirilere oturt. Doğrulama ölçüleri döner."""
     import torch
@@ -156,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--noise", type=float, default=0.1, help="uygulanan eyleme gürültü")
     parser.add_argument("--std", type=float, default=0.3, help="PPO'nun başlangıç std'si")
+    parser.add_argument("--sde", action="store_true", help="keşif gSDE ile (düzgün gürültü)")
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--batch", type=int, default=1024)
@@ -199,15 +229,19 @@ def main(argv: list[str] | None = None) -> int:
             "val_obs": stack("obs", True), "val_act": stack("act", True),
             "val_vobs": stack("vobs", True), "val_ret": stack("ret", True)}
 
+    kwargs = dict(PPO_KWARGS)
+    if args.sde:
+        kwargs.update(use_sde=True, sde_sample_freq=SDE_SAMPLE_FREQ,
+                      policy_kwargs={**PPO_KWARGS["policy_kwargs"], "full_std": True})
     with warnings.catch_warnings():  # tek ortamlık tampon uyarısı; eğitimde 8 ortam var
         warnings.filterwarnings("ignore", message=".*mini-batch size.*")
         model = PPO("MlpPolicy", _spaces_only_env(), device="cpu", seed=args.seed,
-                    verbose=0, **PPO_KWARGS)
+                    verbose=0, **kwargs)
     final = fit(model, data, args.epochs, args.lr, args.batch, log)
-    with torch.no_grad():
-        model.policy.log_std.fill_(math.log(args.std))
+    actual = set_exploration_std(model, data["obs"], args.std)
     model.save(out / "model")
-    log(f"std {args.std}; doğrulama: " + ", ".join(f"{k} {v:.4f}" for k, v in final.items()))
+    log(f"std {args.std} (gerçekleşen {actual:.3f}{', gSDE' if args.sde else ''}); doğrulama: "
+        + ", ".join(f"{k} {v:.4f}" for k, v in final.items()))
 
     for vx in (0.05, 0.10, 0.15):
         log(f"--- değerlendirme, komut vx={vx}\n" + format_result(evaluate(model, vx=vx)))
