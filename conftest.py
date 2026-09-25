@@ -4,5 +4,5 @@ from pathlib import Path
 
 _SRC = Path(__file__).resolve().parent / "src"
 for _pkg in ("hexapod_driver", "hexapod_kinematics", "hexapod_gait", "hexapod_description",
-             "hexapod_gazebo", "hexapod_rl"):
+             "hexapod_gazebo", "hexapod_rl", "hexapod_teleop"):
     sys.path.insert(0, str(_SRC / _pkg))
