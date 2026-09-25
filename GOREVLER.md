@@ -96,18 +96,18 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | G6 | RL ortamı (Gymnasium) | Görkem | G5, S3 | G7 | 🔄 |
 | G7 | PPO eğitimi + alan rastgeleleştirme | Görkem | G6, S5, S6 | G8 | ⏸ |
 | G8 | Politika çalıştırma düğümü (ROS 2) | Görkem | G7, S4 | (vardiya) | ⏸ |
-| S1 | Geliştirme ortamı (ROS 2 + Gazebo, depo, testler) | Samet | — | S3, S4, S5 | ⬜ |
-| S2 | Tripod yürüyüş çekirdeği (saf Python) | Samet | G2 ✅ | S3 | ⬜ |
-| S3 | Tripod yürüyüş simülasyonda | Samet | S1, S2, G5 | G6, S6, (vardiya) | ⏸ |
+| S1 | Geliştirme ortamı (ROS 2 + Gazebo, depo, testler) | Samet | — | S3, S4, S5 | ✅ |
+| S2 | Tripod yürüyüş çekirdeği (saf Python) | Samet | G2 ✅ | S3 | ✅ |
+| S3 | Tripod yürüyüş simülasyonda | Samet | S1 ✅, S2 ✅, G5 ✅ | G6, S6, (vardiya) | ⬜ |
 | S4 | Gerçek robot sürücü düğümü (ROS 2, dry-run) | Samet | S1, G5 | G8, (vardiya) | ⏸ |
 | S5 | Zemin / dünya üreteci | Samet | S1, G5 | G7, S6 | ⏸ |
 | S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3, S5 | G7 | ⏸ |
 | S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
 
 **Şu an başlanabilecekler:**
-- **Görkem:** G6'nın tripod'a bağlı olmayan kısmı (simülasyon hızı, ortam iskeleti; bkz. G6). Tripod'u kullanan kısım S3'ü bekler.
-- **Samet:** S1, S2, S7. Üçü de Görkem'i beklemiyor. S2 ile S7 ROS bile gerektirmiyor.
-- **G5 bitti, simülasyon çalışıyor:** Samet'in S3, S4 ve S5'i artık Görkem'i beklemiyor. Arayüz: [docs/ARAYUZ.md](docs/ARAYUZ.md). Derleme: `bash tools/wsl/derle.sh`.
+- **Görkem:** G6'nın tripod'a bağlı olmayan kısmı bitmişti; S2 de bitti, artık G6'nın "bitti" şartı (tripod'u ortamda ölçüp kaydetmek) için gereken her şey hazır.
+- **Samet:** S1 ve S2 bitti (2026-09-25). Sıradaki: S3 (tripod'u Gazebo'ya ROS düğümüyle bağlamak — arayüz: [docs/ARAYUZ.md](docs/ARAYUZ.md)), paralelde S4 ve S7 de başlayabilir. S3, S4, S5 artık kimseyi beklemiyor.
+- Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S3'ün ROS düğümü) tekrar çalıştırılmalı.
 
 **İki kişinin birbirini beklediği yerler:**
 1. **G5 → S3, S4, S5:** Samet'in simülasyon işleri Görkem'in Gazebo dünyasını ve eklem komut arayüzünü bekler. Samet o sırada S2 (tripod çekirdeği) ve S7 (sensör sürücüleri) ile meşgul olur, boşta kalmaz.
@@ -182,20 +182,25 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 
 ### Samet'in görevleri
 
-#### S1 — Geliştirme ortamı ⬜
+#### S1 — Geliştirme ortamı ✅
 - **Bekler:** — · **Açar:** S3, S4, S5
 - Depoyu klonla; `python -m pytest -q` ile 73 testin geçtiğini gör. ROS 2 + Gazebo: Windows'ta WSL2 + Ubuntu 26.04 kur, sonra `bash tools/wsl/ros_kurulum.sh` (Görkem'in kullandığı betiğin aynısı). Linux'ta aynı betik doğrudan çalışır.
-- **Bitti sayılır:** testler geçiyor; betik "KURULUM TAMAM" diyor.
+- Kuruldu (2026-09-25): WSL2 Ubuntu 26.04, ROS 2 Lyrical + Gazebo 10.5 (`ros_kurulum.sh`), 6 paket derlendi (`derle.sh`), RL ortamı (`rl_kurulum.sh`: torch 2.14 CPU, SB3 2.9.0, gymnasium 1.3.0). `python -m pytest -q`: 124 test geçiyor (gz.sim testleri dahil, 0 atlanan).
+- **Bitti sayılır:** testler geçiyor; betik "KURULUM TAMAM" diyor. ✅
 
-#### S2 — Tripod yürüyüş çekirdeği (saf Python) ⬜
+#### S2 — Tripod yürüyüş çekirdeği (saf Python) ✅
 - **Bekler:** G2 ✅ · **Açar:** S3
 - Yeni paket `hexapod_gait`, `hexapod_driver`/`hexapod_kinematics` gibi ROS'suz çekirdek. Tripod adım döngüsü (iki üçlü grup), destek ve salınım fazında ayak yörüngeleri, hedef gövde hızından (ileri, yan, dönüş) ayak hedeflerine, oradan `HexapodKinematics.inverse` ile eklem açılarına. Hız, adım yüksekliği, adım süresi, duruş genişliği parametre.
 - Dikkat: IK erişilemeyen hedefte `ReachError` fırlatır, kırpmaz; yörünge erişim alanında kalmalı.
-- **Bitti sayılır:** ROS'suz testler geçiyor: bütün yörünge boyunca her ayak erişim alanında; destek fazındaki ayaklar dünyada sabit; bir döngüde gövde hedef mesafeyi alıyor; her an en az üç ayak yerde.
+- Yöntem: her bacak için bir dünya-çerçevesi "çapa" (anchor) tutulur. Ayak yere basınca çapa kilitlenir ve destek boyunca hiç değişmez (gövde üstünden geçer); kalkınca, salınım bitince gövdenin (komut edilen hızla) nerede olacağı tahmin edilip oraya düz gidilir, yükseklik sinüs kavisiyle. Olay tabanlı olduğu için komut hızı bölüm içinde değişse bile (RL'nin üstüne binmesi, G6) her destek fazı kendi içinde tutarlı kalıyor.
+- Testli (`tests/test_tripod_gait.py`, 9 test): komşu bacaklar hep farklı grupta; düz/yana/dönerek yürürken `ReachError` yok (0.15 m/s'e kadar denendi); destek fazındaki ayak (düz ve dönerken) dünyada sabit (<1 µm sapma); bir döngüde ayak izi mesafesi komut hızıyla %5 içinde uyuşuyor; her an tam 3 ayak yerde; komut sıfırsa ayaklar yatayda kıpırdamıyor; `reset()` nötr duruşa dönüyor.
+- **Gerçek fizikte doğrulandı (`tests/test_tripod_gait_physics.py`, Görkem'in G6 notundaki isteği üzerine):** `hexapod_rl.sim` (gz.sim, tork tabanlı servo modeli) üzerinde 0.05–0.15 m/s aralığında komutun **%97–98'i** gerçek hız, yanal kayma 6 saniyede <0.5 cm, yükseklik 98–99 mm (hedef 100). Görkem'in elle yazdığı açık döngü yörüngeden (%94–97) biraz daha iyi. ROS'lu simülasyon (`sim.launch.py`) hâlâ eski hız-komutlu servo modelinde olduğu için orada ayaklar kayabilir (bilinen açık iş, PROJE_DEVIR §13.1b); S3 gerçek robota/ROS'a bağlarken bunu göz önünde bulundur.
+- **Bitti sayılır:** ROS'suz testler geçiyor: bütün yörünge boyunca her ayak erişim alanında; destek fazındaki ayaklar dünyada sabit; bir döngüde gövde hedef mesafeyi alıyor; her an en az üç ayak yerde. ✅
 
-#### S3 — Tripod yürüyüş simülasyonda ⏸
-- **Bekler:** S1, S2, G5 · **Açar:** G6, S6, donanım vardiyası (D9)
+#### S3 — Tripod yürüyüş simülasyonda ⬜
+- **Bekler:** S1 ✅, S2 ✅, G5 ✅ · **Açar:** G6, S6, donanım vardiyası (D9)
 - S2'yi G5'in eklem komut arayüzüne bağlayan ROS 2 düğümü; hız komutu (`geometry_msgs/Twist`) alır.
+- Not (S2'den): ROS'lu simülasyon (`sim.launch.py`) hâlâ eski hız-komutlu servo modelinde, orada tripod'un ayakları kayabilir (bkz. S2 notu, PROJE_DEVIR §13.1b). `hexapod_rl.sim` ile (tork modeli) test edilirse %97-98 hız doğruluğu ölçüldü.
 - **Bitti sayılır:** Gazebo'da düz zeminde devrilmeden en az 1 dakika ileri yürüyor; yana ve yerinde dönüş çalışıyor.
 
 #### S4 — Gerçek robot sürücü düğümü ⏸
