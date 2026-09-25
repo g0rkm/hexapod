@@ -41,7 +41,15 @@ def model() -> RobotModel:
 
 @pytest.fixture(scope="module")
 def gz_urdf(model) -> ET.Element:
+    """Varsayılan (tork) servo modeli."""
     return ET.fromstring(build_urdf(model, gazebo=GazeboOptions("/tmp/controllers.yaml")))
+
+
+@pytest.fixture(scope="module")
+def gz_urdf_velocity(model) -> ET.Element:
+    """Eski hız komutlu servo modeli."""
+    return ET.fromstring(build_urdf(model, gazebo=GazeboOptions("/tmp/controllers.yaml",
+                                                                servo="velocity")))
 
 
 # --- arayüz -----------------------------------------------------------------
@@ -85,8 +93,8 @@ def test_bozuk_komut_reddedilir():
 # --- Gazebo ekleri ------------------------------------------------------------
 
 
-def test_ros2_control_eklem_sirasi_arayuzle_ayni(model, gz_urdf):
-    rc = gz_urdf.find("ros2_control")
+def test_ros2_control_eklem_sirasi_arayuzle_ayni(model, gz_urdf_velocity):
+    rc = gz_urdf_velocity.find("ros2_control")
     assert rc.find("hardware/plugin").text == "gz_ros2_control/GazeboSimSystem"
     assert [j.get("name") for j in rc.findall("joint")] == joint_names()
     for j in rc.findall("joint"):
@@ -97,8 +105,31 @@ def test_ros2_control_eklem_sirasi_arayuzle_ayni(model, gz_urdf):
         assert float(cmd.find("param[@name='max']").text) == pytest.approx(lim.upper)
 
 
-def test_konum_kazanci_zaman_sabitinden(model, gz_urdf):
+def test_tork_modelinde_efor_komutu_ve_eklem_sonumu(model, gz_urdf):
+    """Tork modeli: eklem efor komutu alır (durma torkuyla sınırlı), sönüm URDF'te;
+    hız modelinin konum kazancı yok."""
+    rc = gz_urdf.find("ros2_control")
+    assert [j.get("name") for j in rc.findall("joint")] == joint_names()
+    for j in rc.findall("joint"):
+        assert j.find("command_interface[@name='position']") is None
+        cmd = j.find("command_interface[@name='effort']")
+        assert float(cmd.find("param[@name='max']").text) == pytest.approx(model.effort)
+        assert float(cmd.find("param[@name='min']").text) == pytest.approx(-model.effort)
+        assert {s.get("name") for s in j.findall("state_interface")} == {
+            "position", "velocity", "effort"}
+        joint = gz_urdf.find(f"joint[@name='{j.get('name')}']")
+        assert float(joint.find("dynamics").get("damping")) == pytest.approx(model.servo_damping)
     plugin = gz_urdf.find("gazebo/plugin[@name='gz_ros2_control::GazeboSimROS2ControlPlugin']")
+    assert plugin.find("position_proportional_gain") is None
+
+
+def test_bilinmeyen_servo_modeli_reddedilir():
+    with pytest.raises(ValueError):
+        GazeboOptions("/tmp/c.yaml", servo="hayali")
+
+
+def test_konum_kazanci_zaman_sabitinden(model, gz_urdf_velocity):
+    plugin = gz_urdf_velocity.find("gazebo/plugin[@name='gz_ros2_control::GazeboSimROS2ControlPlugin']")
     assert plugin.find("parameters").text == "/tmp/controllers.yaml"
     gain = float(plugin.find("position_proportional_gain").text)
     # T = 1 / (kazanç x hız)
@@ -141,13 +172,42 @@ def test_gazebo_ekleri_istenmezse_yok(model):
 # --- kontrolcü ayarı ------------------------------------------------------------
 
 
-def test_kontrolcu_ayari(model, tmp_path):
+def test_kontrolcu_ayari_tork_modeli_zincirli(model, tmp_path):
+    """leg_controller komut konusu aynı; hedefi servo_controller'a (pid_controller)
+    zincirlenir, o da P (sertlik) ile efor üretir, durma torkuyla sınırlı."""
+    from hexapod_description.control import SERVO_CONTROLLER, TORQUE_LOOP_HZ
+
     cfg = controllers_config(model)
+    cm = cfg["controller_manager"]["ros__parameters"]
+    assert cm["update_rate"] == TORQUE_LOOP_HZ
+    assert cm[SERVO_CONTROLLER]["type"] == "pid_controller/PidController"
+    assert cm[CONTROLLER_NAME]["type"] == "forward_command_controller/ForwardCommandController"
+    legs = cfg[CONTROLLER_NAME]["ros__parameters"]
+    assert legs["joints"] == [f"{SERVO_CONTROLLER}/{n}" for n in joint_names()]
+    assert legs["interface_name"] == "position"
+    pid = cfg[SERVO_CONTROLLER]["ros__parameters"]
+    assert pid["dof_names"] == joint_names()
+    assert pid["command_interface"] == "effort"
+    assert pid["reference_and_state_interfaces"] == ["position"]
+    for n in joint_names():
+        g = pid["gains"][n]
+        assert g["p"] == pytest.approx(model.servo_stiffness)
+        assert g["d"] == 0.0                          # sönüm URDF'te eklem sönümü
+        assert g["u_clamp_max"] == pytest.approx(model.effort)
+        assert g["u_clamp_min"] == pytest.approx(-model.effort)
+    path = write_controllers_yaml(model, tmp_path / "c.yaml")
+    assert yaml.safe_load(path.read_text(encoding="utf-8")) == cfg
+    with pytest.raises(ValueError):
+        controllers_config(model, servo="hayali")
+
+
+def test_kontrolcu_ayari(model, tmp_path):
+    cfg = controllers_config(model, servo="velocity")
     cm = cfg["controller_manager"]["ros__parameters"]
     assert cm["update_rate"] == round(model.control_rate)
     assert cm[CONTROLLER_NAME]["type"] == "forward_command_controller/ForwardCommandController"
     params = cfg[CONTROLLER_NAME]["ros__parameters"]
     assert params["joints"] == joint_names()
     assert params["interface_name"] == "position"
-    path = write_controllers_yaml(model, tmp_path / "c.yaml")
+    path = write_controllers_yaml(model, tmp_path / "c.yaml", servo="velocity")
     assert yaml.safe_load(path.read_text(encoding="utf-8")) == cfg

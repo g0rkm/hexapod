@@ -31,9 +31,19 @@ bu adla bulur; o yüzden ayak küresi tibia linkinin İLK çarpışması ve adı
 sabit: SDF'te "leg{i}_tibia_foot_collision". Adlar link adını içerir
 (sdformat bunu bekliyor).
 
-Gazebo (gazebo=GazeboOptions): ros2_control bloğu (18 eklem, konum komutu),
-gz_ros2_control eklentisi, IMU ve ayak temas sensörleri eklenir. Bunlar
-ROS/Gazebo dışında hiçbir şeyi etkilemez; RViz için gerekmez.
+Gazebo (gazebo=GazeboOptions): ros2_control bloğu (18 eklem), gz_ros2_control
+eklentisi, IMU ve ayak temas sensörleri eklenir. Bunlar ROS/Gazebo dışında
+hiçbir şeyi etkilemez; RViz için gerekmez.
+
+Servo modeli (GazeboOptions.servo):
+  "torque"    eklem EFOR komutu alır; tork control.py'deki pid_controller'da
+              hesaplanır (P, durma torkuyla sınırlı) ve eklem sönümü URDF'te
+              (<dynamics damping>). hexapod_rl.sim'in tork modeliyle aynı:
+              tork = sertlik x hata - sönüm x hız, |tork| <= durma torku.
+              Fark: tork-hız doğrusu yok (tork sınırı hızla azalmıyor).
+  "velocity"  eski model: konum komutu gz_ros2_control'de hız kontrolüyle
+              uygulanır (zaman sabiti T). Ayaklar kayar (PROJE_DEVIR §12.18);
+              yalnız karşılaştırma için tutuluyor.
 """
 
 from __future__ import annotations
@@ -104,17 +114,27 @@ class MeshSet:
         return {m.file for items in self.placements.values() for m in items}
 
 
+SERVO_MODELS = ("torque", "velocity")
+
+
 @dataclass(frozen=True)
 class GazeboOptions:
     """Gazebo'ya özgü eklerin girdileri.
 
     controllers_yaml: gz_ros2_control'ün okuyacağı kontrolcü dosyasının
-    MUTLAK yolu (hexapod_description.control.write_controllers_yaml üretir).
+    MUTLAK yolu (hexapod_description.control.write_controllers_yaml üretir;
+    aynı servo modeliyle).
+    servo: "torque" ya da "velocity" (modül açıklaması).
     """
 
     controllers_yaml: str
+    servo: str = "torque"
     imu_rate_hz: float = 100.0
     contact_rate_hz: float = 100.0
+
+    def __post_init__(self) -> None:
+        if self.servo not in SERVO_MODELS:
+            raise ValueError(f"servo modeli {SERVO_MODELS} olmalı, {self.servo!r} verildi")
 
 
 def build_urdf(model: RobotModel, meshes: MeshSet | None = None,
@@ -241,21 +261,30 @@ def _fixed(robot: ET.Element, name: str, parent: str, child: str, xyz) -> None:
 
 
 def _gazebo(robot: ET.Element, model: RobotModel, opts: GazeboOptions) -> None:
-    # ros2_control: 18 eklem, konum komutu; durum konum + hız.
+    # ros2_control: 18 eklem; durum konum + hız (+ tork modelinde efor).
+    torque = opts.servo == "torque"
     rc = ET.SubElement(robot, "ros2_control", name="GazeboSimSystem", type="system")
     ET.SubElement(ET.SubElement(rc, "hardware"), "plugin").text = "gz_ros2_control/GazeboSimSystem"
     # Sıra interface.joint_names() ile aynı (bacak bacak, coxa-femur-tibia).
     for leg in sorted(model.mounts):
         for part in JOINT_PARTS:
-            _rc_joint(rc, joint_name(leg, part), model.limits[(leg, part)])
+            name = joint_name(leg, part)
+            if torque:
+                _rc_joint_effort(rc, name, model.effort)
+                # tork modelinin "- sönüm x hız" terimi: fizik motoru her adımda uygular
+                ET.SubElement(robot.find(f"joint[@name='{name}']"), "dynamics",
+                              damping=_num(model.servo_damping))
+            else:
+                _rc_joint(rc, name, model.limits[(leg, part)])
 
-    # gz_ros2_control eklentisi. Konum komutu hız kontrolüyle uygulanır:
-    # hız = kazanç x hata x kontrol hızı -> zaman sabiti T (robot.yaml).
     plugin = ET.SubElement(ET.SubElement(robot, "gazebo"), "plugin",
                            filename="gz_ros2_control-system",
                            name="gz_ros2_control::GazeboSimROS2ControlPlugin")
     ET.SubElement(plugin, "parameters").text = opts.controllers_yaml
-    ET.SubElement(plugin, "position_proportional_gain").text = _num(model.position_gain())
+    if not torque:
+        # Konum komutu hız kontrolüyle uygulanır:
+        # hız = kazanç x hata x kontrol hızı -> zaman sabiti T (robot.yaml).
+        ET.SubElement(plugin, "position_proportional_gain").text = _num(model.position_gain())
 
     # IMU: imu_link base_link'e sabit, sdformat onu base_link'e birleştirir.
     ref = ET.SubElement(robot, "gazebo", reference=IMU_FRAME)
@@ -275,6 +304,17 @@ def _gazebo(robot: ET.Element, model: RobotModel, opts: GazeboOptions) -> None:
         contact = ET.SubElement(sensor, "contact")
         ET.SubElement(contact, "collision").text = foot_collision_name(leg) + "_collision"
         ET.SubElement(contact, "topic").text = foot_contact_topic(leg)
+
+
+def _rc_joint_effort(rc: ET.Element, name: str, effort: float) -> None:
+    joint = ET.SubElement(rc, "joint", name=name)
+    cmd = ET.SubElement(joint, "command_interface", name="effort")
+    ET.SubElement(cmd, "param", name="min").text = _num(-effort)
+    ET.SubElement(cmd, "param", name="max").text = _num(effort)
+    state = ET.SubElement(joint, "state_interface", name="position")
+    ET.SubElement(state, "param", name="initial_value").text = "0"
+    ET.SubElement(joint, "state_interface", name="velocity")
+    ET.SubElement(joint, "state_interface", name="effort")
 
 
 def _rc_joint(rc: ET.Element, name: str, limit) -> None:

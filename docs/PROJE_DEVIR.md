@@ -733,6 +733,7 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-26 | Ödül v5 (progress süzülmüş hıza, güç −0.05/W) + alan rastgeleleştirme (servo gücü/sertliği, 0–18 ms gecikme, itme, IMU gürültüsü; TAHMİN aralıklar), taklit yeniden (bc_v5), 10M eğitim (v5_dr) | v4 hedef hızı aşıyor ve 3–4 kat enerji harcıyordu; rastgeleleştirme açıkken v4 yön tutamıyordu (−21..−52°), tripod ve taklit tutuyordu |
 | 09-26 | **Politika düğümü torch'suz: aktör ağı + eğitim sözleşmesi .npz'de, numpy ile çıkarım** (`hexapod_policy`, `hexapod_rl.export`) | Pi'ye torch kurmak gereksiz ağırlık; ağ küçük (tick 44 µs PC'de). Sözleşme dosyada olunca eğitim ayarı değişse de eski politika doğru çalışır |
 | 09-26 | Politika düğümü eğitilmemiş komutta yürümez, ayakta bekler (komut yok/zaman aşımı, vx eğitim aralığının yarısının altında, IMU yok/bayat, >45° yatık) | Politika yalnız ileri 0.05–0.15 m/s gördü; geri/yana/dönüş komutunda ne yapacağı bilinmiyor |
+| 09-26 | **ROS'lu simde tork servo modeli (varsayılan `servo:=torque`):** `leg_controller` → `pid_controller` (`servo_controller`, P = sertlik, çıkış ±durma torku, 1 kHz) → eklem eforu; sönüm URDF'te eklem sönümü. Eski model `servo:=velocity` | Hız komutlu modelde ayaklar kayıyordu (tripod %84, politika %83); tork modelinde tripod %98, politika %96 (RL simiyle aynı düzey). Komut arayüzü değişmedi. C++ eklenti ya da Python sistem eklentisi yerine: köprü `Float64MultiArray` taşımıyor, zincir standart ros2_control |
 | 09-26 | **Süreç içi Gazebo her süreçte ayrı gz-transport bölümünde** (`GZ_PARTITION=hexapod_rl_<pid>`) | Eğitim sürerken açılan ROS'lu simin `ros_gz_sim create` isteği eğitimin "rl" dünyasına gitti, ROS'lu simde robot doğmadı (§12.22) |
 
 ---
@@ -859,6 +860,13 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
     dünya yüklenmeden önce görünüyor ve `ros2 control list_controllers` takılıyor.
     Ek not: `ros2 control` komutları servis yoksa sonsuza kadar bekler;
     betiklerde `timeout` ile çağır.
+23. **Hızı, hareketin olduğu pencerede ve sim zamanıyla ölç.** Politika
+    düğümünün ROS'lu simdeki hızı önce "%71" diye yazıldı ve push'landı:
+    başlangıç/son pozu `gz model -p` ile alıp duvar saatiyle bölmüştüm;
+    sorgu ~1 s sürüyor ve pencereye boşta geçen süre giriyor, RTF de 1'in
+    altında. Doğrusu (gz poz yayınına abone olup sim zamanıyla, hareketin
+    orta %80'inde): %83 (eski model), %96 (tork modeli). Aynı hata Samet'in
+    teleop ölçümünde de olabilir; karşılaştırmalar aynı yöntemle yapılmalı.
 
 ---
 
@@ -887,16 +895,11 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 
 ### 13.1b Yazılım tarafı
 
-- **ROS'lu simülasyon (sim.launch.py) hâlâ hız komutlu servo modelinde.** RL simi
-  tork modeline geçti (karar günlüğü 09-25); ROS'lu simde tripod ayakları kayar.
-  Çözüm seçenekleri: gz_ros2_control'ün effort arayüzü + tork modelini uygulayan
-  özel bir GazeboSimSystem eklentisi (C++), ya da gz-sim JointPositionController
-  (PID + kuvvet sınırı; tork-hız eğrisi yok). G8 (politika düğümü) simde
-  denenmeden önce yapılmalı.
-- **ROS'lu simde politika düğümü (G8) komutun ~%71'iyle yürüyor** (0.1 m/s
-  komutta 0.071 m/s; tork modelli RL siminde %95+). Yukarıdaki servo modeli
-  farkı; ROS'lu simi politikanın gerçek davranışını görmek için
-  kullanacaksak bu iş öne alınmalı.
+- ~~ROS'lu simülasyon hız komutlu servo modelinde~~ **ÇÖZÜLDÜ (09-26):**
+  `servo:=torque` varsayılan (pid_controller zinciri, karar günlüğü). Kalan fark:
+  ROS'lu simde tork-hız doğrusu yok (gz_ros2_control hız sınırında torku
+  kesiyor; RL simi doğrusal azaltıyor). Ölçülen hızlar iki simde aynı düzeyde
+  (tripod %98, politika %96), şimdilik yeterli.
 - **RL (G7), 09-26 itibarıyla:** ödül v5 (progress süzülmüş hıza bağlı, güç
   cezası −0.05/W) ve alan rastgeleleştirme (servo gücü/sertliği, gecikme,
   itme, IMU gürültüsü) yazıldı; `v5_dr` 10M eğitimi gece sürüyor. Kütle ve

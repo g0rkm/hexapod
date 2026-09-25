@@ -3,12 +3,18 @@
     ros2 launch hexapod_gazebo sim.launch.py
     ros2 launch hexapod_gazebo sim.launch.py gui:=false        # pencere yok (RL, test)
     ros2 launch hexapod_gazebo sim.launch.py world:=/yol/dunya.sdf
+    ros2 launch hexapod_gazebo sim.launch.py servo:=velocity   # eski servo modeli
 
 Sonra ayağa kaldırmak için:  ros2 run hexapod_gazebo stand
 
 Akış: robot.yaml -> RobotModel -> kontrolcü YAML'ı + Gazebo ekli URDF ->
-Gazebo -> robotu doğur -> joint_state_broadcaster -> leg_controller.
-Konular hexapod_description.interface'te (belge: docs/ARAYUZ.md).
+Gazebo -> robotu doğur -> joint_state_broadcaster -> (tork modelinde
+servo_controller) -> leg_controller. Konular hexapod_description.interface'te
+(belge: docs/ARAYUZ.md).
+
+servo: "torque" (varsayılan; hexapod_rl.sim ile aynı tork modeli, pid_controller
+ile) ya da "velocity" (eski hız komutlu model; ayaklar kayar). Ayrıntı:
+hexapod_description/urdf.py ve control.py açıklamaları.
 """
 
 import os
@@ -28,7 +34,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from hexapod_description.control import write_controllers_yaml
+from hexapod_description.control import SERVO_CONTROLLER, write_controllers_yaml
 from hexapod_description.interface import CONTROLLER_NAME, IMU_TOPIC, foot_contact_topic
 from hexapod_description.model import RobotModel
 from hexapod_description.urdf import GazeboOptions, MeshSet, build_urdf
@@ -42,16 +48,17 @@ def _setup(context):
     arg = lambda name: LaunchConfiguration(name).perform(context)  # noqa: E731
     gui = arg("gui").lower() in ("true", "1")
     use_meshes = arg("meshes").lower() in ("true", "1")
+    servo = arg("servo")
 
     desc_share = get_package_share_directory("hexapod_description")
     model = RobotModel.from_config(RobotConfig.load())
 
     controllers = write_controllers_yaml(
-        model, Path(tempfile.gettempdir()) / "hexapod" / "controllers.yaml")
+        model, Path(tempfile.gettempdir()) / "hexapod" / "controllers.yaml", servo)
     meshes = None
     if use_meshes and os.path.isdir(os.path.join(desc_share, "meshes")):
         meshes = MeshSet.load("package://hexapod_description/meshes/")
-    urdf = build_urdf(model, meshes, GazeboOptions(str(controllers)))
+    urdf = build_urdf(model, meshes, GazeboOptions(str(controllers), servo=servo))
 
     world = arg("world")
     if not os.path.isabs(world):
@@ -89,12 +96,12 @@ def _setup(context):
 
     broadcaster = spawner("joint_state_broadcaster")
     legs = spawner(CONTROLLER_NAME)
-
-    return [
-        gz, state_publisher, spawn, bridge,
-        RegisterEventHandler(OnProcessExit(target_action=spawn, on_exit=[broadcaster])),
-        RegisterEventHandler(OnProcessExit(target_action=broadcaster, on_exit=[legs])),
-    ]
+    # Zincirleme: aşağı akıştaki (servo_controller) önce etkin olmalı ki
+    # leg_controller onun referans arayüzlerini alabilsin.
+    chain = [spawner(SERVO_CONTROLLER), legs] if servo == "torque" else [legs]
+    handlers = [RegisterEventHandler(OnProcessExit(target_action=a, on_exit=[b]))
+                for a, b in zip([spawn, broadcaster, *chain[:-1]], [broadcaster, *chain])]
+    return [gz, state_publisher, spawn, bridge, *handlers]
 
 
 def generate_launch_description():
@@ -103,6 +110,8 @@ def generate_launch_description():
                               description="dünya dosyası (adı ya da mutlak yolu)"),
         DeclareLaunchArgument("gui", default_value="true",
                               description="Gazebo penceresi (false: yalnız sunucu)"),
+        DeclareLaunchArgument("servo", default_value="torque",
+                              description="servo modeli: torque (varsayılan) ya da velocity (eski)"),
         DeclareLaunchArgument("meshes", default_value="true",
                               description="CAD mesh'leri (true) ya da kutular (false)"),
         OpaqueFunction(function=_setup),

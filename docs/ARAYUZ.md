@@ -47,7 +47,7 @@ Bacak kimlikleri `config/robot.yaml`'daki `legs[*].id` (0 sol orta, 1 sol ön, 2
 | femur | femur yere paralel | bacak yukarı kalkar |
 | tibia | tibia femura dik | diz açılır, ayak dışarı gider |
 
-- Limitler: kalibrasyon limitleri (`joints[*].limits_deg`) varsa onlar, yoksa geçici ±90° (`simulation.provisional_joint_limits_deg`). Limit dışı komut gerçek robotta `LimitError` verir (servoya gitmez). Simülasyonda ros2_control komutu konum ve hız limitine kırpar (doğrulandı: femur'a 2.0 rad → 1.5708'de durdu) ve günlüğe "out of limits" yazar. İkisi farklı davrandığı için **yayınlayan taraf limit içinde kalmalı.**
+- Limitler: kalibrasyon limitleri (`joints[*].limits_deg`) varsa onlar, yoksa geçici ±90° (`simulation.provisional_joint_limits_deg`). Limit dışı komut gerçek robotta `LimitError` verir (servoya gitmez). Simülasyonda eklem limitte durur (doğrulandı, iki servo modelinde de: femur'a 2.0 rad → 1.5708'de durdu) ve günlüğe "out of limits" yazar. İkisi farklı davrandığı için **yayınlayan taraf limit içinde kalmalı.**
 
 ## Örnek: komut yayınlamak (S3, G8)
 
@@ -79,7 +79,7 @@ def on_command(msg):
 1. **MG996R konum geri bildirimi vermez.** Gerçek robotta `/joint_states` ölçüm değil, **son gönderilen komuttur.** RL politikası eklem açısını gözlem olarak kullanacaksa simülasyonda da komut edilen açıyı (ya da gürültülü, gecikmeli hâlini) görmeli; yoksa simülasyonda öğrendiği bilgiyi gerçekte bulamaz.
 2. **Ayak temas sensörü yok.** `/leg{i}/foot_contact` yalnız simülasyonda. Politikanın **gözlemine girmemeli**; ödül ve değerlendirme (S6) için var.
 3. **IMU yönelimi:** `/imu` her zaman `base_link` yöneliminde yayınlanır. Gerçek sürücü (S7/D8), BNO055'in ham verisini montaj yönelimine (`sensors.imu.mount_rotation_deg`, henüz bilinmiyor) göre döndürür. Bu yüzden politika IMU'nun robotta nasıl takıldığından habersizdir.
-4. **Servo tepkisi:** RL simülasyonu (`hexapod_rl.sim`) servoyu tork tabanlı modelliyor (P denetleyici + DC motor tork-hız doğrusu, `simulation.servo.stiffness_nm_per_rad`, `damping_nm_s_per_rad`). ROS'lu simülasyonda (sim.launch.py) ise konum komutu birinci dereceden bir sistem gibi uygulanır (zaman sabiti `simulation.servo.time_constant_s`, şimdilik tahmin 0.05 s); hız 7.48 rad/s ile sınırlı (doğrulandı: ros2_control komutu 100 Hz'de adım başı 0.0748 rad'a kırpıyor). Gerçek servo farklıysa (D9'da ölçülür) değer güncellenir.
+4. **Servo tepkisi:** iki simülasyon da servoyu tork tabanlı modelliyor: tork = sertlik × hata − sönüm × hız, durma torkuyla sınırlı (`simulation.servo.stiffness_nm_per_rad`, `damping_nm_s_per_rad`, `effort_nm`). RL simülasyonunda (`hexapod_rl.sim`) Python'da, her fizik adımında, DC motorun tork-hız doğrusuyla. ROS'lu simülasyonda (sim.launch.py, 2026-09-26'dan beri varsayılan `servo:=torque`) `leg_controller` bir `pid_controller`'a (`servo_controller`) zincirli: P kazancı sertlik, çıkış ±durma torku, 1 kHz; sönüm URDF'te eklem sönümü. Tork-hız doğrusu yok; yerine gz_ros2_control eklem hız sınırında (7.48 rad/s) torku sıfırlıyor (günlükte "out of limits" uyarıları bundan, beklenen). Komut konusu ve sırası iki modelde aynı. Ölçüldü (düz zemin): tripod 0.08 m/s komutta 0.079 m/s, politika 0.10'da 0.096 m/s; eski model (`servo:=velocity`, konum komutu hız kontrolüyle, zaman sabiti `time_constant_s`) ayak kaydırıyordu: 0.067 ve 0.083 m/s. Gerçek servo farklıysa (D9'da ölçülür) değerler güncellenir.
 
 ## Değiştirme kuralı
 

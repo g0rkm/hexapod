@@ -270,6 +270,10 @@ bash tools/wsl/rl_kurulum.sh
   Yeni paket ya da yeni dosya eklersen `bash tools/wsl/derle.sh`'yi tekrar çalıştır.
 - RViz'de robotu görmek için: `ros2 launch hexapod_description display.launch.py`.
 
+ROS'lu simülasyon varsayılan olarak tork servo modelini kullanır (RL simiyle aynı
+model; ayaklar kaymaz). Eski hız komutlu model karşılaştırma için
+`ros2 launch hexapod_gazebo sim.launch.py servo:=velocity` ile açılır.
+
 ## Gerçek robot sürücüsü (dry-run)
 
 Simülasyondaki kontrolcünün yerine geçer: aynı komut konusunu dinler
