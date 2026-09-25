@@ -804,6 +804,20 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
     bunu her test koşusunda denetliyor. Ayrıca: gz.sim'de `Joint.transmitted_wrench`
     Python'da bozuk (gz::msgs::Wrench çevrilemiyor); tork gerekiyorsa servo
     modelinin uyguladığı tork kullanılır (`SimState.joint_effort`).
+19. **ROS düğümünü birim testleriyle yetinmeden canlı çalıştır.** `rclpy`
+    Lyrical'da `logger.warn` yok, adı `warning`. `hexapod_hardware` düğümü
+    bu yüzden ilk reddedilen komutta çöküyordu; ROS'suz çekirdek testleri
+    (9 test) hepsi geçiyordu çünkü düğüm kabuğuna dokunmuyorlar. Yeni bir
+    düğüm yazınca hata yollarını da (bozuk komut, eksik config) gerçek
+    `ros2 run` ile tetikle. Artık `tests/test_ros_nodes.py` düğümleri gerçek
+    süreç olarak başlatıp bunu otomatik yapıyor (rclpy'li ortamda).
+    İkinci hata: SIGTERM'de (servis durdurma) ve arka plan Ctrl+C'de
+    `rclpy.spin` KeyboardInterrupt değil `ExternalShutdownException` ya da
+    `RCLError` fırlatır; yakalanmazsa hata izi + çıkış kodu 1. Doğrudan
+    başlatılan süreçte Ctrl+C ise KeyboardInterrupt yolundan geçtiği için
+    düzeltmesiz de temiz görünür: kapanışı **SIGTERM ile** test et. Ayrıca:
+    aynı betikte `pkill -f <desen>` kendi WSL kabuğunu da öldürebilir
+    (komut satırında desen geçtiği için).
 
 ---
 
@@ -850,6 +864,10 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 5. `python3 tools/calibrate.py` ile 18 eklemin merkez/yön/span/limitleri.
 6. Güç bağlantısını kontrol et: servo hattı Pi'den ayrı mı, topraklar
    ortak mı, sigorta nerede.
+7. **S4'ten devredilenler:** sürücü düğümü (`hexapod_hardware`) donanımda hiç
+   denenmedi (gerçek I2C yolu, I2C yazma süresi, ilk komutta 18 servonun aynı
+   anda beslenmesi, sert çökmede servoların bırakılamaması). Ayrıntılı kontrol
+   listesi: GOREVLER.md, "S4'ten devredilen, robotta doğrulanacaklar".
 
 ---
 

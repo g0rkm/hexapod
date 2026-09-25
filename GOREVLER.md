@@ -99,14 +99,14 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | S1 | Geliştirme ortamı (ROS 2 + Gazebo, depo, testler) | Samet | — | S3, S4, S5 | ✅ |
 | S2 | Tripod yürüyüş çekirdeği (saf Python) | Samet | G2 ✅ | S3 | ✅ |
 | S3 | Tripod yürüyüş simülasyonda | Samet | S1 ✅, S2 ✅, G5 ✅ | G6, S6, (vardiya) | ✅ |
-| S4 | Gerçek robot sürücü düğümü (ROS 2, dry-run) | Samet | S1, G5 | G8, (vardiya) | ⏸ |
+| S4 | Gerçek robot sürücü düğümü (ROS 2, dry-run) | Samet | S1 ✅, G5 ✅ | G8, (vardiya) | ✅ |
 | S5 | Zemin / dünya üreteci | Samet | S1, G5 | G7, S6 | ⏸ |
 | S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3, S5 | G7 | ⏸ |
 | S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
 
 **Şu an başlanabilecekler:**
 - **Görkem:** S3 bitti — G6'nın "bitti" şartı (tripod'u ortamda ölçüp kaydetmek) artık tamamlanabilir. `ros2 run hexapod_teleop teleop` ile tripod `/cmd_vel` dinliyor.
-- **Samet:** S1, S2, S3 bitti (2026-09-25). Sıradaki: S4 (gerçek sürücü düğümü, dry-run), S5 (zemin üreteci) ya da S7 (sensör sürücüleri) — üçü de kimseyi beklemiyor. S3 bittiği için S6 (ölçüm aracı) da artık yalnızca S5'i bekliyor.
+- **Samet:** S1, S2, S3, S4 bitti (2026-09-25). Sıradaki: S5 (zemin üreteci) ya da S7 (sensör sürücüleri) — ikisi de kimseyi beklemiyor. S6 (ölçüm aracı) yalnızca S5'i bekliyor. G8 (Görkem) için S4 hazır, G7'yi bekliyor.
 - Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S4'ün ROS düğümü) tekrar çalıştırılmalı.
 
 **İki kişinin birbirini beklediği yerler:**
@@ -203,16 +203,26 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 - Mantık iki katmana ayrıldı (hexapod_rl'deki env.py/task.py ayrımıyla aynı desen): `controller.py` ROS'suz çekirdek (hız sınırlama, zaman aşımı/deadman, `ReachError` yakalama — testli, 8 test), `node.py` ince rclpy kabuğu.
 - Güvenlik: komut S2'de test edilen aralığa kırpılıyor (vx ±0.15, vy ±0.08, wz ±0.5 m/s|rad/s). 0.5 sn `/cmd_vel` gelmezse otomatik sıfır hıza döner (deadman) — komut veren taraf çökerse robot sonsuza kadar yürümez.
 - Not (S2'den): ROS'lu simülasyon (`sim.launch.py`) hâlâ eski hız-komutlu servo modelinde, orada tripod'un ayakları kayabilir (bkz. S2 notu, PROJE_DEVIR §13.1b). `hexapod_rl.sim` ile (tork modeli) test edilirse %97-98 hız doğruluğu ölçüldü.
+- S4 sırasında eklendi: SIGTERM'de temiz kapanış düzeltmesi (bkz. S4 notu) ve düğüm için otomatik süreç testi (`tests/test_ros_nodes.py`).
 - **Gazebo'da canlı doğrulandı** (`sim.launch.py gui:=false` + `ros2 run hexapod_teleop teleop`, 2026-09-25):
   - İleri, 65 sn, vx=0.08 m/s: 0→4.38 m, dümdüz (65 sn'de 4.8 mm yana kayma), yükseklik hep 0.097-0.100 m — **devrilme yok**. Gerçek hız ~0.068 m/s (komutun %85'i — eski servo modeli yüzünden `hexapod_rl.sim`'deki %97-98'den düşük, beklenen).
   - Yana, 10 sn, vy=0.06 m/s: 0.48 m yana gitti (%79), ileri yönde sürüklenme yok (0.1 mm).
   - Yerinde dönüş, 10 sn, wz=0.4 rad/s: konum ~sabit (<1 mm), ~161° döndü (komutun %70'i).
 - **Bitti sayılır:** Gazebo'da düz zeminde devrilmeden en az 1 dakika ileri yürüyor; yana ve yerinde dönüş çalışıyor. ✅
 
-#### S4 — Gerçek robot sürücü düğümü ⏸
-- **Bekler:** S1, G5 (arayüz) · **Açar:** G8, donanım vardiyası (D9)
-- `hexapod_driver`'ın ROS 2 sarmalayıcısı: G5'teki eklem komut arayüzünü dinler, `ServoBus.set_angle`'a taşır, eklem durumunu yayınlar. Çekirdek saf Python kalır (CLAUDE.md'deki ayrım). Robot olmadan `--dry-run` ile yazılır ve test edilir.
-- **Bitti sayılır:** dry-run'da 18 eklem doğru kanala doğru darbeyi yazıyor (test); simülasyonla aynı komut arayüzü.
+#### S4 — Gerçek robot sürücü düğümü ✅
+- **Bekler:** S1 ✅, G5 ✅ (arayüz) · **Açar:** G8, donanım vardiyası (D9)
+- `hexapod_driver`'ın ROS 2 sarmalayıcısı: G5'teki eklem komut arayüzünü dinler, `ServoBus`'a taşır, eklem durumunu yayınlar. Çekirdek saf Python kalır (CLAUDE.md'deki ayrım). Robot olmadan `--dry-run` ile yazılır ve test edilir.
+- Yeni paket `hexapod_hardware`: `controller.py` ROS'suz çekirdek (`DriverController`, testli), `node.py` ince rclpy kabuğu. Çalıştırma: `ros2 run hexapod_hardware driver --ros-args -p dry_run:=true` (gerçek donanımda `dry_run` verilmez).
+- `hexapod_driver`'a küçük ekleme: `ServoBus.pulse_for_angle()` ve `set_angles()`. 18 eklemin hepsi önce doğrulanır (kalibrasyon, eklem limiti, mutlak darbe sınırı, kart/kanal tanımı); biri reddedilirse **hiçbir servoya darbe gitmez**. Yarım uygulanmış komut bir bacağı sıçratırdı. `set_angle` davranışı değişmedi (mevcut 30 test aynen geçiyor).
+- Davranış: bozuk komut (yanlış uzunluk, NaN) ve limit dışı komut servoya gitmez, uyarı basılır, düğüm çalışmaya devam eder. `/joint_states` son **kabul edilen** komuttur (MG996R geri bildirim vermez); ilk komuttan önce yayınlanmaz, konum uydurulmaz. Düğüm kapanırken bütün servolar serbest bırakılır (tork kesilir, robot çöker; bilerek).
+- Kablolama/kalibrasyon eksikse düğüm başlamaz, eksik alanları listeler (`calibrate.py` gibi). Gerçek `robot.yaml`'da şu an kablolama boş, yani gerçek config ile dry-run bile **bilerek** hata verir; denemek için `-p config:=... -p calibration:=...` ile sahte kablolamalı dosya verilir.
+- Testli (`tests/test_driver_controller.py` 9 test + `test_servo_layer.py`'de 3 yeni `set_angles` testi): 18 eklemin her biri doğru karta, doğru kanala, doğru darbeyi yazıyor (her eklem farklı merkez/yön/katsayı, iki kart); bozuk/limit dışı/kalibrasyonsuz komutta backend'e **hiçbir yazma** gitmiyor; `stop()` iki kartta da tüm kanalları kapatıyor; **S3'ün ürettiği tripod komutu** (gerçek `TeleopController` çıktısı, ~4 sn) sürücüde de 199/199 kabul ediliyor, yani simülasyonla aynı komut arayüzü.
+- ROS'lu canlı doğrulama (WSL, dry-run, sahte kablolama, 2026-09-25): gerçek config'te temiz hata ve çıkış kodu 2; geçerli komut `/joint_states`'e yansıdı; bozuk komut uyarıyla reddedildi, durum bozulmadı; **S3 + S4 birlikte** (`/cmd_vel` → teleop → komut → sürücü) yürüyüş açıları `/joint_states`'te değişerek akıyor, sürücü hiç komut reddetmedi. Canlı deneme, birim testlerinin göremediği bir hatayı yakaladı (aşağıda).
+- Bulunan hatalar (ikisi de canlı denemede çıktı, birim testleri göremezdi; PROJE_DEVIR §12.19): (1) bu ROS sürümünde `rclpy` günlükçüsünde `warn` yok, adı `warning`; ilk sürümde düğüm **ilk reddedilen komutta çöküyordu**. (2) SIGTERM/arka plan Ctrl+C'de `spin` `KeyboardInterrupt` değil `ExternalShutdownException`/`RCLError` fırlatıyor: hata izi + çıkış kodu 1 (servolar yine bırakılıyordu, `finally` çalışıyor). İkisi de düzeltildi; (2) S3'ün `hexapod_teleop` düğümünde de aynıydı, orada da düzeltildi.
+- Düğüm kabukları için otomatik test (`tests/test_ros_nodes.py`, 3 test, yalnız rclpy'li ortamda; Windows'ta atlanır): düğümler `python -m` ile gerçek süreç olarak başlatılıp konulardan sürülüyor. Sürücü: bozuk ve limit dışı komutta çökmüyor, durum bozulmuyor, geçerli komut `/joint_states`'e yansıyor, eksik kablolamada `drivers[1].address`'i söyleyip çıkış kodu 2 ile çıkıyor. Teleop: `/cmd_vel` → 18 değerlik komut. İkisi de SIGTERM'de çıkış kodu 0, hata izi yok. **Bu testlerin iki hatayı yakaladığı, hatalar geri konarak doğrulandı.**
+- Ölçüm notu: `/joint_states` yayın hızı `ros2 topic hz` ile ortalama 38.8 Hz çıktı (düğümün zamanlayıcısı 50 Hz). Ölçüm WSL'de üç düğüm çalışırken CLI ile yapıldı; hız kaybının araçtan mı makineden mi düğümden mi geldiği ayrıştırılmadı. Pi'de I2C yazma süresi de ayrıca ölçülmeli (18 blok yazma ~13 ms tahmin, 20 ms'lik bütçeye yakın): donanım vardiyasında D9'da bakılacak.
+- **Bitti sayılır:** dry-run'da 18 eklem doğru kanala doğru darbeyi yazıyor (test); simülasyonla aynı komut arayüzü. ✅
 
 #### S5 — Zemin / dünya üreteci ⏸
 - **Bekler:** S1, G5 · **Açar:** G7, S6
@@ -275,7 +285,18 @@ flowchart LR
 | D6 | 18 eklemin kalibrasyonu (`calibrate.py`) | D5 | Her eklem: `c` → `dir` → `span` → `limit min/max`. `config/calibration.yaml` dolu ve commit'li; `limits` çıktısı robot.yaml'a işlendi (URDF artık gerçek limitleri kullanır). |
 | D7 | Tartım ve elektronik envanteri | D2 | Robot yürüyeceği hâliyle tartıldı → `body.total_mass_kg`, `measured: true`. Üstündeki batarya/buck sayısı, kapak takılı mı yazıldı; `simulation.mass_inputs` düzeltilip `tools/cad_sim_model.py` yeniden çalıştırıldı. |
 | D8 | Sensör montaj bilgisi + S7'nin donanım testi | D3, S7 | IMU adresi ve montaj yönü, üç VL53L0X'in XSHUT GPIO'ları ve bakış yönleri robot.yaml → `sensors`'ta. Üç mesafe sensörü ve IMU aynı anda okunuyor. |
-| D9 | Gerçek robotta tripod | D6, S3, S4 | Önce havada, sonra yerde yürüyor. Simülasyondan farklar raporlandı: ayak sapması, servo ısınması, besleme çökmesi (Pi resetlenirse brownout'tur, yazılım hatası değil). |
+| D9 | Gerçek robotta tripod | D6, S3, S4 | Önce havada, sonra yerde yürüyor. Simülasyondan farklar raporlandı: ayak sapması, servo ısınması, besleme çökmesi (Pi resetlenirse brownout'tur, yazılım hatası değil). Ayrıca aşağıdaki "S4'ten devredilen, robotta doğrulanacaklar" listesi tamamlandı. |
 | D10 | Gerçek limit ve kütleyle yeniden eğitim | D6, D7, G7 | G7 gerçek eklem limitleri ve ölçülen kütleyle tekrarlandı; D9'daki farklar rastgeleleştirme aralıklarına yansıtıldı. |
 | D11 | Pi 4'e aktarma | D10, G8, D8, D9 | Politika + ROS 2 düğümleri Pi'de, gerçek IMU ve servolarla kapalı döngü; robot düz zeminde yürüyor. |
 | D12 | Saha denemesi | D11 | TÜBİTAK planındaki gerçek arazi denemesi: eğim, engebe, kum, kaygan zemin. Her zemin için video, hız ve devrilme sayısı. |
+
+### S4'ten devredilen, robotta doğrulanacaklar (D9 ile birlikte yapılır)
+
+S4 (sürücü düğümü) yalnızca dry-run'da ve simülasyonla doğrulandı. Aşağıdakiler robot olmadan **görülemedi**, D9'da sırayla kontrol edilecek. Unutulmasın diye burada:
+
+1. **Gerçek I2C yolu hiç çalıştırılmadı.** Geliştirme PC'sinde `smbus2` kurulu değil, `SMBusBackend` denenmedi. Pi'de `pip install smbus2`, sonra `ros2 run hexapod_hardware driver` (`dry_run` **verilmeden**). Önce kablolama girilince (D5/D6) dry-run'ın eksik alan vermeden başladığını gör, sonra gerçek donanım. 18 eklemin her birinin doğru servoyu sürdüğünü gözle doğrula (D4 haritasıyla karşılaştır).
+2. **I2C yazma süresi ölçülmedi.** 18 eklem = 18 blok yazma; 100 kHz I2C'de ~13 ms **tahmin** (ölçüm değil), 50 Hz komut bütçesi 20 ms. Pi'de ölç. Sığmazsa: değişmeyen kanallara yazmayı atla ya da I2C hızını 400 kHz'e çıkar.
+3. **`/joint_states` hızı.** WSL'de `ros2 topic hz` ile ortalama 38.8 Hz ölçüldü (düğümün zamanlayıcısı 50 Hz); sebebi (ölçüm aracı / WSL yükü / düğüm) ayrıştırılmadı. Pi'de tekrar ölç.
+4. **İlk komutta 18 servo aynı anda beslenir.** MG996R konum geri bildirimi vermez; ilk komutta bulundukları yerden hedefe tam hızla gider, akım sıçrar ve brownout riski doğar (Pi resetlenirse yazılım hatası gibi görünür, bkz. brif §6). İlk denemeyi robot havada, güç kaynağı akım sınırlıyken yap. Gerekirse kademeli açılış (bacak bacak) sürücüye eklenir. Bu bir **risk tespiti**; denenmedi.
+5. **Sert çökmede servolar bırakılamaz.** Düğüm `SIGTERM`/Ctrl+C ile kapanırken servolar serbest kalır (test edildi). `kill -9` ya da elektrik kesilmesinde PCA9685 son darbeyi üretmeye devam eder, servolar tork uygular; yazılımla çözülemez. Servo hattına acil kesme (anahtar/röle) düşünülmeli.
+6. **Kalibrasyon bilgisi olmadan komut reddedilir.** Bu bilerek böyle (`MissingValue`); D6 bitmeden sürücü hiçbir servoyu sürmez. D9'da `calibration.yaml` dolu ve commit'li olmalı.
