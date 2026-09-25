@@ -11,7 +11,14 @@ tripod ritmine uyum ve ayakların havada kalma oranı yazılır. Ayrıntılı
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
+
+
+def _yaw(q) -> float:
+    """(w, x, y, z) -> yukarı eksen etrafındaki yön, rad."""
+    w, x, y, z = q
+    return math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
 
 
 def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123) -> dict:
@@ -20,6 +27,7 @@ def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123) -> 
     env = HexapodEnv()
     obs, _ = env.reset(seed=seed, options={"command": (vx, 0.0, 0.0)})
     x0, y0 = env._state.base_pos[0], env._state.base_pos[1]
+    yaw0 = _yaw(env._state.base_quat)
     steps = int(round(seconds / env.dt))
     fell, gait, airborne, n = False, 0.0, 0.0, 0
     info = {"base_pos": env._state.base_pos}
@@ -34,9 +42,12 @@ def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123) -> 
             break
     dx = info["base_pos"][0] - x0
     dy = info["base_pos"][1] - y0
+    yaw1 = _yaw(env._state.base_quat)
+    turned = math.degrees(math.atan2(math.sin(yaw1 - yaw0), math.cos(yaw1 - yaw0)))
     env.close()
     return {"komut_vx": vx, "sure_s": n * env.dt, "alinan_yol_m": dx, "yana_kayma_m": dy,
-            "ortalama_hiz_m_s": dx / max(n * env.dt, 1e-9), "devrildi": fell,
+            "ortalama_hiz_m_s": dx / max(n * env.dt, 1e-9),
+            "toplam_yol_m": math.hypot(dx, dy), "yon_sapmasi_derece": turned, "devrildi": fell,
             "ritim_uyumu": gait / max(n, 1), "havadaki_ayak_orani": airborne / max(n, 1)}
 
 
