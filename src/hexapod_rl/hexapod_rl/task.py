@@ -31,6 +31,17 @@ yakınken hız izleme ~1, dönüş komutu hep 0 olduğundan dönüş terimi beda
     grup havada, diğeri yerde; ikinci yarıda tersi. Ayak teması YALNIZCA
     ödülde (gözlemde değil). Yol gösterici; hareketi politika öğreniyor.
   - hız komutu en az 0.05 m/s; dönüş ağırlığı 0.5 -> 0.2
+
+Ödül v3 (ilk yürüyen politikadan sonra, models/tork_v2_10M): robot kararlı
+yürüdü ama hız komutunu yok saydı (0.05/0.10/0.15 m/s'de aynı hız) ve
+saniyede ~12° sağa döndü. Dönmek v2'de ucuzdu: 0.21 rad/s'lik dönüş,
+tolerans 0.5 rad/s ile dönüş teriminden yalnızca %16 kaybettiriyordu
+(ağırlık 0.2 -> adım başı 0.03). Hız toleransı 0.10 m/s de 0.05 ile 0.15'i
+neredeyse aynı puanlıyordu. Düzeltmeler:
+  - dönüş izleme: ağırlık 0.2 -> 1.0, tolerans 0.5 -> 0.2 rad/s
+    (12°/s dönüş artık adım başı ~0.67 kaybettiriyor)
+  - hız izleme toleransı 0.10 -> 0.05 m/s (0.087 m/s yürürken 0.15 komutu
+    artık ~%80 puan kaybettiriyor)
 """
 
 from __future__ import annotations
@@ -67,15 +78,15 @@ class TaskConfig:
         "lin_vel": 1.0,        # hız komutunu izleme (exp)
         "progress": 10.0,      # komut yönünde hız (m/s), komutla sınırlı
         "gait": 0.5,           # tripod ritmi (0..1)
-        "yaw_rate": 0.2,
+        "yaw_rate": 1.0,       # dönüş hızını izleme (exp); v3'te 0.2 -> 1.0
         "orientation": -2.0,   # gövdenin yatması
         "height": -20.0,       # yükseklik sapması (m^2)
         "power": -0.02,        # mekanik güç, W (enerji)
         "action_rate": -0.01,  # sarsıntı
         "fall": -10.0,         # devrilince bir kez
     })
-    lin_vel_sigma: float = 0.10    # m/s
-    yaw_rate_sigma: float = 0.5    # rad/s
+    lin_vel_sigma: float = 0.05    # m/s; v3'te 0.10 -> 0.05
+    yaw_rate_sigma: float = 0.2    # rad/s; v3'te 0.5 -> 0.2
 
 
 def action_to_targets(action, default: list[float], scale: float,

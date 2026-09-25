@@ -138,3 +138,25 @@ def test_ilerleme_komutla_sinirli_ve_geri_gitmek_sifir():
     _, geri = reward(state(lin=(-0.1, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False)
     assert hizli["progress"] == pytest.approx(cfg.w["progress"] * 0.1)
     assert geri["progress"] == 0.0
+
+
+# --- ödül v3 --------------------------------------------------------------------
+
+
+def test_donmek_artik_pahali():
+    """v2'de ~12°/s dönüş neredeyse bedavaydı; v3'te belirgin puan kaybettirmeli."""
+    cfg = TaskConfig()
+    cmd = (0.1, 0.0, 0.0)
+    _, duz = reward(state(lin=(0.1, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False)
+    _, donen = reward(state(lin=(0.1, 0.0, 0.0), ang=(0.0, 0.0, -0.21)), [0.0] * 18,
+                      [0.0] * 18, cmd, cfg, False)
+    assert duz["yaw_rate"] - donen["yaw_rate"] > 0.5
+
+
+def test_farkli_hizlar_ayirt_ediliyor():
+    """0.087 m/s yürürken 0.15 komutu, tam izlemeye göre en az %70 hız izleme puanı kaybettirmeli."""
+    cfg = TaskConfig()
+    cmd = (0.15, 0.0, 0.0)
+    _, tam = reward(state(lin=(0.15, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False)
+    _, yavas = reward(state(lin=(0.087, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False)
+    assert yavas["lin_vel"] < 0.3 * tam["lin_vel"]
