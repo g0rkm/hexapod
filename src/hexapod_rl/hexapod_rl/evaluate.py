@@ -28,12 +28,12 @@ def _yaw(q) -> float:
 
 
 def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123,
-             noise: float = 0.0, task=None) -> dict:
+             noise: float = 0.0, task=None, terrain_sdf: str = "") -> dict:
     import numpy as np
 
     from .env import HexapodEnv
 
-    env = HexapodEnv(task=task)
+    env = HexapodEnv(task=task, terrain_sdf=terrain_sdf)
     obs, _ = env.reset(seed=seed, options={"command": (vx, 0.0, 0.0)})
     if hasattr(model, "reset"):   # iç durumu olan denetleyici (baseline.TripodPolicy)
         model.reset()

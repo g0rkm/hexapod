@@ -118,3 +118,24 @@ def test_alan_rastgelelestirme(tmp_path_factory):
         assert pushes >= 1
     finally:
         e.close()
+
+
+def test_zemin_sdf_ile_kurulur(tmp_path_factory):
+    """S5'in zeminleri buradan girer: düz zemin yerine verilen statik model.
+    Burada üst yüzü z=0'da bir kutu (düzlem değil): robot üstünde ~100 mm durmalı."""
+    terrain = """<model name="ground">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <pose>0 0 -0.05 0 0 0</pose>
+          <geometry><box><size>4 4 0.1</size></box></geometry>
+        </collision>
+      </link>
+    </model>"""
+    e = HexapodEnv(workdir=tmp_path_factory.mktemp("zemin"), terrain_sdf=terrain)
+    try:
+        e.reset(seed=0)
+        assert e._state.base_pos[2] == pytest.approx(e.task.stand_height_mm / 1000, abs=0.004)
+        assert all(e._state.foot_contact)
+    finally:
+        e.close()

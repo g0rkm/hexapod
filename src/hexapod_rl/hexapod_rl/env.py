@@ -49,12 +49,16 @@ class HexapodEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, task: TaskConfig | None = None, physics_step: float = 0.002,
-                 config_path: str | Path | None = None, workdir: Path | None = None) -> None:
+                 config_path: str | Path | None = None, workdir: Path | None = None,
+                 terrain_sdf: str = "") -> None:
+        """terrain_sdf: düz zeminin yerine geçen statik <model> SDF parçası (S5'in
+        zemin üreteci; boşsa düz zemin). Kısıtlar HexapodSim açıklamasında."""
         super().__init__()
         self.task = task or TaskConfig()
         config = RobotConfig.load(config_path)
         model = RobotModel.from_config(config)
-        self.sim = HexapodSim(model, physics_step=physics_step, workdir=workdir)
+        self.sim = HexapodSim(model, physics_step=physics_step, workdir=workdir,
+                              terrain_sdf=terrain_sdf)
         self.dt = self.sim.dt
 
         pose = standing_pose(HexapodKinematics.from_config(config),
@@ -157,10 +161,11 @@ class HexapodEnv(gym.Env):
         self._next_push = self._push_gap()
 
 
-def make_env(rank: int, task: TaskConfig | None = None, physics_step: float = 0.002):
+def make_env(rank: int, task: TaskConfig | None = None, physics_step: float = 0.002,
+             terrain_sdf: str = ""):
     """SubprocVecEnv için fabrika; her süreç kendi Gazebo dünyasını kurar."""
     def _init():
-        env = HexapodEnv(task=task, physics_step=physics_step)
+        env = HexapodEnv(task=task, physics_step=physics_step, terrain_sdf=terrain_sdf)
         env.reset(seed=rank)
         return env
     return _init

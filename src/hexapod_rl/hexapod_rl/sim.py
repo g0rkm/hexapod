@@ -39,6 +39,19 @@ tripod duruşu ikisinde de 0.6 N·m'de bile çökmüyor; sorun dinamikti.
 ROS'lu simülasyon (sim.launch.py) hâlâ hız modelini kullanıyor; açık iş
 (PROJE_DEVIR §13).
 
+Zemin (terrain_sdf; S5): düz zeminin yerine geçen statik bir <model> SDF
+parçası. Kısıtlar (2026-09-26):
+  - robot orijinde, DÜZ zemine göre doğar (ayaklar z=0'ın 1 cm üstünde):
+    orijin çevresinin üst yüzü z=0'da olmalı, yoksa ayaklar zeminin içinde
+    doğar;
+  - ayak teması (SimState.foot_contact; ödülün ritim terimi ve
+    değerlendirme bunu kullanır) geometrik: ayak küresinin alt ucu dünya
+    z=0'ın 2 mm yakınında mı. Engebeli/eğimli zeminde YANLIŞ olur; S5 ile
+    birlikte gerçek temasa (gz Contact) ya da zemin yüksekliğine geçilmeli.
+  - sürtünme zeminin <surface><friction>'ında. Ölçüldü (gösterim tripod'u,
+    0.12 m/s): düz zeminde mu 1.0 ile 0.15 arası fark yok, 0.05'te %8
+    yavaşlıyor. Yani sürtünme ancak eğimle birlikte (S5) anlam kazanır.
+
 Alan rastgeleleştirme düğmeleri (G7; bölüm başında env.py çeker):
 set_servo() durma torkunu ve sertliği ölçekler (akü gerilimi, servo farkı,
 TAHMİN olan Kp), latency_steps yeni hedefin servoya kaç fizik adımı sonra
