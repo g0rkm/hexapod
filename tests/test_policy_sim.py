@@ -99,3 +99,47 @@ def test_artik_eylem_sifir_duzeltmeyle_tripod_gibi_yurur(tmp_path):
         state = sim.step(c.tick(state.time))
     assert state.base_pos[0] - x0 > 0.8 * 0.1 * 4.0
     assert abs(math.degrees(_yaw(state.base_quat) - yaw0)) < 3.0
+
+
+OMNI_NPZ = REPO / "models" / "ppo_omni_250k" / "policy.npz"
+
+
+@pytest.mark.parametrize("command", [(-0.1, 0.0, 0.0), (0.0, 0.06, 0.0), (0.0, 0.0, 0.4),
+                                     (0.0, 0.0, 0.0)])
+def test_her_yon_politikasi_robottaki_koduyla_yurur(tmp_path, command):
+    """Depodaki her yön politikası (models/ppo_omni_250k/policy.npz), robotta
+    koşacak denetleyiciyle: geri, yana ve yerinde dönüşte komutun en az %70'i;
+    sıfır komutta ölü bölge -> ayakta bekler, yerinden oynamaz."""
+    from hexapod_kinematics import HexapodKinematics
+
+    policy = MlpPolicy.load(OMNI_NPZ)
+    config = RobotConfig.load(REPO / "config" / "robot.yaml")
+    model = RobotModel.from_config(config)
+    sim = HexapodSim(model, workdir=tmp_path / "sim")
+    limits = [(model.limits[(int(n[3]), n.split("_")[1])].lower,
+               model.limits[(int(n[3]), n.split("_")[1])].upper) for n in joint_names(model.mounts)]
+    c = PolicyController(policy, limits, kin=HexapodKinematics.from_config(config))
+    state = sim.reset()
+    for _ in range(50):
+        c.on_imu(state.base_quat, state.ang_vel_in_base(), state.time)
+        state = sim.step(c.tick(state.time))
+    p0, yaw0, seconds = state.base_pos, _yaw(state.base_quat), 4.0
+    for _ in range(int(seconds * 50)):
+        c.on_imu(state.base_quat, state.ang_vel_in_base(), state.time)
+        c.on_command(*command, state.time)
+        state = sim.step(c.tick(state.time))
+    dx, dy = state.base_pos[0] - p0[0], state.base_pos[1] - p0[1]
+    turned = math.atan2(math.sin(_yaw(state.base_quat) - yaw0), math.cos(_yaw(state.base_quat) - yaw0))
+    vx, vy, wz = command
+    if command == (0.0, 0.0, 0.0):
+        assert c.status.startswith("dur (komut ölü bölgede")
+        assert math.hypot(dx, dy) < 0.005 and abs(turned) < 0.02
+        return
+    assert c.status == "yürüyor"
+    if vx:
+        assert dx / (vx * seconds) > 0.7 and abs(dy) < 0.05
+    if vy:
+        assert dy / (vy * seconds) > 0.7 and abs(dx) < 0.05
+    if wz:
+        assert turned / (wz * seconds) > 0.7 and math.hypot(dx, dy) < 0.05
+    assert state.base_pos[2] > 0.08

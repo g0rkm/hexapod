@@ -1,0 +1,14 @@
+adım: 163840, ortam: 16, süre: 1.5 dk (1818 adım/s)
+komut_vx: 0.100
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: 1.074
+yana_kayma_m: -0.013
+ortalama_hiz_m_s: 0.107
+toplam_yol_m: 1.074
+yon_sapmasi_derece: -0.436
+devrildi: False
+adim_basi_odul: 3.240
+ortalama_guc_w: 2.309
+ritim_uyumu: 0.940
+havadaki_ayak_orani: 0.449

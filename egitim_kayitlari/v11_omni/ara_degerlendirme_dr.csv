@@ -1,0 +1,15 @@
+model,dr_skor,devrilen
+tripod,2.6095,0
+phase,2.5797,0
+ppo_250000_steps,2.5782,0
+ppo_500000_steps,2.581,0
+ppo_750000_steps,2.5802,0
+ppo_1000000_steps,2.5754,0
+ppo_1250000_steps,2.5807,0
+ppo_1500000_steps,2.5722,0
+ppo_1750000_steps,2.5729,0
+ppo_2000000_steps,2.5669,0
+ppo_2250000_steps,2.5663,0
+ppo_2500000_steps,2.5768,0
+ppo_2750000_steps,2.5721,0
+ppo_3000000_steps,2.5667,0
