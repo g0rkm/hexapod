@@ -78,3 +78,15 @@ def test_yayla_ve_egitim_seti():
         assert (sdf == "") == (h is None), label              # düz zemin: ikisi de boş
     with pytest.raises(ValueError):
         training_terrains("yok", 4)
+
+
+def test_ara_kayit_zemin_durumlari():
+    from hexapod_rl.terrain_probe import EVAL_CASES, TRAIN_SETS, eval_cases
+
+    assert set(EVAL_CASES) <= set(TRAIN_SETS)       # her ölçüm seti bir eğitim setine ait
+    cases = eval_cases("deneme")
+    assert len(cases) == len(EVAL_CASES["deneme"])
+    for label, sdf, height, cmd in cases:
+        assert sdf.startswith("<model") and callable(height) and len(cmd) == 3, label
+    with pytest.raises(ValueError):
+        eval_cases("yok")

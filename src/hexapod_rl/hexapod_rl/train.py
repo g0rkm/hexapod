@@ -33,6 +33,10 @@ aşmaya kayıyordu, en iyisi 250k ara kaydıydı (ders 25). Her ara kayıtta
 ileride 0.05/0.10/0.15, her yönde yedi komut; düz zemin, rastgeleleştirme
 yok, 10 s); adım başı ödüllerin ortalaması en yüksek olan best_model.zip
 olarak saklanır, bütün ölçümler ara_degerlendirme.csv'ye yazılır.
+--terrains ile eğitimde zemin durumları da ölçülür (terrain_probe.EVAL_CASES;
+her biri kendi Gazebo dünyasında, kurulup kapatılır): yalnız düz zemine
+bakan seçim zeminde en iyi ara kaydı kaçırıyordu (v13: 250k seçildi, zeminde
+en iyisi 2.25M; bu ölçütle 2.25M seçilir).
 
 Çıktılar ~/hexapod_runs/<ad>/ altında (OneDrive'a senkronlanmasın diye
 depoda değil): model.zip (son), best_model.zip (en iyi ara kayıt), ara
@@ -68,8 +72,36 @@ PPO_KWARGS = dict(
 )
 
 
-def best_checkpoint_callback(every: int, out: Path, task, seconds: float = 10.0):
-    """Her `every` çağrıda politikayı ölçüp en iyisini best_model.zip olarak saklar."""
+def measure_model(model, task, commands, terrain_cases=(), seconds: float = 10.0,
+                  env=None) -> tuple[float, dict]:
+    """Ara kayıt seçiminin ölçütü: düz zemindeki komutlar (env yeniden kullanılır)
+    + zemin durumları (her biri kendi dünyasında, kurulup kapatılır), hepsi
+    deterministik ve rastgeleleştirmesiz; skor adım başı ödüllerin ortalaması.
+    Ödül hedef hızı aşmayı (lin_vel) ve enerjiyi cezalandırdığı için yalnız
+    ilerlemeye bakan bir ölçütün düştüğü tuzağa düşmez (ders 30)."""
+    from .env import HexapodEnv
+
+    results = evaluate_set(model, commands, seconds, env=env, task=task)
+    row = {f"odul_{c[0]:+.2f}_{c[1]:+.2f}_{c[2]:+.2f}": r["adim_basi_odul"]
+           for c, r in zip(commands, results)}
+    fell = sum(r["devrildi"] for r in results)
+    for label, sdf, height, cmd in terrain_cases:
+        e = HexapodEnv(task=task, terrain_sdf=sdf, terrain_height=height)
+        try:
+            r = evaluate(model, seconds, vx=cmd[0], vy=cmd[1], wz=cmd[2], env=e)
+        finally:
+            e.close()
+        row[f"zemin_{label}"] = r["adim_basi_odul"]
+        fell += r["devrildi"]
+    score = sum(row.values()) / len(row)
+    return score, {"skor": round(score, 4), "devrilen": fell,
+                   **{k: round(v, 4) for k, v in row.items()}}
+
+
+def best_checkpoint_callback(every: int, out: Path, task, seconds: float = 10.0,
+                             terrain_cases=()):
+    """Her `every` çağrıda politikayı ölçüp (measure_model) en iyisini
+    best_model.zip olarak saklar. terrain_cases: (ad, sdf, yükseklik, komut)."""
     from stable_baselines3.common.callbacks import BaseCallback
 
     from .env import HexapodEnv
@@ -92,12 +124,9 @@ def best_checkpoint_callback(every: int, out: Path, task, seconds: float = 10.0)
         def measure(self) -> None:
             if self.env is None:
                 self.env = HexapodEnv(task=task)
-            results = evaluate_set(self.model, commands, seconds, env=self.env)
-            score = sum(r["adim_basi_odul"] for r in results) / len(results)
-            row = {"adim": self.num_timesteps, "skor": round(score, 4),
-                   "devrilen": sum(r["devrildi"] for r in results)}
-            for c, r in zip(commands, results):
-                row[f"odul_{c[0]:+.2f}_{c[1]:+.2f}_{c[2]:+.2f}"] = round(r["adim_basi_odul"], 4)
+            score, cols = measure_model(self.model, task, commands, terrain_cases, seconds,
+                                        env=self.env)
+            row = {"adim": self.num_timesteps, **cols}
             new = not self.csv.exists()
             with self.csv.open("a", newline="", encoding="utf-8") as f:
                 w = csv.DictWriter(f, fieldnames=list(row), lineterminator="\n")
@@ -206,7 +235,11 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
-    best = best_checkpoint_callback(every, out, eval_task)
+    cases = []
+    if args.terrains:   # ara kayıt seçimi zemini de görsün (ders 30)
+        from .terrain_probe import EVAL_CASES, eval_cases
+        cases = eval_cases(args.terrains) if args.terrains in EVAL_CASES else []
+    best = best_checkpoint_callback(every, out, eval_task, terrain_cases=cases)
     t0 = time.time()
     model.learn(total_timesteps=args.steps, reset_num_timesteps=True,
                 callback=CallbackList([CheckpointCallback(every, str(out / "checkpoints"), "ppo"),

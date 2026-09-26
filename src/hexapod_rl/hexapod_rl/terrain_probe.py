@@ -134,6 +134,27 @@ TRAIN_SETS = {
 }
 
 
+#: Eğitim içinde ara kayıt seçiminde ölçülen zemin durumları (train.py): her
+#: set için (ad, zemin, komut). Ölçüt düz zemin setine ek olarak bunların
+#: adım başı ödülü; ödül hedef hızı aşmayı zaten cezalandırıyor (lin_vel).
+EVAL_CASES = {
+    "deneme": (
+        ("çukur 45 ileri", lambda: pit(0.045), (0.10, 0.0, 0.0)),
+        ("çukur 45 yana", lambda: pit(0.045), (0.0, 0.06, 0.0)),
+        ("çukur 60 geri", lambda: pit(0.060), (-0.10, 0.0, 0.0)),
+        ("yayla 50 ileri", lambda: plateau(0.050), (0.10, 0.0, 0.0)),
+        ("yokuş yukarı 20", lambda: slope(-20.0), (0.10, 0.0, 0.0)),
+    ),
+}
+
+
+def eval_cases(name: str) -> list[tuple[str, str, object, tuple[float, float, float]]]:
+    """Zemin setinin ölçüm durumları: (ad, terrain_sdf, terrain_height, komut)."""
+    if name not in EVAL_CASES:
+        raise ValueError(f"{name!r} için ölçüm durumu yok; olanlar: {sorted(EVAL_CASES)}")
+    return [(label, *make(), cmd) for label, make, cmd in EVAL_CASES[name]]
+
+
 def training_terrains(name: str, n: int) -> list[tuple[str, str, object]]:
     """n ortama (ad, terrain_sdf, terrain_height): listeyi sırayla dağıt."""
     if name not in TRAIN_SETS:
