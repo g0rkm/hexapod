@@ -734,6 +734,8 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-26 | **Politika düğümü torch'suz: aktör ağı + eğitim sözleşmesi .npz'de, numpy ile çıkarım** (`hexapod_policy`, `hexapod_rl.export`) | Pi'ye torch kurmak gereksiz ağırlık; ağ küçük (tick 44 µs PC'de). Sözleşme dosyada olunca eğitim ayarı değişse de eski politika doğru çalışır |
 | 09-26 | Politika düğümü eğitilmemiş komutta yürümez, ayakta bekler (komut yok/zaman aşımı, vx eğitim aralığının yarısının altında, IMU yok/bayat, >45° yatık) | Politika yalnız ileri 0.05–0.15 m/s gördü; geri/yana/dönüş komutunda ne yapacağı bilinmiyor |
 | 09-26 | **ROS'lu simde tork servo modeli (varsayılan `servo:=torque`):** `leg_controller` → `pid_controller` (`servo_controller`, P = sertlik, çıkış ±durma torku, 1 kHz) → eklem eforu; sönüm URDF'te eklem sönümü. Eski model `servo:=velocity` | Hız komutlu modelde ayaklar kayıyordu (tripod %84, politika %83); tork modelinde tripod %98, politika %96 (RL simiyle aynı düzey). Komut arayüzü değişmedi. C++ eklenti ya da Python sistem eklentisi yerine: köprü `Float64MultiArray` taşımıyor, zincir standart ros2_control |
+| 09-26 | v5_dr 10M yerine 5M'de durduruldu; gSDE denendi (v6_sde lr 3e-4, v6b lr 1e-4 + target_kl 0.02), ikisi de bozuldu, bırakıldı | gSDE'de eğitim ödülü sistematik düştü (2300 → 1630) ve politika dönmeye kaydı; KL küçükken bile. Sebep çözülmedi (§12.24) |
+| 09-26 | **Ödül v6: dönüş toleransı 0.2 → 0.1 rad/s; devam eğitiminde keşif std 0.05, lr 1e-4, target_kl 0.02** (`--std`, `--lr`, `--target-kl`) | Bütün PPO'lar yavaşça sağa dönüyordu; 2°/s sapma v5'te terimin %3'ü. Düşük gürültü, eğitimde koşan davranışı gürültüsüz davranışa yaklaştırır. Sonuç `models/ppo_v7_8M`: hız izleme doğru, yön 4 kat iyi; enerji hâlâ tripod'un 3 katı |
 | 09-26 | **Süreç içi Gazebo her süreçte ayrı gz-transport bölümünde** (`GZ_PARTITION=hexapod_rl_<pid>`) | Eğitim sürerken açılan ROS'lu simin `ros_gz_sim create` isteği eğitimin "rl" dünyasına gitti, ROS'lu simde robot doğmadı (§12.22) |
 
 ---
@@ -867,6 +869,21 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
     altında. Doğrusu (gz poz yayınına abone olup sim zamanıyla, hareketin
     orta %80'inde): %83 (eski model), %96 (tork modeli). Aynı hata Samet'in
     teleop ölçümünde de olabilir; karşılaştırmalar aynı yöntemle yapılmalı.
+24. **gSDE bu kurulumda PPO'yu bozdu.** Taklitten başlayıp gSDE ile (SB3
+    use_sde, full_std, sde_sample_freq 16) eğitince, lr 1e-4 ve target_kl
+    0.02 ile güncellemeler küçükken bile eğitim ödülü 750k adımda 2300'den
+    1630'a düştü, politika dönmeye kaydı, entropi arttı (gürültü gizli
+    katmanın büyüklüğüyle büyüyor). Aynı ayarlarda bağımsız gürültüyle
+    ödül artıyordu. Sebep bulunmadı; bağımsız gürültü + düşük std (0.05)
+    işe yaradı. Tekrar denenirse önce stokastik değerlendirmeyle eğitim
+    davranışına bak.
+25. **PPO'nun keşif gürültüsü davranışın parçası olur.** std 0.1–0.15'lik
+    bağımsız gürültüyle eğitilen politika, ortalama eylemi gürültüyü telafi
+    edecek şekilde ayarlıyor: gürültüsüz koşunca hedef hızı %10–30 aşıyor
+    ve fazla enerji harcıyor (stokastik koşunca hız doğru). Taklitten
+    başlayan bir politikayı iyileştirirken gürültüyü küçük tut (0.05) ya da
+    std'yi zamanla düşür; değerlendirmeyi hem deterministik hem stokastik
+    yap.
 
 ---
 
@@ -900,11 +917,14 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
   ROS'lu simde tork-hız doğrusu yok (gz_ros2_control hız sınırında torku
   kesiyor; RL simi doğrusal azaltıyor). Ölçülen hızlar iki simde aynı düzeyde
   (tripod %98, politika %96), şimdilik yeterli.
-- **RL (G7), 09-26 itibarıyla:** ödül v5 (progress süzülmüş hıza bağlı, güç
-  cezası −0.05/W) ve alan rastgeleleştirme (servo gücü/sertliği, gecikme,
-  itme, IMU gürültüsü) yazıldı; `v5_dr` 10M eğitimi gece sürüyor. Kütle ve
-  sürtünme rastgeleleştirmesi yok (dünyanın süreç başında yeniden kurulması
-  gerekiyor). Zeminli eğitim S5, "bitti" ölçümü S6 bekliyor.
+- **RL (G7), 09-26 sabahı:** en iyi PPO `models/ppo_v7_8M` (ödül v6,
+  rastgeleleştirme). Hız izliyor, eylem gürültüsünde en iyisi; ama düz
+  zeminde tripod hâlâ önde, çünkü PPO 3 kat enerji harcıyor ve hızlıda yön
+  kaydırıyor. Seçenekler: güç cezasını artırmak; eylemi tripod'un üstüne
+  "artık" (residual) düzeltme yapmak (G6'da düşünülmüştü; düz zeminde
+  tripod'a eşit başlar, RL yalnız düzeltmeyi öğrenir); std'yi daha da
+  düşürmek. Kütle rastgeleleştirmesi yok. Sürtünme düz zeminde etkisiz
+  (ölçüldü), eğimle S5'te. Zeminli eğitim S5, "bitti" ölçümü S6 bekliyor.
   Karşılaştırma: `models/README.md`.
 
 ### 13.2 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)

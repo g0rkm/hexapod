@@ -14,7 +14,30 @@ python -m hexapod_rl.evaluate models/ppo_v4_4M/model.zip --vx 0.1 --noise 0.1
 python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Samet'in tripod'u
 ```
 
-## Karşılaştırma (2026-09-26)
+## Gece karşılaştırması (2026-09-26 sabah, ödül v6)
+
+Ödül v6 (`hexapod_rl.task`), düz zemin, 10 s, deterministik. Rastgeleleştirme:
+servo gücü/sertliği, 0–18 ms gecikme, itme, IMU gürültüsü (`--randomize`).
+Hiçbiri devrilmedi.
+
+| Model | Gürültüsüz ödül (0.05 / 0.10 / 0.15) | Gerçek hız | Yön (10 s) | Güç | Rastgeleleştirmede ödül (vx 0.10, 3 tohum) | Eylem gürültüsünde ödül (0.10) |
+|---|---|---|---|---|---|---|
+| tripod (Samet) | **2.83 / 3.22 / 3.57** | 0.049 / 0.098 / 0.146 | ~0° | 1.5 / 1.9 / 2.6 W | 3.08–3.22 | 1.46 (0.067 m/s) |
+| taklit (bc_v5) | 2.83 / 3.19 / 3.55 | 0.049 / 0.096 / 0.143 | <2.3° | 1.5 / 1.9 / 2.5 W | 3.03–3.22 | 1.73 |
+| PPO v5_dr 5M | 2.23 / 2.47 / 2.84 | 0.060 / 0.113 / 0.158 | −24 / −42 / −41° | 7.0 / 7.6 / 9.3 W | 2.40–2.51 | 2.20 |
+| **ppo_v7_8M** | 2.55 / 2.94 / 3.31 | **0.053 / 0.098 / 0.146** | +6 / −3 / −11° | 5.6 / 6.4 / 8.0 W | 2.82–3.00 | **2.23** (0.102 m/s) |
+
+Özet:
+- **ppo_v7_8M en iyi PPO:** hız komutunu doğru izliyor, yön sapması v5_dr'nin
+  dörtte biri. Eylem gürültüsü altında açık ara en iyisi (hızını koruyor).
+- **Düz zeminde tripod ve taklit hâlâ önde:** PPO 3 kat enerji harcıyor ve
+  hızlıda yön kaydırıyor. Mevcut rastgeleleştirme aralıkları tripod'u hiç
+  zorlamıyor; RL'nin asıl sınavı zeminli dünyalar (S5).
+- **gSDE (düzgün keşif) bu kurulumda işe yaramadı:** iki deneme (lr 3e-4 ve
+  1e-4 + target_kl) eğitim ödülünü düşürdü ve dönmeye kaydı; durduruldu,
+  depoya alınmadı.
+
+## Karşılaştırma (2026-09-26, ödül v4)
 
 Ödül v4, düz zemin, 10 s, `evaluate` (deterministik). "Gürültülü": eyleme
 N(0, 0.1) eklendi (0.05 rad; servo titremesi ve PPO'nun eğitimde kendi keşif
@@ -85,3 +108,21 @@ keşif gürültüsünde dönen yürüyüşü düz yürüyüşten çok ödüllend
   (−0.02/W) enerjiyi neredeyse bedava bırakıyor (7 W adım başı 0.14).
 
 **Gerçek robotta DENENMEDİ** (tork_v2_10M'deki not geçerli).
+
+## ppo_v7_8M — düşük gürültüyle devam, ödül v6 (2026-09-26)
+
+- **Eğitim:** iki aşama, ikisi de rastgeleleştirme açık.
+  1. v5_dr: taklitten (bc_v5), ödül v5, lr 3e-4, std 0.15 → 0.094,
+     5M adım (10M planlanmıştı, 5M'de durduruldu).
+  2. v7_lowstd: v5_dr 5M'den, ödül v6 (dönüş toleransı 0.1 rad/s),
+     std 0.05, lr 1e-4, target_kl 0.02, 3M adım, 77 dk.
+  Eğitim ödülü (v6) 2034 → 2522; ayarlar `ayarlar.txt`'de.
+- **Neden düşük gürültü:** bağımsız adım gürültüsüyle eğitilen PPO, ortalama
+  eylemi "gürültüyle uygulanacak" diye ayarlıyor: gürültüsüz koşunca hedef
+  hızı aşıyor ve fazla enerji harcıyordu. Gürültüyü 0.05'e indirip küçük
+  adımlarla devam edince hız izleme düzeldi (0.10 komutta 0.113 → 0.098).
+- **Sonuç:** yukarıdaki tablo. Kalan sorunlar: enerji (tripod'un ~3 katı),
+  hızlıda yön kayması (0.15'te −11°).
+
+**Gerçek robotta DENENMEDİ.**
+

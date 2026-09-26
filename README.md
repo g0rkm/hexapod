@@ -19,7 +19,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Gazebo simülasyonu | ✅ robot doğuyor, ayağa kalkıyor; sensörler yayında |
 | Gait motoru (tripod) | ✅ çekirdek ([hexapod_gait](src/hexapod_gait)) + ROS düğümü ([hexapod_teleop](src/hexapod_teleop)); Gazebo'da 65 sn devrilmeden yürüdü, yana ve yerinde dönüş çalışıyor |
 | Gerçek robot sürücü düğümü | ✅ dry-run'da çalışıyor ([hexapod_hardware](src/hexapod_hardware)); gerçek donanımda denenmedi, kablolama bekliyor |
-| RL (PPO) | 🔄 düz zeminde yürüyor, gürültüde tripod'u geçiyor ([models/](models/README.md)); alan rastgeleleştirmeli eğitim sürüyor, zeminler S5'i bekliyor |
+| RL (PPO) | 🔄 düz zeminde yürüyor, hız komutunu izliyor, gürültüde tripod'u geçiyor ama 3 kat enerji harcıyor ([models/](models/README.md)); zeminler S5'i bekliyor |
 | Politika düğümü | ✅ [hexapod_policy](src/hexapod_policy): torch'suz (numpy), ROS'lu Gazebo'da yürüdü |
 | Pi 4'e aktarma | ⛔ |
 
