@@ -63,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lr", type=float, default=None, help="öğrenme hızı (modeldekini ezer)")
     parser.add_argument("--target-kl", type=float, default=None,
                         help="güncelleme KL'si bunu aşınca dönemleri kes")
+    parser.add_argument("--residual", action="store_true",
+                        help="artık eylem modu (tripod + düzeltme); model de öyle olmalı")
     parser.add_argument("--power-weight", type=float, default=None,
                         help="güç cezası ağırlığı, W başına (varsayılan: TaskConfig)")
     parser.add_argument("--std", type=float, default=None,
@@ -78,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     weights = dict(TaskConfig().w)
     if args.power_weight is not None:
         weights["power"] = args.power_weight
-    task = TaskConfig(w=weights,
+    task = TaskConfig(w=weights, action_mode="residual" if args.residual else "absolute",
                       randomization=Randomization() if args.randomize else None)
     venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task)
                                      for i in range(args.envs)],
@@ -102,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     (out / "ayarlar.txt").write_text(
         f"learning_rate: {model.learning_rate}\ntarget_kl: {model.target_kl}\n"
         f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\nstd: {args.std}\n"
-        f"power_weight: {task.w['power']}\n",
+        f"power_weight: {task.w['power']}\naction_mode: {task.action_mode}\n",
         encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
@@ -113,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     model.save(out / "model")
     venv.close()
 
-    result = evaluate(model)
+    result = evaluate(model, task=TaskConfig(action_mode=task.action_mode))
     lines = [f"adım: {args.steps}, ortam: {args.envs}, süre: {wall / 60:.1f} dk "
              f"({args.steps / wall:.0f} adım/s)"]
     lines.append(format_result(result))

@@ -74,7 +74,10 @@ def _collect(job) -> list[dict]:
         ep = {"obs": [], "act": [], "rew": [], "command": command, "fell": False}
         done = False
         while not done:
-            a = np.asarray(demo.action(env._phase, command), dtype=np.float32)
+            if env.base is None:
+                a = np.asarray(demo.action(env._phase, command), dtype=np.float32)
+            else:   # artık eylem: gösterim = tripod'un kendisi = düzeltme 0
+                a = np.zeros(ACTION_SIZE, dtype=np.float32)
             ep["obs"].append(obs)
             ep["act"].append(a)
             noisy = np.clip(a + rng.normal(0.0, noise, ACTION_SIZE), -1.0, 1.0)
@@ -186,6 +189,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--noise", type=float, default=0.1, help="uygulanan eyleme gürültü")
     parser.add_argument("--std", type=float, default=0.3, help="PPO'nun başlangıç std'si")
     parser.add_argument("--sde", action="store_true", help="keşif gSDE ile (düzgün gürültü)")
+    parser.add_argument("--residual", action="store_true",
+                        help="artık eylem modu: politika tripod'a düzeltme verir (etiket 0)")
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--batch", type=int, default=1024)
@@ -207,7 +212,8 @@ def main(argv: list[str] | None = None) -> int:
     gamma = PPO_KWARGS["gamma"]
     tail = int(round(3 / (1 - gamma)))    # getirinin %95'i bu kadar adımda birikir
     seeds = [args.seed * 1000 + i for i in range(args.episodes)]
-    task = TaskConfig(randomization=Randomization()) if args.randomize else TaskConfig()
+    task = TaskConfig(action_mode="residual" if args.residual else "absolute",
+                      randomization=Randomization() if args.randomize else None)
     jobs = [(seeds[i::args.workers], args.noise, gamma, tail, task) for i in range(args.workers)]
     t0 = time.time()
     with multiprocessing.get_context("fork").Pool(args.workers) as pool:
@@ -243,8 +249,10 @@ def main(argv: list[str] | None = None) -> int:
     log(f"std {args.std} (gerçekleşen {actual:.3f}{', gSDE' if args.sde else ''}); doğrulama: "
         + ", ".join(f"{k} {v:.4f}" for k, v in final.items()))
 
+    eval_task = TaskConfig(action_mode=task.action_mode)
     for vx in (0.05, 0.10, 0.15):
-        log(f"--- değerlendirme, komut vx={vx}\n" + format_result(evaluate(model, vx=vx)))
+        log(f"--- değerlendirme, komut vx={vx}\n"
+            + format_result(evaluate(model, vx=vx, task=eval_task)))
     (out / "ozet.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"kaydedildi -> {out}")
     return 0

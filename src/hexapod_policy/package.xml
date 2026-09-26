@@ -13,6 +13,7 @@
 
   <exec_depend>hexapod_description</exec_depend>
   <exec_depend>hexapod_driver</exec_depend>
+  <exec_depend>hexapod_kinematics</exec_depend>  <!-- tripod.py: artık eylem tabanı -->
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>

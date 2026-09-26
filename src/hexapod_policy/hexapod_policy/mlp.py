@@ -35,8 +35,21 @@ class PolicyContract:
     control_hz: float                   # politikanın eğitildiği komut hızı
     default_rad: tuple[float, ...]      # eylem 0'ın karşılığı (ayakta duruş), interface sırası
     command_ranges: dict[str, tuple[float, float]]   # vx, vy (m/s), wz (rad/s)
+    # "absolute": hedef = default_rad + action_scale x eylem
+    # "residual": hedef = tripod(saat, komut) + residual_scale x eylem (tripod.PhaseTripod)
+    action_mode: str = "absolute"
+    residual_scale: float = 0.0
+    base_gait: dict | None = None       # residual: groups, reach_mm, height_mm, lift_mm
 
     def __post_init__(self) -> None:
+        if self.action_mode not in ("absolute", "residual"):
+            raise ValueError(f"bilinmeyen eylem modu: {self.action_mode!r}")
+        if self.action_mode == "residual":
+            if not self.residual_scale > 0:
+                raise ValueError("artık eylem modunda residual_scale pozitif olmalı")
+            missing = {"groups", "reach_mm", "height_mm", "lift_mm"} - set(self.base_gait or {})
+            if missing:
+                raise ValueError(f"artık eylem modunda taban yürüyüş eksik: {sorted(missing)}")
         if len(self.default_rad) != self.action_size:
             raise ValueError(f"varsayılan duruş {len(self.default_rad)} değer, "
                              f"eylem boyutu {self.action_size}")
@@ -107,6 +120,9 @@ class MlpPolicy:
             control_hz=float(c["control_hz"]),
             default_rad=tuple(float(v) for v in c["default_rad"]),
             command_ranges={k: (float(v[0]), float(v[1])) for k, v in c["command_ranges"].items()},
+            action_mode=c.get("action_mode", "absolute"),
+            residual_scale=float(c.get("residual_scale", 0.0)),
+            base_gait=c.get("base_gait"),
         )
         return cls(layers, meta["activation"], contract, meta.get("source", ""))
 

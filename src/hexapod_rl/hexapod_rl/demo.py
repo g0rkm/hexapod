@@ -14,20 +14,18 @@ RL ortamında ikisi neredeyse aynı ölçülüyor (baseline.TripodPolicy ile,
 hız komutuna bağlı (iç durumu yok); taklit edilen şeyin gözlemden
 çıkarılabilmesi gerekir. TripodGait ise dünya çerçevesinde çapa tutar.
 
-Yörünge: adım saati ortamınkiyle aynı; saatin ilk yarısında groups[0]
-havada, groups[1] yerde (task.gait_score ile aynı sözleşme). Destek fazında
-ayak gövdeye göre istenen hareketin tersine kayar; bir destek fazı 0.5/hz s
-sürdüğünden destekte ayağın yer değiştirmesi = hız x 0.5/hz. Dönüş komutu
-(wz) ayağı gövde merkezi etrafında kaydırır. Salınımda ayak yarım sinüsle
-kalkıp öne gelir.
+Yörüngenin kendisi hexapod_policy.tripod.PhaseTripod'da (robottaki politika
+düğümü "artık eylem" modunda aynısını kullanır). Adım saati ortamınkiyle
+aynı; saatin ilk yarısında groups[0] havada, groups[1] yerde
+(task.gait_score ile aynı sözleşme).
 """
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from hexapod_kinematics import HexapodKinematics
+from hexapod_policy.tripod import PhaseTripod
 
 from .task import ACTION_SIZE
 
@@ -42,32 +40,19 @@ class TripodDemo:
     reach_mm: float           # duruş: ayağın coxa ekseninden yatay uzaklığı
     height_mm: float          # duruş: gövde yüksekliği
     lift_mm: float = 25.0     # salınımda ayak kaldırma
+    base: PhaseTripod = field(init=False, repr=False, compare=False)
 
-    def feet(self, phase: float, command) -> dict[int, tuple[float, float, float]]:
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "base", PhaseTripod(
+            self.kin, self.groups, self.gait_hz, self.reach_mm, self.height_mm, self.lift_mm))
+
+    def feet(self, phase: float, command):
         """Adım saatinin phase ([0, 1)) anında ayak hedefleri, gövde çerçevesi, mm."""
-        vx, vy, wz = command
-        stance_s = 0.5 / self.gait_hz
-        out = {}
-        for leg, m in self.kin.mounts.items():
-            hx = m.x + self.reach_mm * math.cos(m.yaw)
-            hy = m.y + self.reach_mm * math.sin(m.yaw)
-            # destekte ayağın gövdeye göre gidişi, mm (hız m/s -> mm/s)
-            dx = (vx * 1000.0 - wz * hy) * stance_s
-            dy = (vy * 1000.0 + wz * hx) * stance_s
-            p = (phase + 0.5) % 1.0 if leg in self.groups[0] else phase
-            if p < 0.5:                        # destek: +d/2'den -d/2'ye
-                s, dz = 0.5 - 2.0 * p, 0.0
-            else:                              # salınım: -d/2'den +d/2'ye, kalkarak
-                q = (p - 0.5) * 2.0
-                s, dz = -0.5 + q, self.lift_mm * math.sin(math.pi * q)
-            out[leg] = (hx + s * dx, hy + s * dy, -self.height_mm + dz)
-        return out
+        return self.base.feet(phase, command)
 
     def targets(self, phase: float, command) -> list[float]:
         """Eklem hedefleri, rad, interface.joint_names() sırasıyla."""
-        angles = self.kin.inverse(self.feet(phase, command))
-        return [math.radians(v) for leg in sorted(angles)
-                for v in angles[leg].as_dict().values()]
+        return self.base.targets(phase, command)
 
     def action(self, phase: float, command) -> list[float]:
         """Ortamın eylemi: (hedef - varsayılan) / ölçek. Kırpılmaz; aralık dışına

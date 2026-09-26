@@ -169,3 +169,36 @@ def test_bozuk_imu_yok_sayilir():
 def test_limit_sayisi_denetlenir():
     with pytest.raises(ValueError):
         PolicyController(constant_policy([0.0] * ACTION_SIZE), [(-1.0, 1.0)] * 17)
+
+
+# --- artık eylem modu -------------------------------------------------------------
+
+
+def test_artik_eylemde_sifir_duzeltme_tripodun_kendisi():
+    """Eylem 0 iken hedef tam olarak eğitimdeki tripod (PhaseTripod); eylem
+    residual_scale ile eklenir. Kinematik verilmezse düğüm başlamaz."""
+    from pathlib import Path
+
+    from hexapod_driver import RobotConfig
+    from hexapod_kinematics import HexapodKinematics
+    from hexapod_policy.tripod import PhaseTripod
+
+    kin = HexapodKinematics.from_config(
+        RobotConfig.load(Path(__file__).resolve().parent.parent / "config" / "robot.yaml"))
+    base_gait = {"groups": [[0, 2, 4], [1, 3, 5]], "reach_mm": 130.0, "height_mm": 100.0,
+                 "lift_mm": 25.0}
+    c = PolicyContract(obs_size=OBS_SIZE, action_size=ACTION_SIZE, action_scale=0.5, gait_hz=1.5,
+                       control_hz=50.0, default_rad=DEFAULT, command_ranges=RANGES,
+                       action_mode="residual", residual_scale=0.2, base_gait=base_gait)
+    tripod = PhaseTripod(kin, ((0, 2, 4), (1, 3, 5)), 1.5, 130.0, 100.0, 25.0)
+    for bias, offset in ((0.0, 0.0), (0.5, 0.1)):
+        policy = MlpPolicy([(np.zeros((ACTION_SIZE, OBS_SIZE)), np.full(ACTION_SIZE, bias))],
+                           "tanh", c)
+        ctl = PolicyController(policy, [(-3.0, 3.0)] * ACTION_SIZE, kin=kin)
+        ctl.on_imu(LEVEL, (0, 0, 0), 0.0)
+        ctl.on_command(0.1, 0.0, 0.0, 0.0)
+        for k in range(10):
+            expected = [t + offset for t in tripod.targets(ctl._phase, (0.1, 0.0, 0.0))]
+            assert ctl.tick(0.0) == pytest.approx(expected)
+    with pytest.raises(ValueError):
+        PolicyController(policy, [(-3.0, 3.0)] * ACTION_SIZE)

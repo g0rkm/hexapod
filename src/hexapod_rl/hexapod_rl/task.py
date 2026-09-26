@@ -71,6 +71,15 @@ toleransı 0.2 rad/s (~11°/s) iken 2°/s'lik sapma terimin yalnız %3'ünü
 kaybettiriyordu; PPO'nun gürültüsü içinde bu fark görünmüyordu.
   - yaw_rate_sigma 0.2 -> 0.1 rad/s (2°/s artık %11, 4°/s %37 kaybettirir)
 
+Artık eylem modu (action_mode = "residual", 2026-09-26): eylem varsayılan
+duruşa değil, adım saatinin tripod'una (hexapod_policy.tripod.PhaseTripod)
+eklenen düzeltmedir: hedef = tripod(saat, komut) + residual_scale x eylem.
+Neden: PPO'nun kendi bulduğu yürüyüş her şeyi tripod kadar iyi yapıyor ama
+3 kat enerji harcıyordu ve güç cezası bunu düzeltmedi (models/README).
+Artık eylemde eylem 0 = tripod; politika düz zeminde tripod'un verimiyle
+başlar, yalnız gerektiğinde düzeltir. "residual" terimi düzeltmenin
+büyüklüğünü (eylem karelerinin ortalaması) cezalandırır; yalnız bu modda.
+
 Alan rastgeleleştirme (G7): Randomization, bölüm başında env.py çeker;
 TaskConfig.randomization None ise kapalı (değerlendirmenin varsayılanı).
 Zemin ve sürtünme S5'in (Samet) dünyalarıyla gelecek; kütle dünyanın
@@ -117,10 +126,14 @@ class TaskConfig:
         "power": -0.05,        # mekanik güç, W (enerji); v5'te -0.02 -> -0.05
         "action_rate": -0.01,  # sarsıntı
         "fall": -10.0,         # devrilince bir kez
+        "residual": -0.5,      # yalnız artık eylem modunda: ortalama eylem karesi
     })
     lin_vel_sigma: float = 0.05    # m/s; v3'te 0.10 -> 0.05
     yaw_rate_sigma: float = 0.1    # rad/s; v3'te 0.5 -> 0.2, v6'da -> 0.1
     vel_filter_s: float = 0.5      # s; v4: izleme terimleri bu ortalamaya bakar
+    action_mode: str = "absolute"  # "absolute": varsayılan duruş + eylem; "residual": tripod + eylem
+    residual_scale: float = 0.2    # rad; artık eylem modunda eylem 1 -> tripod'dan bu kadar
+    lift_mm: float = 25.0          # artık eylem modunda tripod'un ayak kaldırması
     randomization: "Randomization | None" = None   # None: kapalı
 
 
@@ -236,6 +249,8 @@ def reward(state: SimState, action, prev_action, command: tuple[float, float, fl
         "action_rate": sum((a - b) ** 2 for a, b in zip(action, prev_action)),
         "fall": 1.0 if fell else 0.0,
     }
+    if cfg.action_mode == "residual":
+        terms["residual"] = sum(a * a for a in action) / len(action)
     weighted = {k: cfg.w[k] * v for k, v in terms.items()}
     return sum(weighted.values()), weighted
 

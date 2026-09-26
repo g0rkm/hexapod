@@ -238,3 +238,12 @@ def test_rastgelelestirme_varsayilanda_kapali():
     for lo, hi in (r.servo_strength, r.servo_stiffness, r.latency_ms, r.push_force_n,
                    r.push_every_s):
         assert 0 <= lo <= hi
+
+
+def test_artik_eylem_cezasi_yalniz_o_modda():
+    cmd = (0.1, 0.0, 0.0)
+    a = [0.5] * 18
+    _, mutlak = reward(state(), a, a, cmd, TaskConfig(), False)
+    _, artik = reward(state(), a, a, cmd, TaskConfig(action_mode="residual"), False)
+    assert "residual" not in mutlak
+    assert artik["residual"] == pytest.approx(TaskConfig().w["residual"] * 0.25)

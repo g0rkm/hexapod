@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
         COMMAND_RATE_HZ, COMMAND_TOPIC, IMU_TOPIC, joint_names)
     from hexapod_description.model import RobotModel
     from hexapod_driver import HexapodError, RobotConfig
+    from hexapod_kinematics import HexapodKinematics
 
     class StartupError(Exception):
         """Düğüm kurulamadı (politika dosyası yok/bozuk, config eksik)."""
@@ -65,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
             self._last_status = None
             self.get_logger().info(
                 f"hexapod_policy hazır: {path} | {topic} + {IMU_TOPIC} -> {COMMAND_TOPIC} | "
-                f"eğitim aralığı vx {c.command_ranges['vx']}")
+                f"eğitim aralığı vx {c.command_ranges['vx']} | eylem modu {c.action_mode}")
 
         @staticmethod
         def _build(path, config_path, cmd_timeout, imu_timeout) -> PolicyController:
@@ -77,13 +78,18 @@ def main(argv: list[str] | None = None) -> int:
             except (OSError, ValueError, KeyError) as exc:
                 raise StartupError(f"politika okunamadı ({path}): {exc}") from exc
             try:
-                model = RobotModel.from_config(RobotConfig.load(config_path))
+                config = RobotConfig.load(config_path)
+                model = RobotModel.from_config(config)
+                kin = HexapodKinematics.from_config(config)
             except HexapodError as exc:
                 raise StartupError(str(exc)) from exc
             limits = [(model.limits[(int(n[3]), n.split("_")[1])].lower,
                        model.limits[(int(n[3]), n.split("_")[1])].upper)
                       for n in joint_names(model.mounts)]
-            return PolicyController(policy, limits, cmd_timeout, imu_timeout)
+            try:
+                return PolicyController(policy, limits, cmd_timeout, imu_timeout, kin=kin)
+            except ValueError as exc:
+                raise StartupError(f"politika bu robota uymuyor: {exc}") from exc
 
         def _now(self) -> float:
             return self.get_clock().now().nanoseconds / 1e9

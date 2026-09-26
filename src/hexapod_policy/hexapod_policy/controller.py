@@ -22,6 +22,10 @@ eğitimdeki bölüm başıyla aynı durumu görür.
   - IMU verisi yok ya da bayat (politika kör koşmasın),
   - gövde max_tilt_deg'den fazla yatmış (eğitimde bölüm burada biterdi).
 Eğitim aralığının dışındaki komut aralığa kırpılır (clipped_command).
+
+Artık eylem modunda (sözleşme action_mode = "residual") hedef, adım
+saatinin tripod'u (tripod.PhaseTripod; eğitimdekiyle aynı kod) + politikanın
+düzeltmesidir; bunun için robotun kinematiği (kin) verilmelidir.
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ from typing import Sequence
 import numpy as np
 
 from .mlp import MlpPolicy
+from .tripod import PhaseTripod
 
 Vec3 = tuple[float, float, float]
 Quat = tuple[float, float, float, float]   # (w, x, y, z), dünya <- gövde
@@ -54,8 +59,15 @@ class PolicyController:
 
     def __init__(self, policy: MlpPolicy, limits: Sequence[tuple[float, float]],
                  cmd_timeout_s: float = 0.5, imu_timeout_s: float = 0.2,
-                 max_tilt_deg: float = 45.0) -> None:
+                 max_tilt_deg: float = 45.0, kin=None) -> None:
         c = policy.contract
+        self.base = None
+        if c.action_mode == "residual":
+            if kin is None:
+                raise ValueError("artık eylem politikası robotun kinematiğini (kin) ister")
+            g = c.base_gait
+            self.base = PhaseTripod(kin, tuple(tuple(x) for x in g["groups"]), c.gait_hz,
+                                    g["reach_mm"], g["height_mm"], g["lift_mm"])
         if len(limits) != c.action_size:
             raise ValueError(f"{c.action_size} eklem limiti bekleniyordu, {len(limits)} geldi")
         self.policy = policy
@@ -98,9 +110,14 @@ class PolicyController:
             self.status = reason
             return list(self._targets)
         c = self.policy.contract
-        action = np.clip(self.policy(self.observation(self._effective_command())), -1.0, 1.0)
-        self._targets = [_clip(d + c.action_scale * float(a), lim)
-                         for d, a, lim in zip(c.default_rad, action, self.limits)]
+        command = self._effective_command()
+        action = np.clip(self.policy(self.observation(command)), -1.0, 1.0)
+        if self.base is None:
+            base, scale = c.default_rad, c.action_scale
+        else:
+            base, scale = self.base.targets(self._phase, command), c.residual_scale
+        self._targets = [_clip(b + scale * float(a), lim)
+                         for b, a, lim in zip(base, action, self.limits)]
         self._phase = (self._phase + c.gait_hz / c.control_hz) % 1.0
         self.status = "yürüyor"
         return list(self._targets)

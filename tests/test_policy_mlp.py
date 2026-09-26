@@ -69,3 +69,50 @@ def test_boyut_hatalari_yakalanir():
         PolicyContract(obs_size=4, action_size=2, action_scale=0.5, gait_hz=1.5,
                        control_hz=50.0, default_rad=(0.0,),
                        command_ranges={"vx": (0, 1), "vy": (0, 0), "wz": (0, 0)})
+
+
+# --- artık eylem sözleşmesi ------------------------------------------------------
+
+BASE = {"groups": [[0, 2, 4], [1, 3, 5]], "reach_mm": 130.0, "height_mm": 100.0, "lift_mm": 25.0}
+
+
+def residual_contract(**kw) -> PolicyContract:
+    args = dict(obs_size=4, action_size=2, action_scale=0.5, gait_hz=1.5, control_hz=50.0,
+                default_rad=(0.1, 0.1),
+                command_ranges={"vx": (0.05, 0.15), "vy": (0.0, 0.0), "wz": (0.0, 0.0)},
+                action_mode="residual", residual_scale=0.2, base_gait=BASE)
+    args.update(kw)
+    return PolicyContract(**args)
+
+
+def test_artik_eylem_sozlesmesi_dogrulanir():
+    residual_contract()
+    with pytest.raises(ValueError):
+        residual_contract(residual_scale=0.0)
+    with pytest.raises(ValueError):
+        residual_contract(base_gait={"groups": [[0], [1]]})
+    with pytest.raises(ValueError):
+        residual_contract(action_mode="hayali")
+
+
+def test_artik_eylem_kaydet_yukle(tmp_path):
+    p = random_policy()
+    q = MlpPolicy(p.layers, "tanh", residual_contract())
+    r = MlpPolicy.load(q.save(tmp_path / "r.npz"))
+    assert r.contract.action_mode == "residual"
+    assert r.contract.residual_scale == pytest.approx(0.2)
+    assert r.contract.base_gait == BASE
+
+
+def test_eski_dosyalar_mutlak_modda_yuklenir(tmp_path):
+    """Mod alanları eklenmeden önce yazılmış dosyalar (sözleşmede anahtar yok) mutlak modda."""
+    p = random_policy()
+    path = p.save(tmp_path / "eski.npz")
+    with np.load(path) as data:
+        arrays = {k: data[k] for k in data.files}
+    meta = json.loads(str(arrays["meta"]))
+    for k in ("action_mode", "residual_scale", "base_gait"):
+        meta["contract"].pop(k)
+    arrays["meta"] = np.array(json.dumps(meta))
+    np.savez(tmp_path / "eski2.npz", **arrays)
+    assert MlpPolicy.load(tmp_path / "eski2.npz").contract.action_mode == "absolute"

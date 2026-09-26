@@ -139,3 +139,20 @@ def test_zemin_sdf_ile_kurulur(tmp_path_factory):
         assert all(e._state.foot_contact)
     finally:
         e.close()
+
+
+def test_artik_eylem_modunda_sifir_eylem_tripod(tmp_path_factory):
+    from hexapod_rl.task import TaskConfig
+
+    e = HexapodEnv(task=TaskConfig(action_mode="residual"),
+                   workdir=tmp_path_factory.mktemp("artik"))
+    try:
+        e.reset(seed=0, options={"command": (0.1, 0.0, 0.0)})
+        x0 = e._state.base_pos[0]
+        for _ in range(int(round(4.0 / e.dt))):
+            _, _, terminated, _, info = e.step(np.zeros(18, dtype=np.float32))
+            assert not terminated
+            assert info["reward_terms"]["residual"] == 0.0
+        assert e._state.base_pos[0] - x0 > 0.8 * 0.1 * 4.0
+    finally:
+        e.close()

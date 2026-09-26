@@ -30,6 +30,7 @@ from hexapod_description.model import RobotModel
 from hexapod_driver.config import RobotConfig
 from hexapod_gazebo.pose import standing_pose
 from hexapod_kinematics import HexapodKinematics
+from hexapod_policy.tripod import PhaseTripod
 
 from .sim import HexapodSim
 from .task import (
@@ -66,6 +67,13 @@ class HexapodEnv(gym.Env):
         self.default = [math.radians(v) for leg in sorted(pose)
                         for v in pose[leg].as_dict().values()]
         self.groups = tripod_groups({leg: m.yaw for leg, m in model.mounts.items()})
+        if self.task.action_mode not in ("absolute", "residual"):
+            raise ValueError(f"bilinmeyen eylem modu: {self.task.action_mode!r}")
+        self.base = None
+        if self.task.action_mode == "residual":
+            t = self.task
+            self.base = PhaseTripod(HexapodKinematics.from_config(config), self.groups,
+                                    t.gait_hz, t.stand_reach_mm, t.stand_height_mm, t.lift_mm)
         self.limits = [(model.limits[(int(n[3]), n.split("_")[1])].lower,
                         model.limits[(int(n[3]), n.split("_")[1])].upper)
                        for n in self.sim.names]
@@ -104,7 +112,11 @@ class HexapodEnv(gym.Env):
 
     def step(self, action):
         action = [float(a) for a in np.asarray(action, dtype=np.float64).reshape(-1)]
-        targets = action_to_targets(action, self.default, self.task.action_scale, self.limits)
+        if self.base is None:
+            targets = action_to_targets(action, self.default, self.task.action_scale, self.limits)
+        else:   # artık eylem: tripod(saat, komut) + düzeltme
+            targets = action_to_targets(action, self.base.targets(self._phase, self._command),
+                                        self.task.residual_scale, self.limits)
         if self._steps >= self._next_push:
             self._push()
         state = self.sim.step(targets)

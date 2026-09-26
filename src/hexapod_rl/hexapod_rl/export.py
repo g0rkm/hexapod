@@ -36,14 +36,25 @@ def contract_for(task: TaskConfig, config_path=None) -> PolicyContract:
     from hexapod_gazebo.pose import standing_pose
     from hexapod_kinematics import HexapodKinematics
 
+    from .task import tripod_groups
+
     kin = HexapodKinematics.from_config(RobotConfig.load(config_path))
     pose = standing_pose(kin, task.stand_reach_mm, task.stand_height_mm)
     default = tuple(math.radians(v) for leg in sorted(pose) for v in pose[leg].as_dict().values())
+    residual = task.action_mode == "residual"
+    base = None
+    if residual:
+        groups = tripod_groups({leg: m.yaw for leg, m in kin.mounts.items()})
+        base = {"groups": [list(g) for g in groups], "reach_mm": task.stand_reach_mm,
+                "height_mm": task.stand_height_mm, "lift_mm": task.lift_mm}
     return PolicyContract(
         obs_size=OBS_SIZE, action_size=ACTION_SIZE, action_scale=task.action_scale,
         gait_hz=task.gait_hz, control_hz=COMMAND_RATE_HZ, default_rad=default,
         command_ranges={"vx": tuple(task.vx_range), "vy": tuple(task.vy_range),
                         "wz": tuple(task.wz_range)},
+        action_mode=task.action_mode,
+        residual_scale=task.residual_scale if residual else 0.0,
+        base_gait=base,
     )
 
 
@@ -58,13 +69,14 @@ def from_sb3(model, contract: PolicyContract, source: str = "") -> MlpPolicy:
     return MlpPolicy(layers, activation, contract, source)
 
 
-def export(zip_path: Path, out: Path | None = None, check: int = 256) -> Path:
+def export(zip_path: Path, out: Path | None = None, check: int = 256,
+           task: TaskConfig | None = None) -> Path:
     from stable_baselines3 import PPO
 
     zip_path = Path(zip_path)
     out = Path(out) if out else zip_path.with_name("policy.npz")
     model = PPO.load(zip_path, device="cpu")
-    policy = from_sb3(model, contract_for(TaskConfig()), source=zip_path.name)
+    policy = from_sb3(model, contract_for(task or TaskConfig()), source=zip_path.name)
     policy.save(out)
 
     loaded = MlpPolicy.load(out)
@@ -82,8 +94,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="SB3 modelini numpy politikasına aktar")
     parser.add_argument("model", type=Path)
     parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument("--residual", action="store_true",
+                        help="politika artık eylem modunda eğitildi (tripod + düzeltme)")
     args = parser.parse_args(argv)
-    out = export(args.model, args.out)
+    out = export(args.model, args.out,
+                 task=TaskConfig(action_mode="residual") if args.residual else None)
     print(f"yazıldı -> {out} ({out.stat().st_size / 1024:.0f} KB); SB3 ile aynı (fark < 1e-5)")
     return 0
 

@@ -82,6 +82,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seconds", type=float, default=10.0)
     parser.add_argument("--noise", type=float, default=0.0, help="eyleme gürültü (std)")
     parser.add_argument("--randomize", action="store_true", help="alan rastgeleleştirme açık")
+    parser.add_argument("--residual", action="store_true",
+                        help="politika artık eylem modunda (tripod + düzeltme)")
     parser.add_argument("--seed", type=int, default=123)
     args = parser.parse_args(argv)
     if args.model == "tripod":
@@ -90,7 +92,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         model = PPO.load(Path(args.model), device="cpu")
     from .task import Randomization, TaskConfig
-    task = TaskConfig(randomization=Randomization()) if args.randomize else None
+    task = TaskConfig(action_mode="residual" if args.residual else "absolute",
+                      randomization=Randomization() if args.randomize else None)
     print(format_result(evaluate(model, args.seconds, args.vx, seed=args.seed,
                                  noise=args.noise, task=task)))
     return 0
