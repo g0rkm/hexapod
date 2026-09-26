@@ -198,3 +198,58 @@ def test_artik_eylem_modunda_sifir_eylem_tripod(tmp_path_factory):
         assert e._state.base_pos[0] - x0 > 0.8 * 0.1 * 4.0
     finally:
         e.close()
+
+
+class _SifirDuzeltme:
+    """Artık eylem modunda eylem 0 = tripod'un kendisi."""
+
+    def predict(self, obs, deterministic=True):
+        return np.zeros(18, dtype=np.float32), None
+
+
+def test_olcum_ayni_ortamda_tekrarlanir_ve_donus_olculur(tmp_path_factory):
+    """Eğitimde ara kayıt seçimi tek bir ortamı yeniden kullanır; sonuç yeni
+    ortamdakiyle aynı olmalı. Yerinde dönüş komutunda tripod gerçekten döner."""
+    from hexapod_rl.evaluate import evaluate
+    from hexapod_rl.task import TaskConfig
+
+    task = TaskConfig(action_mode="residual")
+    e = HexapodEnv(task=task, workdir=tmp_path_factory.mktemp("olcum"))
+    try:
+        a = evaluate(_SifirDuzeltme(), 3.0, vx=0.0, wz=0.4, env=e)
+        evaluate(_SifirDuzeltme(), 1.0, vx=0.1, env=e)          # araya başka bir ölçüm
+        b = evaluate(_SifirDuzeltme(), 3.0, vx=0.0, wz=0.4, env=e)
+    finally:
+        e.close()
+    c = evaluate(_SifirDuzeltme(), 3.0, vx=0.0, wz=0.4, task=task)
+    for k in a:
+        assert a[k] == pytest.approx(b[k], abs=1e-9) and a[k] == pytest.approx(c[k], abs=1e-9)
+    assert a["komut_wz"] == 0.4 and not a["devrildi"]
+    assert a["donus_hizi_rad_s"] > 0.5 * 0.4
+    assert abs(a["govde_vx_m_s"]) < 0.02 and abs(a["govde_vy_m_s"]) < 0.02
+
+
+def test_en_iyi_ara_kayit_saklanir(tmp_path):
+    pytest.importorskip("stable_baselines3")
+    import csv
+
+    from stable_baselines3 import PPO
+    from stable_baselines3.common.logger import configure
+
+    from hexapod_rl.pretrain import _spaces_only_env
+    from hexapod_rl.task import TaskConfig
+    from hexapod_rl.train import PPO_KWARGS, best_checkpoint_callback
+
+    model = PPO("MlpPolicy", _spaces_only_env(), device="cpu", seed=0, verbose=0, **PPO_KWARGS)
+    model.set_logger(configure(None, []))
+    cb = best_checkpoint_callback(1, tmp_path, TaskConfig(action_mode="residual"), seconds=1.0)
+    cb.init_callback(model)
+    cb.measure()
+    cb.best = cb.best + 1.0          # ikinci ölçüm daha kötü sayılsın: dosya değişmemeli
+    stamp = (tmp_path / "best_model.zip").stat().st_mtime_ns
+    cb.measure()
+    cb.on_training_end()
+    rows = list(csv.DictReader((tmp_path / "ara_degerlendirme.csv").open(encoding="utf-8")))
+    assert len(rows) == 2 and len(rows[0]) == 3 + 3             # adım, skor, devrilen + 3 komut
+    assert (tmp_path / "best_model.zip").stat().st_mtime_ns == stamp
+    assert cb.best_step == 0

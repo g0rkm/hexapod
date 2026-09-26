@@ -259,3 +259,49 @@ def test_artik_eylem_cezasi_yalniz_o_modda():
     _, artik = reward(state(), a, a, cmd, TaskConfig(action_mode="residual"), False)
     assert "residual" not in mutlak
     assert artik["residual"] == pytest.approx(TaskConfig().w["residual"] * 0.25)
+
+
+# --- komut örnekleme (her yöne yürüyüş, 2026-09-26) -------------------------------
+
+
+def test_varsayilan_komut_eskisiyle_ayni_cekim():
+    """Varsayılan görevde komut eskisi gibi çekilir: eski tohumlar aynı komutu verir."""
+    import numpy as np
+
+    from hexapod_rl.task import sample_command
+
+    cfg = TaskConfig()
+    for seed in range(5):
+        a = sample_command(cfg, np.random.default_rng(seed))
+        rng = np.random.default_rng(seed)
+        b = tuple(float(rng.uniform(*r)) for r in (cfg.vx_range, cfg.vy_range, cfg.wz_range))
+        assert a == b
+
+
+def test_her_yon_komutlari():
+    import numpy as np
+
+    from hexapod_rl.task import OMNI_COMMANDS, command_fraction, sample_command, task_from_flags
+
+    cfg = task_from_flags(residual=True, omni=True)
+    assert cfg.vx_range == OMNI_COMMANDS["vx_range"] and cfg.action_mode == "residual"
+    rng = np.random.default_rng(0)
+    cmds = [sample_command(cfg, rng) for _ in range(2000)]
+    for c in cmds:
+        assert command_fraction(c, cfg) >= 1 / 3 - 1e-12          # "dur" kadar küçük yok
+        for v, (lo, hi) in zip(c, (cfg.vx_range, cfg.vy_range, cfg.wz_range)):
+            assert lo <= v <= hi
+    arr = np.array(cmds)
+    assert (arr[:, 0] < 0).mean() > 0.2                            # geri de var
+    tek = (np.count_nonzero(arr, axis=1) == 1).mean()              # saf ileri/yana/dönüş
+    assert 0.3 < tek < 0.6
+    for axis in range(3):                                          # her eksen tek başına da gelir
+        only = (arr[:, axis] != 0) & (np.count_nonzero(arr, axis=1) == 1)
+        assert only.mean() > 0.05
+
+
+def test_komut_buyuklugu_sabit_eksenleri_saymaz():
+    from hexapod_rl.task import command_fraction
+
+    cfg = TaskConfig()                                  # yalnız ileri: vy, wz sabit 0
+    assert command_fraction((0.05, 0.3, 1.0), cfg) == pytest.approx(1 / 3)

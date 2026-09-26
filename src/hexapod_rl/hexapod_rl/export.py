@@ -25,7 +25,7 @@ import numpy as np
 
 from hexapod_policy.mlp import MlpPolicy, PolicyContract
 
-from .task import ACTION_SIZE, OBS_SIZE, TaskConfig
+from .task import ACTION_SIZE, OBS_SIZE, TaskConfig, task_from_flags
 
 _ACTIVATIONS = {"Tanh": "tanh", "ReLU": "relu"}
 
@@ -55,6 +55,8 @@ def contract_for(task: TaskConfig, config_path=None) -> PolicyContract:
         action_mode=task.action_mode,
         residual_scale=task.residual_scale if residual else 0.0,
         base_gait=base,
+        # eğitimde çekilen en küçük komutun yarısı: altında düğüm ayakta bekler
+        command_deadband=0.5 * task.min_command_frac,
     )
 
 
@@ -96,9 +98,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--residual", action="store_true",
                         help="politika artık eylem modunda eğitildi (tripod + düzeltme)")
+    parser.add_argument("--omni", action="store_true",
+                        help="politika her yöne eğitildi (task.OMNI_COMMANDS)")
     args = parser.parse_args(argv)
-    out = export(args.model, args.out,
-                 task=TaskConfig(action_mode="residual") if args.residual else None)
+    out = export(args.model, args.out, task=task_from_flags(args.residual, args.omni))
     print(f"yazıldı -> {out} ({out.stat().st_size / 1024:.0f} KB); SB3 ile aynı (fark < 1e-5)")
     return 0
 

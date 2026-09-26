@@ -42,6 +42,7 @@ from .task import (
     fallen,
     observation,
     reward,
+    sample_command,
     tripod_groups,
 )
 
@@ -98,9 +99,7 @@ class HexapodEnv(gym.Env):
         state = self.sim.reset()
         for _ in range(int(round(self.task.settle_s / self.dt))):  # duruşa yerleş
             state = self.sim.step(self.default)
-        t = self.task
-        self._command = tuple(float(self.np_random.uniform(*r))
-                              for r in (t.vx_range, t.vy_range, t.wz_range))
+        self._command = sample_command(self.task, self.np_random)
         if options and "command" in options:
             self._command = tuple(float(v) for v in options["command"])
         self._phase = 0.0

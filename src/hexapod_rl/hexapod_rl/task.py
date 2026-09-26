@@ -139,6 +139,57 @@ class TaskConfig:
     residual_scale: float = 0.2    # rad; artık eylem modunda eylem 1 -> tripod'dan bu kadar
     lift_mm: float = 25.0          # artık eylem modunda tripod'un ayak kaldırması
     randomization: "Randomization | None" = None   # None: kapalı
+    # komut örnekleme (sample_command); varsayılanlar eski davranış: aralıktan düz çekim
+    command_zero_prob: float = 0.0  # her bileşen bu olasılıkla 0 (saf ileri/yana/dönüş sık gelsin)
+    min_command_frac: float = 0.0   # command_fraction bunun altındaysa yeniden çek ("dur" değil)
+
+
+#: Her yöne yürüyüş (G7, 2026-09-26). Sınırlar Samet'in teleop'unun
+#: (hexapod_teleop.TeleopLimits: vx 0.15, vy 0.08 m/s, wz 0.5 rad/s); tripod
+#: bunlarda test edildi (S2) ve PhaseTripod bu kutunun her köşesinde
+#: erişilebilir (coxa en çok 21°). Bileşenlerin yarısı sıfırlanır: saf ileri,
+#: geri, yana ve yerinde dönüş de sık gelir. Aralığın üçte birinden küçük
+#: komutlar (eski ileri aralığın alt sınırı 0.05 = 0.15/3) çekilmez: "dur"
+#: komutunu politika değil düğüm karşılar (ayakta duruş).
+OMNI_COMMANDS = dict(vx_range=(-0.15, 0.15), vy_range=(-0.08, 0.08), wz_range=(-0.5, 0.5),
+                     command_zero_prob=0.5, min_command_frac=1.0 / 3.0)
+
+
+def task_from_flags(residual: bool = False, omni: bool = False,
+                    randomize: bool = False, **overrides) -> TaskConfig:
+    """Komut satırı bayraklarından (--residual, --omni, --randomize) görev ayarı;
+    train, pretrain, evaluate ve export aynı yolu kullanır."""
+    kwargs = dict(action_mode="residual" if residual else "absolute",
+                  randomization=Randomization() if randomize else None)
+    if omni:
+        kwargs.update(OMNI_COMMANDS)
+    kwargs.update(overrides)
+    return TaskConfig(**kwargs)
+
+
+def command_fraction(command, cfg: TaskConfig) -> float:
+    """Komutun büyüklüğü, her eksen kendi aralığının en uç değerine bölünerek
+    (0..1); eğitimde sabit tutulan (genişliği 0) eksenler sayılmaz."""
+    out = 0.0
+    for v, (lo, hi) in zip(command, (cfg.vx_range, cfg.vy_range, cfg.wz_range)):
+        if hi > lo:
+            out = max(out, abs(v) / max(abs(lo), abs(hi)))
+    return out
+
+
+def sample_command(cfg: TaskConfig, rng) -> tuple[float, float, float]:
+    """Bölüm başında hız komutu. rng: numpy Generator (ortamın np_random'ı).
+
+    Varsayılan TaskConfig'te eskisiyle aynı: her eksen kendi aralığından,
+    aynı rastgele sayı sırasıyla (eski tohumlar aynı komutu verir)."""
+    ranges = (cfg.vx_range, cfg.vy_range, cfg.wz_range)
+    for _ in range(1000):
+        cmd = [float(rng.uniform(*r)) for r in ranges]
+        if cfg.command_zero_prob > 0:
+            cmd = [0.0 if rng.uniform() < cfg.command_zero_prob else v for v in cmd]
+        if command_fraction(cmd, cfg) >= cfg.min_command_frac:
+            return tuple(cmd)
+    raise ValueError("komut örneklenemedi: min_command_frac aralıklarla sağlanamıyor")
 
 
 @dataclass(frozen=True)

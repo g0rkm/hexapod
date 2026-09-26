@@ -36,8 +36,8 @@ from pathlib import Path
 import numpy as np
 
 from .demo import TripodDemo
-from .evaluate import evaluate, format_result
-from .task import ACTION_SIZE, OBS_SIZE, Randomization, TaskConfig
+from .evaluate import eval_commands, evaluate_set, format_result
+from .task import ACTION_SIZE, OBS_SIZE, task_from_flags
 
 
 def demo_for(env) -> TripodDemo:
@@ -191,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sde", action="store_true", help="keşif gSDE ile (düzgün gürültü)")
     parser.add_argument("--residual", action="store_true",
                         help="artık eylem modu: politika tripod'a düzeltme verir (etiket 0)")
+    parser.add_argument("--omni", action="store_true",
+                        help="her yöne komut (task.OMNI_COMMANDS); PPO da --omni ile")
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--batch", type=int, default=1024)
@@ -212,8 +214,7 @@ def main(argv: list[str] | None = None) -> int:
     gamma = PPO_KWARGS["gamma"]
     tail = int(round(3 / (1 - gamma)))    # getirinin %95'i bu kadar adımda birikir
     seeds = [args.seed * 1000 + i for i in range(args.episodes)]
-    task = TaskConfig(action_mode="residual" if args.residual else "absolute",
-                      randomization=Randomization() if args.randomize else None)
+    task = task_from_flags(args.residual, args.omni, args.randomize)
     jobs = [(seeds[i::args.workers], args.noise, gamma, tail, task) for i in range(args.workers)]
     t0 = time.time()
     with multiprocessing.get_context("fork").Pool(args.workers) as pool:
@@ -249,10 +250,10 @@ def main(argv: list[str] | None = None) -> int:
     log(f"std {args.std} (gerçekleşen {actual:.3f}{', gSDE' if args.sde else ''}); doğrulama: "
         + ", ".join(f"{k} {v:.4f}" for k, v in final.items()))
 
-    eval_task = TaskConfig(action_mode=task.action_mode)
-    for vx in (0.05, 0.10, 0.15):
-        log(f"--- değerlendirme, komut vx={vx}\n"
-            + format_result(evaluate(model, vx=vx, task=eval_task)))
+    eval_task = task_from_flags(args.residual, args.omni)
+    commands = eval_commands(eval_task)
+    for c, result in zip(commands, evaluate_set(model, commands, task=eval_task)):
+        log(f"--- değerlendirme, komut (vx, vy, wz) = {c}\n" + format_result(result))
     (out / "ozet.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"kaydedildi -> {out}")
     return 0

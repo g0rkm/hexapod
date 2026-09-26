@@ -18,9 +18,20 @@ gSDE'li taklitten 3e-4 ile başlayan PPO'da güncellemeler çok büyüktü (KL
 0.06-0.23, kırpılma 0.5-0.7) ve ödül 200 bin adımda 2200'den 1570'e düştü.
 target_kl, bir güncellemedeki dönemleri KL bu değeri aşınca keser.
 
+--omni: her yöne yürüyüş (task.OMNI_COMMANDS: ileri/geri, yana, dönüş);
+taklit de --omni ile yapılmalı.
+
+En iyi ara kayıt (2026-09-26): uzun eğitimde politika yine hedef hızı
+aşmaya kayıyordu, en iyisi 250k ara kaydıydı (ders 25). Her ara kayıtta
+(250 bin adımda bir) politika deterministik ölçülür (evaluate.eval_commands:
+ileride 0.05/0.10/0.15, her yönde yedi komut; düz zemin, rastgeleleştirme
+yok, 10 s); adım başı ödüllerin ortalaması en yüksek olan best_model.zip
+olarak saklanır, bütün ölçümler ara_degerlendirme.csv'ye yazılır.
+
 Çıktılar ~/hexapod_runs/<ad>/ altında (OneDrive'a senkronlanmasın diye
-depoda değil): model.zip, ara kayıtlar (checkpoints/), progress.csv
-(SB3 günlüğü), degerlendirme.txt. Ortam: tools/wsl/rl_kurulum.sh.
+depoda değil): model.zip (son), best_model.zip (en iyi ara kayıt), ara
+kayıtlar (checkpoints/), progress.csv (SB3 günlüğü), ara_degerlendirme.csv,
+degerlendirme.txt. Ortam: tools/wsl/rl_kurulum.sh.
 
 Sonda kısa bir değerlendirme yapılır (evaluate.py); ara kayıtlar da
 `python -m hexapod_rl.evaluate <zip>` ile değerlendirilebilir.
@@ -29,11 +40,12 @@ Sonda kısa bir değerlendirme yapılır (evaluate.py); ara kayıtlar da
 from __future__ import annotations
 
 import argparse
+import csv
 import math
 import time
 from pathlib import Path
 
-from .evaluate import evaluate, format_result
+from .evaluate import eval_commands, evaluate, evaluate_set, format_result
 
 # Sıfırdan eğitimin PPO ayarları; pretrain.py de modelini bunlarla kurar.
 PPO_KWARGS = dict(
@@ -43,15 +55,64 @@ PPO_KWARGS = dict(
 )
 
 
+def best_checkpoint_callback(every: int, out: Path, task, seconds: float = 10.0):
+    """Her `every` çağrıda politikayı ölçüp en iyisini best_model.zip olarak saklar."""
+    from stable_baselines3.common.callbacks import BaseCallback
+
+    from .env import HexapodEnv
+
+    commands = eval_commands(task)
+
+    class BestCheckpoint(BaseCallback):
+        def __init__(self) -> None:
+            super().__init__()
+            self.best = -math.inf
+            self.best_step = None
+            self.env = None       # ilk ölçümde kurulur (alt süreçler çatallandıktan sonra)
+            self.csv = out / "ara_degerlendirme.csv"
+
+        def _on_step(self) -> bool:
+            if self.n_calls % every == 0:
+                self.measure()
+            return True
+
+        def measure(self) -> None:
+            if self.env is None:
+                self.env = HexapodEnv(task=task)
+            results = evaluate_set(self.model, commands, seconds, env=self.env)
+            score = sum(r["adim_basi_odul"] for r in results) / len(results)
+            row = {"adim": self.num_timesteps, "skor": round(score, 4),
+                   "devrilen": sum(r["devrildi"] for r in results)}
+            for c, r in zip(commands, results):
+                row[f"odul_{c[0]:+.2f}_{c[1]:+.2f}_{c[2]:+.2f}"] = round(r["adim_basi_odul"], 4)
+            new = not self.csv.exists()
+            with self.csv.open("a", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=list(row))
+                if new:
+                    w.writeheader()
+                w.writerow(row)
+            if score > self.best:
+                self.best, self.best_step = score, self.num_timesteps
+                self.model.save(out / "best_model")
+            self.logger.record("eval/skor", score)
+            self.logger.record("eval/en_iyi_adim", self.best_step)
+
+        def _on_training_end(self) -> None:
+            if self.env is not None:
+                self.env.close()
+
+    return BestCheckpoint()
+
+
 def main(argv: list[str] | None = None) -> int:
     import torch
     from stable_baselines3 import PPO
-    from stable_baselines3.common.callbacks import CheckpointCallback
+    from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
     from stable_baselines3.common.logger import configure
     from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 
     from .env import make_env
-    from .task import Randomization, TaskConfig
+    from .task import TaskConfig, task_from_flags
 
     parser = argparse.ArgumentParser(description="Hexapod PPO eğitimi")
     parser.add_argument("--steps", type=int, default=1_000_000)
@@ -65,6 +126,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="güncelleme KL'si bunu aşınca dönemleri kes")
     parser.add_argument("--residual", action="store_true",
                         help="artık eylem modu (tripod + düzeltme); model de öyle olmalı")
+    parser.add_argument("--omni", action="store_true",
+                        help="her yöne komut (task.OMNI_COMMANDS)")
     parser.add_argument("--power-weight", type=float, default=None,
                         help="güç cezası ağırlığı, W başına (varsayılan: TaskConfig)")
     parser.add_argument("--std", type=float, default=None,
@@ -80,8 +143,8 @@ def main(argv: list[str] | None = None) -> int:
     weights = dict(TaskConfig().w)
     if args.power_weight is not None:
         weights["power"] = args.power_weight
-    task = TaskConfig(w=weights, action_mode="residual" if args.residual else "absolute",
-                      randomization=Randomization() if args.randomize else None)
+    task = task_from_flags(args.residual, args.omni, args.randomize, w=weights)
+    eval_task = task_from_flags(args.residual, args.omni)   # ölçüm: rastgeleleştirmesiz
     venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task)
                                      for i in range(args.envs)],
                                     start_method="fork"))
@@ -104,20 +167,27 @@ def main(argv: list[str] | None = None) -> int:
     (out / "ayarlar.txt").write_text(
         f"learning_rate: {model.learning_rate}\ntarget_kl: {model.target_kl}\n"
         f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\nstd: {args.std}\n"
-        f"power_weight: {task.w['power']}\naction_mode: {task.action_mode}\n",
+        f"power_weight: {task.w['power']}\naction_mode: {task.action_mode}\n"
+        f"omni: {args.omni}\nenvs: {args.envs}\n",
         encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
+    best = best_checkpoint_callback(every, out, eval_task)
     t0 = time.time()
     model.learn(total_timesteps=args.steps, reset_num_timesteps=True,
-                callback=CheckpointCallback(every, str(out / "checkpoints"), "ppo"))
+                callback=CallbackList([CheckpointCallback(every, str(out / "checkpoints"), "ppo"),
+                                       best]))
     wall = time.time() - t0
     model.save(out / "model")
     venv.close()
 
-    result = evaluate(model, task=TaskConfig(action_mode=task.action_mode))
+    result = evaluate(model, task=eval_task)
     lines = [f"adım: {args.steps}, ortam: {args.envs}, süre: {wall / 60:.1f} dk "
              f"({args.steps / wall:.0f} adım/s)"]
+    if best.best_step is not None:
+        lines.append(f"en iyi ara kayıt: {best.best_step} adım, skor {best.best:.3f} "
+                     f"-> best_model.zip (ara_degerlendirme.csv)")
+    lines.append("son model, komut vx 0.10:")
     lines.append(format_result(result))
     (out / "degerlendirme.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
