@@ -111,6 +111,33 @@ Kayıtlar `egitim_kayitlari/v15_odul_v7`, `v16_odul_v7_k3`.
 **Gerçek robotta DENENMEDİ.** Gerçek robotta 50 mm ayak kaldırmanın
 erişilebilirliği ve servo yükü eklem limitleri (D6) ile kontrol edilmeli.
 
+### Bütün zemin türleri: eğim, engebe, kaygan, basamak (2026-09-26 akşam)
+
+G7'nin "bitti" şartındaki üç tür (eğim, engebe, kaygan) + basamaklar, kendi
+deneme zeminlerimde (S5'in yerine geçmez). Rastgeleleştirme açık, 3 tohum,
+deterministik, 10 s; hücre: ortalama yol (m) ve 0.4 m'den fazla ilerleyen
+tohum; D = devrilme. Engel skoru: düz hariç, her durumda en fazla beklenen
+yol (1 m, yanda 0.6 m). Kaygan yokuşta çekiş için en az μ = tan θ gerekir
+(10° 0.18, 15° 0.27, 20° 0.36): μ 0.3 / 0.4 fiziksel sınıra %10 yakın.
+
+| Model | Basamak 45 / 60 | Çukur 60 geri | Çukur 45 yana | Yokuş 20° | Kaygan yokuş 10° μ0.25 | Kaygan yokuş 15° μ0.3 | Kaygan yokuş 20° μ0.4 | Engebe 40 / 60 | Engebe 40 yana | Engel skoru |
+|---|---|---|---|---|---|---|---|---|---|---|
+| tripod (Samet) | 0.09 / 0.09 (0/3) | 0.13 (0/3) | 0.12 (0/3) | 0.76 | 0.13 (0/3) | **−3.60, D3** | **−3.48, D3** | 0.47 / 0.10 (0/3) | 0.27 (0/3) | 0.281 |
+| tripod, 50 mm adım | 0.62 (2/3) / 0.09 | 0.14 (0/3) | 0.12 (0/3) | 0.70 | 0.16 (0/3) | −3.57, D3 | −3.47, D3 | 0.77 / 0.81 | 0.51 | 0.443 |
+| taban 50 mm (düzeltme 0) | 0.90 / 0.27 (1/3) | 0.45 (2/3) | 0.58 | 0.82 | 0.48 (2/3) | −1.02 | −1.26 | 0.91 / 0.87 | 0.52 | 0.628 |
+| **ppo_lift50_3750k** | **1.04 / 0.70 (3/3)** | **0.98 (3/3)** | **0.63** | **0.94** | **0.57 (3/3)** | −0.20 | −0.14 | **0.99 / 0.97** | **0.62** | **0.763** |
+
+- **Politika her zemin türünde tripod'dan iyi.** Engebe ve kaygan eğim
+  eğitimde yoktu; politika genelleşiyor. Samet'in tripod'u kaygan yokuşta
+  geriye kayıp 3/3 devriliyor, politika devrilmeden tutunuyor (−0.1…−0.2 m).
+- Payı dar kaygan yokuşları (15° μ 0.3, 20° μ 0.4) kimse çıkamıyor.
+- **Deneme (v17):** eğitim setine kaygan eğim ve engebe eklendi
+  (`TRAIN_SETS["deneme2"]`), `ppo_lift50_3750k`'dan 3M adım (49 dk, 1014
+  adım/s; engebe simi ~2 kat yavaş). İyileştirmedi: engel skoru ara
+  kayıtlarda 0.675–0.719 (başlangıç 0.763). Çukur ortamı 8'den 3'e indiği
+  için çukur becerileri zayıfladı; dar paylı kaygan yokuşlarda ilerleme yok.
+  Model alınmadı (`egitim_kayitlari/v17_deneme2`).
+
 ## Her yöne yürüyüş — `ppo_omni_250k` (2026-09-26 öğlen, yeni PC)
 
 Politika artık ileri/geri (vx ±0.15), yana (vy ±0.08) ve dönüş (wz ±0.5)

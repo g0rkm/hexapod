@@ -392,6 +392,15 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
   indi ama güç 3.9–4.0 W'ta kaldı; katsayı 3'te zemin becerisi bozuldu
   (çukurdan yana çıkış 0/3). **Kör politikada düz verim ile zemin
   sağlamlığı arasında ödünleşim var** (ders 33).
+- **Bütün zemin türleri** (eğim, engebe, kaygan, basamak; deneme
+  zeminleri, rastgeleleştirme açık, 3 tohum): `ppo_lift50_3750k` engel
+  skoru **0.763**; Samet'in tripod'u 0.281, 50 mm adımla 0.443, düzeltmesiz
+  50 mm taban 0.628. Engebe ve kaygan eğim eğitimde yoktu, politika
+  genelleşiyor. Samet'in tripod'u 15° kaygan yokuşta (μ 0.3) geriye kayıp
+  3/3 devriliyor; politika devrilmeden tutunuyor ama çıkamıyor (sürtünme
+  payı %10, fiziksel sınıra yakın). Payı olan kaygan yokuşu (10° μ 0.25)
+  politika 3/3 çıkıyor, tripod 0/3. Bunları da eğitime katma denemesi
+  (v17) iyileştirmedi (ders 34). Tablo: models/README.
 - **Adil karşılaştırma:** Samet'in `TripodGait`'i de 50 mm adımla
   ölçüldü: zemin skoru 0.548 (25 mm'de 0.404), RL 0.879. Aynı adım
   yüksekliğinde de RL açık ara önde; 45 mm çukurdan yana çıkış ve 60 mm
@@ -1228,6 +1237,7 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | Zeminli eğitim ortam başına (`--terrains`), ilk deneme kendi deneme zeminlerimle | S5 henüz yok; altyapı hazır olsun, S5 gelince yalnız liste değişsin |
 | 09-26 | v12_zemin (taban 25 mm) 2.25M'de durduruldu; **taban ayak kaldırma 50 mm** ile yeniden (`--lift-mm 50`) | 2M adımda hiçbir engelde iyileşme yoktu; düzeltmesiz tripod 40–60 mm kaldırmayla 45–60 mm engelleri geçiyor ve düzde ödül değişmiyor |
 | 09-26 | `ppo_lift50_2250k` depoya, ara kayıt elle (zemin skoruyla) seçildi | Eğitim içi seçim düz zemine bakıp 250k'yı seçti; zemin skorunda en iyisi 2.25M |
+| 09-26 | Deneme zeminlerine kaygan (μ) ve engebe (`rough`) eklendi; v17 (bunlarla eğitim) depoya alınmadı | G7 "bitti" şartının üç türü ölçülebilsin. v17 engel skorunu 0.763'ten 0.68–0.72'ye düşürdü (ders 34) |
 | 09-26 | Ödül v7 (`progress_overshoot`) eklendi ama varsayılan 0 (v6) kaldı; v15/v16 modelleri depoya alınmadı | Aşma biraz azaldı, enerji azalmadı, katsayı 3'te zemin bozuldu (ders 33). Raporlar ortak ödülle (`standard_reward`, v6) |
 | 09-26 | v14 (std 0.05, 2M) → `ppo_lift50_3750k` depoya; ara kayıt rastgeleleştirmeli 3 tohumla elle seçildi | Düzde aşma azalmadı ama 60 mm basamak 3/3, zemin skoru 0.957; eğitim içi deterministik seçim (500k) ikili durumlarda gürültülü (ders 32) |
 | 09-26 | **Ayak teması ve gövde yüksekliği zemin yüksekliği fonksiyonuna göre** (`terrain_height(x, y)`, `terrain_sdf` ile zorunlu çift); fizik motorunun temas sensörü değil | Sensör yolu (Contact sistemi + gz.transport) tek süreci 381 → 182 adım/s yavaşlattı ve mesajlar eşzamansız (tekrarlanabilirlik bozulur). Yükseklik yolu bedava, sensörle 0–20° eğimde %97.8–98.8 uyumlu (§12.26). Yüksekliksiz zemin reddedilir: z=0 varsaymak değer uydurmak olur |
@@ -1464,6 +1474,15 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     yürüyüşü her yerde kullanıyor. Çözüm ödülde değil gözlemde: ileri bakan
     mesafe sensörleri (3 VL53L0X alındı, S7/D8) ya da iki model arasında
     düğümde seçim (düzde `ppo_omni_250k`, engelde `ppo_lift50_3750k`).
+34. **Eğitim setini çeşitlendirmek var olan beceriyi sulandırabilir.** v17'de
+    16 ortamlık sete kaygan eğim ve engebe eklenince çukur ortamı 8'den
+    3'e indi; 3M adım sonra çukur becerileri zayıfladı (60 mm çukurdan geri
+    3/3 → 1/3–2/3), yeni türlerde anlamlı kazanç olmadı (engebeye politika
+    zaten genelleşiyordu; dar paylı kaygan yokuşlar fiziksel sınırda).
+    Ders: yeni bir zemin türü eklemeden önce mevcut politikanın o türde
+    zaten ne yaptığını ölç (engebe: iyi); fiziksel olarak çözülebilir mi
+    bak (kaygan yokuşta μ > tan θ payı); set oranlarını koru ya da ortam
+    sayısını artır. S5 gelince müfredat bunu gözetmeli.
 
 ---
 
