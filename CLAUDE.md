@@ -118,6 +118,7 @@ tools/preview_urdf.py     URDF'i PNG'ye çizer (ROS'suz önizleme)
 tools/wsl/ros_kurulum.sh  WSL'e ROS 2 Lyrical + Gazebo kurulumu
 tools/wsl/derle.sh        ROS paketlerini ~/hexapod_ws'te derler
 tools/wsl/rl_kurulum.sh   ~/hexapod_venv: torch (CPU), SB3, Gymnasium
+tools/wsl/politika_ros_olcum.sh  ROS'lu simde politika düğümünü komut komut ölçer
 tools/cadlib/             CAD araçlarının ortak kütüphanesi
 tests/
 docs/                     PROJE_DEVIR.md, ARAYUZ.md (eklem arayüzü), brif, malzeme/

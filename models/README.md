@@ -46,6 +46,9 @@ seti: (0.1,0,0), (−0.1,0,0), (0,±0.06,0), (0,0,±0.4), (0.1,0.04,0.25).
   iyi bir tripod'un üstüne öğrenilecek çok şey yok; beklenen.
 - Eklem gürültüsünde tripod'dan açık ara iyi (1.84'e 1.46): açık döngü tripod
   titreşimde hızının üçte birini kaybediyor.
+- **ROS'lu simde gerçek politika düğümüyle** (`tools/wsl/politika_ros_olcum.sh`):
+  ileri %101, geri %100, yana %101–104, dönüş %99–100, karışık
+  (0.1, 0.04, 0.25) %100/%104/%96; sıfır komutta ayakta, hareket 0.0 mm.
 
 **Eğitim:** taklit `bc_omni` (128 bölüm, 16 işçi, gürültü 0.25, std 0.15) →
 PPO `v10_omni` (lr 1e-4, target_kl 0.02, std 0.15), 2.1M'de durduruldu; en
