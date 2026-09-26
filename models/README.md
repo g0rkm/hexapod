@@ -26,6 +26,7 @@ Hiçbiri devrilmedi.
 | taklit (bc_v5) | 2.83 / 3.19 / 3.55 | 0.049 / 0.096 / 0.143 | <2.3° | 1.5 / 1.9 / 2.5 W | 3.03–3.22 | 1.73 |
 | PPO v5_dr 5M | 2.23 / 2.47 / 2.84 | 0.060 / 0.113 / 0.158 | −24 / −42 / −41° | 7.0 / 7.6 / 9.3 W | 2.40–2.51 | 2.20 |
 | **ppo_v7_8M** | 2.55 / 2.94 / 3.31 | **0.053 / 0.098 / 0.146** | +6 / −3 / −11° | 5.6 / 6.4 / 8.0 W | 2.82–3.00 | **2.23** (0.102 m/s) |
+| v8 (v7 + güç −0.10/W, +2M; depoda değil) | 2.61 / 3.01 / 3.24 | 0.052 / 0.103 / 0.145 | −2 / −7 / −9° | 5.5 / 6.4 / 7.3 W | 2.86–2.98 | 2.16 |
 
 Özet:
 - **ppo_v7_8M en iyi PPO:** hız komutunu doğru izliyor, yön sapması v5_dr'nin
@@ -33,6 +34,11 @@ Hiçbiri devrilmedi.
 - **Düz zeminde tripod ve taklit hâlâ önde:** PPO 3 kat enerji harcıyor ve
   hızlıda yön kaydırıyor. Mevcut rastgeleleştirme aralıkları tripod'u hiç
   zorlamıyor; RL'nin asıl sınavı zeminli dünyalar (S5).
+- **Fark neredeyse tamamen enerji:** 0.10 m/s'de terim terim (v8'e karşı
+  tripod) hız izleme 0.967'ye 0.962, ilerleme 0.971'e 0.928 (PPO önde),
+  güç −0.316'ya −0.096 (6.3 W'a 1.9 W). Deterministik eylem titremiyor
+  (eylem değişimi cezası −0.002); fazla güç yürüyüş biçiminin kendisinden.
+  Güç cezasını iki katına çıkarmak (v8) 2M adımda bunu değiştirmedi.
 - **gSDE (düzgün keşif) bu kurulumda işe yaramadı:** iki deneme (lr 3e-4 ve
   1e-4 + target_kl) eğitim ödülünü düşürdü ve dönmeye kaydı; durduruldu,
   depoya alınmadı.
