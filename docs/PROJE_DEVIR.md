@@ -8,7 +8,7 @@
 >
 > Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum §0.5;
 > zemine göre ayak teması §7.8; her yöne politika `ppo_omni_250k` §3.2;
-> kütle rastgeleleştirmesi; ilk zeminli eğitim `ppo_lift50_2250k` §3.3)
+> kütle rastgeleleştirmesi; zeminli eğitim `ppo_lift50_3750k` §3.3)
 > · Testler: **Linux 245/245**, Windows 204 geçti + 8 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
@@ -309,7 +309,7 @@ artık geçersiz ya da güncellendi:
 | 5 | Klasik yürüyüş (tripod) | ✅ Samet: `hexapod_gait` (S2), `hexapod_teleop` (S3) |
 | 6 | Gerçek robot sürücü düğümü (`hexapod_hardware`) | ✅ Samet (S4); yalnız dry-run, donanımda denenmedi |
 | 7 | RL ortamı (`hexapod_rl`) | ✅ (G6); tripod aynı ortamda ölçüldü |
-| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_omni_250k` (her yöne); zeminde `models/ppo_lift50_2250k` (ilk zeminli eğitim, 45 mm engeller). Asıl zeminler S5'i bekliyor |
+| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_omni_250k` (her yöne); zeminde `models/ppo_lift50_3750k` (deneme zeminlerinde eğitildi, 45–60 mm engeller). Asıl zeminler S5'i bekliyor |
 | 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu Gazebo'da yürüdü; son G7 politikasıyla tekrar aktarılacak |
 | 10 | Pi 4'e aktarma | ⛔ donanım vardiyası (D11) |
 
@@ -384,6 +384,9 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
 - **Bedeli düz zemin:** hedef hızı %10 aşıyor, güç 3.8 W (25 mm'li
   politika 2.0 W). Düz zeminde `ppo_omni_250k` daha iyi. İkisi de
   depoda; hangisinin robota gideceği D11'de zemine göre seçilir.
+- **Devam (v14, std 0.05):** düzde aşmayı azaltmadı (%14, 4.0 W) ama
+  zeminde ilerledi: `ppo_lift50_3750k` 60 mm basamağı da 3/3 geçiyor,
+  zemin skoru 0.957 (tablolar models/README). Zeminde şu an en iyisi bu.
 - **Adil karşılaştırma:** Samet'in `TripodGait`'i de 50 mm adımla
   ölçüldü: zemin skoru 0.548 (25 mm'de 0.404), RL 0.879. Aynı adım
   yüksekliğinde de RL açık ara önde; 45 mm çukurdan yana çıkış ve 60 mm
@@ -1215,6 +1218,7 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | Zeminli eğitim ortam başına (`--terrains`), ilk deneme kendi deneme zeminlerimle | S5 henüz yok; altyapı hazır olsun, S5 gelince yalnız liste değişsin |
 | 09-26 | v12_zemin (taban 25 mm) 2.25M'de durduruldu; **taban ayak kaldırma 50 mm** ile yeniden (`--lift-mm 50`) | 2M adımda hiçbir engelde iyileşme yoktu; düzeltmesiz tripod 40–60 mm kaldırmayla 45–60 mm engelleri geçiyor ve düzde ödül değişmiyor |
 | 09-26 | `ppo_lift50_2250k` depoya, ara kayıt elle (zemin skoruyla) seçildi | Eğitim içi seçim düz zemine bakıp 250k'yı seçti; zemin skorunda en iyisi 2.25M |
+| 09-26 | v14 (std 0.05, 2M) → `ppo_lift50_3750k` depoya; ara kayıt rastgeleleştirmeli 3 tohumla elle seçildi | Düzde aşma azalmadı ama 60 mm basamak 3/3, zemin skoru 0.957; eğitim içi deterministik seçim (500k) ikili durumlarda gürültülü (ders 32) |
 | 09-26 | **Ayak teması ve gövde yüksekliği zemin yüksekliği fonksiyonuna göre** (`terrain_height(x, y)`, `terrain_sdf` ile zorunlu çift); fizik motorunun temas sensörü değil | Sensör yolu (Contact sistemi + gz.transport) tek süreci 381 → 182 adım/s yavaşlattı ve mesajlar eşzamansız (tekrarlanabilirlik bozulur). Yükseklik yolu bedava, sensörle 0–20° eğimde %97.8–98.8 uyumlu (§12.26). Yüksekliksiz zemin reddedilir: z=0 varsaymak değer uydurmak olur |
 
 ---
@@ -1428,6 +1432,16 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     fixture/sunucu referanslarını keser: bellek ve iş parçacığı sabit, uyarı
     yok. Eğitim içi zemin ölçümü süreçte onlarca dünya kurduğu için şarttı.
     Test: `test_kapatinca_gazebo_birakilir`.
+32. **Geç/geçeme durumlarında tek deterministik ölçüm gürültülü.** Eğitim
+    içi seçim her zemin durumunu bir kez, rastgeleleştirmesiz ölçüyor; 60 mm
+    gibi sınırdaki bir engel küçük bir farkla geçiliyor ya da geçilemiyor
+    ve skor sıçrıyor (v14 250k'da 60 mm çukur 1.17, 500k'da 2.77). Seçim
+    500k'yı seçti; rastgeleleştirme açık 3 tohumlu ölçüm 1.5M'yi açıkça öne
+    koydu (60 mm basamak 1/3'e 3/3). Zeminli bir modeli depoya almadan önce
+    ara kayıtları çok tohumla ölç; eğitim içi seçim ilk eleme.
+    Ayrıca: std 0.05 (ders 25) 50 mm tabanlı politikada hız aşmasını
+    azaltmadı (%10 → %14); aşma burada gürültü uyumundan değil, engel
+    geçmenin getirdiği agresif yürüyüşten olabilir.
 
 ---
 
@@ -1535,11 +1549,13 @@ zeminler.
    `terrain_probe.EVAL_CASES`, `train.measure_model`.
 9. ✅ **Adil karşılaştırma:** `TripodGait` 50 mm adımla (`terrain_probe
    tripod:50`) zemin skoru 0.548, RL 0.879 (§3.3).
-10. **Düzde aşma ve enerji:** 50 mm'li politika hedef hızı %10 aşıyor ve
-    3.8 W harcıyor. Seçenekler: std 0.05 ile devam (ders 25), ya da ödülde
-    aşmayı cezalandırmak.
-11. **60 mm:** taban 60 mm kaldırmayla ya da daha uzun eğitimle. Gövde
-    çarpışma kutusunun altı yerden ~63 mm'de; 60 mm sınıra yakın.
+10. **Düzde aşma ve enerji:** 50 mm'li politika hedef hızı %10–14 aşıyor
+    ve 3.8–4.0 W harcıyor. std 0.05 ile devam denendi, olmadı (ders 32).
+    Sıradaki seçenek: ödülde aşmayı açıkça cezalandırmak (lin_vel
+    toleransı ya da progress'in üstüne aşma cezası), önce tripod'la aynı
+    ödülde ölçerek (ders 20).
+11. ✅ **60 mm:** `ppo_lift50_3750k` 60 mm basamağı ve 60 mm çukurdan geri
+    çıkışı 3/3 geçiyor (daha uzun eğitimle).
 12. Eğimde `orientation` cezası dünyaya göre (§13.2-1): v13 20° yokuşta
     yürüdü; cezanın gövdeyi yataya çekmeye zorladığına dair işaret yok,
     ama S5'in eğimlerinde bakılmalı.

@@ -202,9 +202,9 @@ donanım bilgileri config'e sonradan girilir.
 5. ✅ Klasik yürüyüş (tripod) — çekirdek (`hexapod_gait`) + ROS düğümü
    (`hexapod_teleop`), Gazebo'da doğrulandı
 6. 🔄 RL ortamı (✅) + PPO eğitimi: düz zeminde en iyi `models/ppo_omni_250k`
-   (tripod + öğrenilmiş düzeltme, her yöne); zeminde `models/ppo_lift50_2250k`
-   (taban 50 mm ayak kaldırma, deneme zeminlerinde eğitildi); asıl zeminler
-   S5'i bekliyor
+   (tripod + öğrenilmiş düzeltme, her yöne); zeminde `models/ppo_lift50_3750k`
+   (taban 50 mm ayak kaldırma, deneme zeminlerinde eğitildi, 60 mm engeller);
+   asıl zeminler S5'i bekliyor
 7. 🔄 Pi 4'e aktarma: politika düğümü (`hexapod_policy`) ve sürücü düğümü
    (`hexapod_hardware`) yazıldı, simde çalışıyor; Pi'de denenmedi
 

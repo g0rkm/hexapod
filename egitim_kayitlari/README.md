@@ -40,6 +40,7 @@ tablolar: `models/README.md`.
 | `bc_omni_m`, `v11_omni` | her yön, std 0.05, kütle rastgeleleştirmeli, 3M | düşüş yok, tripod düzeyinde (en iyi 750k, 2.850) |
 | `v12_zemin` | `ppo_omni_250k`'dan devam, deneme zeminleri (`--terrains deneme`), taban 25 mm, std 0.1; 2.25M'de durduruldu | hiçbir engelde iyileşme yok (`zemin_olcumu.md`) |
 | `bc_lift50`, `v13_lift50` | taban ayak kaldırma 50 mm, taklit ve PPO deneme zeminlerinde, 3M | 2.25M ara kaydı → `models/ppo_lift50_2250k`; bütün ara kayıtların zemin ölçümü `zemin_olcumu.md` (rastgeleleştirme açık, 3 tohum) |
+| `v14_lift50_std05` | `ppo_lift50_2250k`'dan std 0.05 ile devam, 2M; ara kayıt seçimi zemini de ölçüyor | 1.5M ara kaydı → `models/ppo_lift50_3750k` (60 mm 3/3); düzde aşma azalmadı (`zemin_olcumu.md`, `duz_olcumu.txt`) |
 | `omni_olcum_2026-09-26.txt` | v10/v11 ve tabanların ham ölçüm çıktısı (her yön, ileri, rastgeleleştirme, gürültü, kütle, deneme zeminleri) | tablolar `models/README.md`'de |
 
 Yeni PC'den (2026-09-26 öğlen) itibaren her eğitimde ayrıca:

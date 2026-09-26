@@ -16,7 +16,7 @@ python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Same
 python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip:residual
 ```
 
-## Zeminli eğitim — `ppo_lift50_2250k` (2026-09-26 öğleden sonra)
+## Zeminli eğitim — `ppo_lift50_3750k` ve `ppo_lift50_2250k` (2026-09-26 öğleden sonra)
 
 İlk zeminde eğitilmiş politika. Her yöne, artık eylem; **taban tripod ayağı
 50 mm kaldırıyor** (öncekiler 25 mm). Eğitim 16 ortamda, deneme zeminleriyle
@@ -40,7 +40,8 @@ yani hedef hızı aşmak puan getirmez.
 | tripod (Samet), adım 50 mm | 0.62 (2/3) | 0.09 (0/3) | 0.41 (2/3) | 0.12 (0/3) | 0.14 (0/3) | 0.86 (3/3) | 0.70 | 1.00 | 0.548 |
 | ppo_omni_250k (25 mm) | 0.08 (0/3) | 0.08 (0/3) | 0.12 (0/3) | 0.11 (0/3) | 0.12 (0/3) | 0.46 (3/3) | 0.85 | 1.02 | 0.407 |
 | taban 50 mm (düzeltme 0) | 0.90 (3/3) | 0.27 (1/3) | 0.91 (3/3) | 0.58 (3/3) | 0.45 (2/3) | 0.86 (3/3) | 0.82 | 1.00 | 0.791 |
-| **ppo_lift50_2250k** | **1.00 (3/3)** | 0.30 (1/3) | **1.03 (3/3)** | 0.59 (3/3) | **0.79 (3/3)** | 0.93 (3/3) | **0.91** | 1.10 | **0.879** |
+| ppo_lift50_2250k | 1.00 (3/3) | 0.30 (1/3) | 1.03 (3/3) | 0.59 (3/3) | 0.79 (3/3) | 0.93 (3/3) | 0.91 | 1.10 | 0.879 |
+| **ppo_lift50_3750k** | **1.04 (3/3)** | **0.70 (3/3)** | **1.07 (3/3)** | **0.63 (3/3)** | **0.98 (3/3)** | **0.99 (3/3)** | **0.94** | 1.14 | **0.957** |
 
 **Düz zemin** (her yön seti, 10 s, deterministik):
 
@@ -50,6 +51,7 @@ yani hedef hızı aşmak puan getirmez.
 | taban 50 mm | 2.829 | 0.049 / 0.100 / 0.150 | 3.13 W | 3.09–3.16 | 1.82 | 3.20 |
 | ppo_omni_250k | **2.868** | 0.050 / 0.100 / 0.150 | 1.98 W | 3.08–3.24 | 1.84 | 3.25 |
 | ppo_lift50_2250k | 2.764 | 0.053 / 0.109 / 0.165 | 3.82 W | 3.05–3.08 | **1.88** | 3.13 |
+| ppo_lift50_3750k | 2.693 | — / 0.114 / — | 4.02 W | — | 1.87 | 3.07 |
 
 - **Zeminde RL tabanını geçiyor:** aynı 50 mm tabana göre engellerde +%15
   (0.726 → 0.834), zemin skoru 0.791 → 0.879. 60 mm çukurdan geri çıkışı
@@ -74,7 +76,19 @@ yani hedef hızı aşmak puan getirmez.
   bulamadı (`egitim_kayitlari/v12_zemin/zemin_olcumu.md`).
 
 **Eğitim:** taklit `bc_lift50` (zeminlerde, 128 bölüm, std 0.1) → PPO
-`v13_lift50` (lr 1e-4, target_kl 0.02, std 0.1, 3M, 34 dk, 1461 adım/s).
+`v13_lift50` (lr 1e-4, target_kl 0.02, std 0.1, 3M, 34 dk, 1461 adım/s)
+→ 2.25M ara kaydı `ppo_lift50_2250k`. Ondan devam `v14_lift50_std05` (std
+0.05, 2M, 22 dk; ara kayıt seçimi artık zemin durumlarını da ölçüyor):
+1.5M ara kaydı `ppo_lift50_3750k` (bc'den toplam 3.75M adım).
+
+**v14 (std 0.05) sonucu:** amaç düzdeki hız aşmasını ve enerjiyi azaltmaktı,
+**olmadı** (1.5M'de aşma %14, 4.0 W). Ama zeminde belirgin ilerleme: 60 mm
+basamak 1/3 → **3/3**, zemin skoru 0.879 → **0.957**. Eğitim içi seçim
+(deterministik, tek ölçüm) 500k'yı seçti; rastgeleleştirmeli 3 tohumlu
+ölçüm 1.5M'yi açıkça öne koydu (geç/geçeme durumları tek ölçümde
+gürültülü, `egitim_kayitlari/v14_lift50_std05/zemin_olcumu.md`). ROS'lu
+simde gerçek düğümle bütün komutlarda yürüyor (ileri/geri/yana %106–115,
+dönüş %89–97), sıfır komutta ayakta.
 
 **Gerçek robotta DENENMEDİ.** Gerçek robotta 50 mm ayak kaldırmanın
 erişilebilirliği ve servo yükü eklem limitleri (D6) ile kontrol edilmeli.
