@@ -1,12 +1,14 @@
 # Hexapod — Proje Devir Belgesi
 
-> **Bu belgeyi okuyan Claude için:** Projeye yeni bir hesaptan/oturumdan
-> devam ediyorsun. Önceki oturumların bütün bağlamı, kararları, bulunan
-> hataları ve kullanıcının çalışma tercihleri burada. Herhangi bir iş
-> yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa
-> özetidir; çelişki görürsen bu belge + koddaki güncel durum esastır.
+> **Bu belgeyi okuyan Claude için:** Projeye yeni bir bilgisayardan, hesaptan
+> ya da oturumdan devam ediyorsun. Önceki oturumların bütün bağlamı, kararları,
+> bulunan hataları ve kullanıcının çalışma tercihleri burada. Herhangi bir iş
+> yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
+> çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-25** (2. oturum) · Testler: **114/114** (Linux; Windows'ta 102, Gazebo/Gymnasium testleri atlanır)
+> Son güncelleme: **2026-09-26** (3. oturum sonu, yeni bilgisayara geçiş öncesi)
+> · Testler: **Linux 208/208**, Windows 178 geçti + 8 atlandı (Gazebo/ROS/SB3
+> testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -15,9 +17,10 @@
 
 ## İçindekiler
 
+0. [Yeni bilgisayara geçiş (RTX 5070'li PC)](#0-yeni-bilgisayara-geçiş-rtx-5070li-pc)
 1. [Kullanıcı ve çalışma tarzı](#1-kullanıcı-ve-çalışma-tarzı)
 2. [Proje özeti ve hedef](#2-proje-özeti-ve-hedef)
-3. [Mevcut durum ve yol haritası](#3-mevcut-durum-ve-yol-haritası)
+3. [Mevcut durum](#3-mevcut-durum)
 4. [Donanım](#4-donanım)
 5. [Geometri ve koordinat çerçeveleri](#5-geometri-ve-koordinat-çerçeveleri)
 6. [IK ↔ kalibrasyon sözleşmesi](#6-ik--kalibrasyon-sözleşmesi)
@@ -28,9 +31,101 @@
 11. [Karar günlüğü](#11-karar-günlüğü)
 12. [Bilinen tuzaklar ve çıkarılan dersler](#12-bilinen-tuzaklar-ve-çıkarılan-dersler)
 13. [Açık kalan işler](#13-açık-kalan-işler)
-14. [Sıradaki iş için hazır plan: URDF + Gazebo](#14-sıradaki-iş-için-hazır-plan-urdf--gazebo)
+14. [Sıradaki iş için hazır plan](#14-sıradaki-iş-için-hazır-plan)
 15. [Depoda olmayan kaynakların özeti](#15-depoda-olmayan-kaynakların-özeti)
 16. [Yeni oturumda ilk adımlar](#16-yeni-oturumda-ilk-adımlar)
+
+---
+
+## 0. Yeni bilgisayara geçiş (RTX 5070'li PC)
+
+2026-09-26'da kullanıcı çalışmayı RTX 5070 ekran kartlı başka bir bilgisayara
+taşıdı. "Proje klasöründeki her şey diğer bilgisayarda da olmalı" dedi.
+
+### 0.1 Ne nerede
+
+- **Depo (GitHub, gizli): https://github.com/g0rkm/hexapod**, dal `main`.
+  Proje klasörünün tamamı depoda: kod, belgeler, CAD (~345 MB), eğitilmiş
+  modeller (`models/`), bütün eğitimlerin hafif kayıtları
+  (`egitim_kayitlari/`). Klasörde git dışında kalan yalnız Python önbellekleri
+  (`__pycache__`, `.pytest_cache`). Taşıma öncesi kontrol edildi.
+- **Faturalar ve TÜBİTAK ekran görüntüleri bu klasörde değil.** Kişisel veri
+  içerdikleri için hiç depoya girmedi (§10); içerikleri bu belgede özetli
+  (§4.1, §15).
+- **Eski PC'de kalanlar:** hepsi yeniden üretilebilir.
+  - WSL içindeki `~/hexapod_ws` (colcon derlemesi) ve `~/hexapod_venv` (RL
+    paketleri): kurulum betikleri yeniden kurar.
+  - `~/hexapod_runs`: eğitim ara kayıtları, toplam ~100 MB. Hafif kısmı
+    depoda (`egitim_kayitlari/`), önemli modeller `models/`'da.
+  - Claude'un eski PC'deki hafıza notları: içerikleri bu belgeye işlendi (§1).
+
+### 0.2 Kurulum (yeni PC, sırayla)
+
+Kullanıcı terminalde deneyimsiz. Adımları tek tek ver; sudo şifresini asla sen
+girme (§1).
+
+1. **Windows'ta NVIDIA sürücüsü güncel olsun.** WSL içinde CUDA için Linux'a
+   ayrıca sürücü KURULMAZ; Windows sürücüsü yeter.
+2. **WSL2 + Ubuntu 26.04.** Eski PC'de dağıtım adı `Ubuntu` (26.04.1 LTS),
+   kullanıcı adı `gorkem`. Yönetici PowerShell'de `wsl --install`, dağıtım
+   adını `wsl --list --online` ile doğrula.
+3. **Depoyu al.** `git clone https://github.com/g0rkm/hexapod.git`.
+   Eski PC'de depo OneDrive altındaydı (`C:\Users\gorke\OneDrive\Masaüstü\hexapod`).
+   Yeni PC aynı OneDrive hesabıyla açılırsa klasör kendiliğinden de gelir.
+   Ama aynı depoyu iki bilgisayarda OneDrive üzerinden aynı anda kullanma,
+   `.git` bozulabilir; tek yerden çalış, değişiklikleri git ile taşı.
+   Yeni kurulumda depoyu OneDrive dışına klonlamak daha güvenli.
+4. **WSL'de, depo klasöründe** (ör. `cd /mnt/c/Users/<ad>/.../hexapod`):
+   - `bash tools/wsl/ros_kurulum.sh`: ROS 2 Lyrical + Gazebo + ros2_control.
+     sudo ister, kullanıcı girer. Sonunda "KURULUM TAMAM" der.
+   - `bash tools/wsl/derle.sh`: paketleri `~/hexapod_ws`'te derler (kaynaklar
+     depoya sembolik bağlı).
+   - `bash tools/wsl/rl_kurulum.sh`: `~/hexapod_venv` (torch CPU, SB3 2.9,
+     Gymnasium 1.3).
+5. **Doğrula:**
+   - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
+     depo kökünde `python -m pytest -q`. Beklenen: 178 geçti, 8 atlandı.
+     Eski PC'de Python 3.11.
+   - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
+     source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
+     Beklenen: 208 geçti, ~1 dk.
+   - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
+     Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
+   - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
+     `ros2 run hexapod_gazebo stand`. Robot 100 mm'ye kalkar.
+
+### 0.3 RTX 5070 hakkında dürüst not
+
+Bu projede eğitimin darboğazı **GPU değil, CPU**.
+
+- Her paralel ortam kendi Gazebo fizik simülasyonunu CPU'da koşuyor.
+- Politika ağı çok küçük (29 → 128 → 128 → 18).
+- SB3 de MlpPolicy'li PPO için CPU'yu öneriyor.
+- Eski PC'de 8 ortamla saniyede ~500–690 adım; 3M adım ~75 dk sürüyordu.
+
+Yeni PC'de eğitimi hızlandıran şey **çekirdek sayısı**. Daha çok çekirdek
+varsa `--envs` artırılır (ör. 16; `n_steps 256 × envs`, batch 512'nin katı
+olmalı).
+
+GPU ancak GPU'da paralel çalışan bir simülatöre (Isaac Lab, MuJoCo MJX gibi)
+geçilirse işe yarar. Bu, TÜBİTAK başvurusundaki Gazebo'dan sapma olur;
+kullanıcıya sormadan yapma.
+
+İstenirse torch'un CUDA sürümü: RTX 50 serisi (Blackwell) CUDA 12.8+ ile
+derlenmiş PyTorch ister. Örnek:
+`pip install torch --index-url https://download.pytorch.org/whl/cu128`
+**Denenmedi**; `rl_kurulum.sh` CPU sürümünü kurar.
+
+WSL varsayılan olarak Windows RAM'inin yarısını ve bütün çekirdekleri
+kullanır; gerekirse `%UserProfile%\.wslconfig` ile değiştirilir
+(`[wsl2]`, `memory=`, `processors=`).
+
+### 0.4 Yeni PC'de değişebilecek yollar
+
+Kodda sabit bir kullanıcı yolu yok. Betikler depoyu kendi konumundan bulur,
+`robot.yaml` yukarı doğru aranır. Ama bu belgede ve eski betik örneklerinde
+geçen `C:\Users\gorke\...`, `/mnt/c/Users/gorke/...`, `~/hexapod_runs` gibi
+yollar eski PC'ye ait; yeni PC'de kullanıcı adı farklı olabilir.
 
 ---
 
@@ -40,41 +135,59 @@
 e-postası `gorkemmutlu227@gmail.com`. Proje bir üniversite kulübü takım
 projesi (TÜBİTAK Milli Teknoloji Kulüpler Birliği, Kulüp Geliştirme
 Desteği başvurusu). Görkem yazılım tarafını Claude ile yürütüyor.
-Takım arkadaşı **Samet** de yazılım tarafında: yazılım görevleri Görkem
-ile Samet arasında bölüşüldü (2026-09-24, kullanıcının kararı). Donanım
-işleri **durduruldu** ve ayrı bir donanım vardiyasına taşındı. Görev
-sahipleri ve bağımlılıklar [GOREVLER.md](../GOREVLER.md)'de.
+Takım arkadaşı **Samet** (GitHub: Oruc74, `sametoruc74@gmail.com`) de
+yazılım tarafında: yazılım görevleri ikisi arasında bölüşüldü. Donanım
+işleri **durduruldu**, ayrı bir donanım vardiyasına taşındı. Görev sahipleri
+ve bağımlılıklar [GOREVLER.md](../GOREVLER.md)'de.
 
 **Önemli:** Görkem robotu **kendisi monte etmedi**. Donanım, lehim, kablo
-ve terminal işlerinde deneyimli değil ve bu tür işler istenince bunalıyor
-(bir keresinde açıkça "ben nasıl yapacam bilmiyorum, ben birleştirmedim
-aleti, yazılımı elimizdeki bilgilerle yapamaz mıyız" dedi). Donanım işi
+ve terminal işlerinde deneyimli değil; bu tür işler istenince bunalıyor.
+Bir keresinde açıkça "ben nasıl yapacam bilmiyorum, ben birleştirmedim
+aleti, yazılımı elimizdeki bilgilerle yapamaz mıyız" dedi. Donanım işi
 robotu kuran takım arkadaşına kalıyor.
 
 **İletişim tercihleri:**
 - Türkçe konuş. Samimi ve doğrudan olabilirsin.
-- **Kısa, madde madde** cevap ("kısaca yaz madde madde"). Uzun tablolu,
-  jargonlu talimatları anlamadığını söyledi.
-- Bir şey anlatman gerekiyorsa **çok basit** anlat ("mala anlatır gibi"):
-  her adım tek eylem, komutlar ayrı kod bloklarında, terim kullanırsan tek
-  cümleyle açıkla.
-- Ondan bir şey istemeden önce: **bu işi bir araçla otomatikleştirebilir
-  miyim?** Otomatikleştirilebiliyorsa kullanıcıya talimat yazmak yerine
-  aracı yaz (örnek: kabloları elle takip ettirmek yerine `map_channels.py`).
-- Gereksiz soru sorma. Makul varsayımı yap, söyle, devam et. Robot simetrik
-  olduğu için "ön neresi" gibi sorular gereksizdi, sordum ve kullanıcı
-  bunu belirtti.
-- Donanım/ölçüm işi isteme. Geometri CAD'den geliyor (bkz. §11).
+- **Kısa, madde madde** cevap ver. Uzun, tablolu, jargonlu talimatları
+  anlamadığını söyledi.
+- Bir şey anlatman gerekiyorsa **çok basit** anlat: her adım tek eylem,
+  komutlar ayrı kod bloklarında, terim kullanırsan tek cümleyle açıkla.
+- Ondan bir şey istemeden önce sor: bu işi bir araçla otomatikleştirebilir
+  miyim? Otomatikleştirilebiliyorsa talimat yazmak yerine aracı yaz (örnek:
+  kabloları elle takip ettirmek yerine `map_channels.py`).
+- Gereksiz soru sorma. Makul varsayımı yap, söyle, devam et.
+- Donanım ya da ölçüm işi isteme. Geometri CAD'den geliyor (§5.3).
+
+**Özerklik (3. oturumda yerleşti):**
+- Kullanıcı uzun işleri bana bırakıyor. Kendi sözleriyle: "eğitim bittikten
+  sonra kontrol edip pushlarsın", "devam ettir işlemleri, gece boyu
+  çalışmaya devam edebilirsin".
+- Uzun eğitimleri başlatmak, izlemek, bitince değerlendirmek, belgeleri
+  güncellemek ve commit + push etmek benim işim.
+- Sık sık "bitti mi", "ne zaman bitecek" diye soruyor: kısa bir durum (yüzde,
+  kalan süre, ara sonuç) ver.
+- Uzun eğitim sürerken bilgisayar uyumamalı. Eğitimi Windows'ta
+  `SetThreadExecutionState` tutan bir PowerShell sarmalayıcısıyla başlat.
+  Claude Code'un keep_awake'i oturum boşta kalınca bırakıyor.
+- Bir karşılaştırma deneyi başlamadan önce RL ortam kodunu değiştirme: süreç
+  başlarken diskteki kodu yükler.
+- Yanlış bir sonucu push'ladıysan sonraki commit'te açıkça düzelt ve
+  kullanıcıya söyle (3. oturumda bir hız ölçümü için oldu, §12.23).
+- Kullanıcı bazen bilgisayarı acil kapatması gerektiğini söyler: ara
+  kayıttan devam edilebildiğini söyle, kodu push'la, durumu belgeye yaz.
 
 **Git tercihleri (kesin):**
 - Commit mesajları **Türkçe ve detaylı**: ne değiştiğini değil, **neden**
-  öyle yapıldığını da anlatsın.
+  öyle yapıldığını da anlatsın. Ölçüm sonuçlarını sayılarıyla yaz.
 - Commit'lerde **Claude imzası YOK**: `Co-Authored-By`, "Generated with
   Claude Code" ve benzeri satırlar yasak. Yazar yalnızca Görkem.
 - Değişiklikleri **mantıklı, ayrı commit'lere** böl (düzeltme, özellik,
   belge ayrı).
-- **Push'u kullanıcı istediğinde** yap. Şimdiye kadar hep "commit atıp
-  pushla" diyerek istedi; istemeden push etme, gerekirse tek satırla sor.
+- **Push:** kullanıcı "commit atıp pushla" diye istiyor ve bir iş bitince
+  push'lamama izin verdi. Push öncesi kişisel veri kontrolü (§10).
+- Samet de aynı depoya push'luyor. Çalışmaya başlamadan `git pull`
+  (`--rebase`) yap. Push edilmemiş kendi commit'lerini onunkilerin üstüne al.
+- Ağ hatasında (HTTP2) `git -c http.version=HTTP/1.1 push`.
 
 ---
 
@@ -88,19 +201,20 @@ tibia), toplam **18 servo**.
 > Raspberry Pi 4'e aktarılacak; her koşulda ve her zorlukta çözüm üreten
 > bir sistem.
 
-TÜBİTAK başvurusundaki yöntem (bkz. §15): Gazebo'da sanal IMU ve temas
-sensörleriyle donatılmış bir hexapod modeli; Python tabanlı bir RL ajanı
-(**Stable-Baselines3, PPO**) robotun devrilmeden, en az enerjiyle ve en
-hızlı ilerlemesini ödüllendiren bir fonksiyonla eğitilecek. Sabit
-yürüyüş desenleri (CPG) yerine değişken zemine uyum sağlayan, öğrenilmiş
-bir yürüyüş hedefleniyor. Eğitim simülasyonda yapılıp gerçek robota
-aktarılacak (sim-to-real).
+TÜBİTAK başvurusundaki yöntem (bkz. §15):
+- Gazebo'da sanal IMU ve temas sensörleriyle donatılmış bir hexapod modeli.
+- Python tabanlı bir RL ajanı (**Stable-Baselines3, PPO**).
+- Ödül: robotun devrilmeden, en az enerjiyle ve en hızlı ilerlemesi.
+- Sabit yürüyüş desenleri (CPG) yerine değişken zemine uyum sağlayan,
+  öğrenilmiş bir yürüyüş.
+- Eğitim simülasyonda yapılıp gerçek robota aktarılacak (sim-to-real).
 
-**Gerçekçi beklenti (kullanıcıya söylendi):** RL politikası eğitimde
-gördüğü zorluk türlerine karşı sağlam olur, "her koşula" değil. Eğitim
-senaryolarının kapsamı (eğim, engebe, kaygan zemin, itme, kütle/sürtünme
-değişimi) sistemin neyi çözebileceğini belirler. Eğitim PC'de yapılır;
-Pi 4 yalnızca eğitilmiş politikayı çalıştırır.
+**Gerçekçi beklenti (kullanıcıya söylendi):**
+- RL politikası eğitimde gördüğü zorluk türlerine karşı sağlam olur, "her
+  koşula" değil.
+- Eğitim senaryolarının kapsamı (eğim, engebe, kaygan zemin, itme,
+  kütle/sürtünme değişimi) sistemin neyi çözebileceğini belirler.
+- Eğitim PC'de yapılır; Pi 4 yalnızca eğitilmiş politikayı çalıştırır.
 
 **Strateji: önce yazılım, sonra donanım.** Her şey CAD geometrisiyle
 simülasyonda geliştiriliyor. Kablolama ve kalibrasyon yazılımın önünde
@@ -110,31 +224,57 @@ engel değil; robotu kuran kişi tarafından yapılıp config'e girilecek.
 artık geçersiz ya da güncellendi:
 - Mimari: brifteki düz, katmanlı Python yığını yerine **ROS 2 + Gazebo +
   RL** (TÜBİTAK başvurusu esas alındı). Katman sırası yine geçerli.
-- "Segment uzunluklarını kumpasla ölç" notu: **iptal**, CAD kullanılıyor.
-- Brifteki "kesinleşmemiş" maddeler (DOF, servo arayüzü) artık kesin:
-  3 DOF, PCA9685 üzerinden PWM.
+- "Segment uzunluklarını kumpasla ölç" notu **iptal**; CAD kullanılıyor.
+- Brifte "kesinleşmemiş" olan DOF ve servo arayüzü artık kesin: 3 DOF,
+  PCA9685 üzerinden PWM.
 
 ---
 
-## 3. Mevcut durum ve yol haritası
+## 3. Mevcut durum
 
 | # | Aşama | Durum |
 |---|---|---|
-| 1 | Servo sürücü katmanı (`hexapod_driver`) | ✅ bitti, testli |
-| 1b | Kalibrasyon, kanal haritası, donanım kontrolü, CAD çıkarım araçları | ✅ bitti |
-| 2 | Ters/düz kinematik + gövde pozu (`hexapod_kinematics`) | ✅ bitti, testli |
-| 3 | **URDF modeli** (robot.yaml'dan, STL'ler görsel mesh) | ✅ testli; RViz ve check_urdf'ten geçti |
-| 4 | Gazebo dünyası + ROS 2 kontrol arayüzü | ✅ robot Gazebo'da doğuyor ve ayağa kalkıyor (G5) |
-| 5 | Klasik yürüyüş (tripod) — RL için referans ve yedek | ✅ Samet: `hexapod_gait` + `hexapod_teleop` (S2, S3), gerçek sürücü düğümü `hexapod_hardware` (S4) |
-| 6 | RL ortamı (Gymnasium) + PPO eğitimi, değişken zeminler | 🔄 ortam bitti (G6); PPO düz zeminde yürüyor, gürültüde tripod'u geçiyor (G7, `models/`); zeminler S5'i bekliyor |
-| 7 | Pi 4'e aktarma: politika + ROS 2 düğümleri + gerçek sürücü | 🔄 politika düğümü (`hexapod_policy`, G8) ve sürücü düğümü (`hexapod_hardware`, S4) yazıldı; Pi'de denenmedi (D11) |
+| 1 | Servo sürücü katmanı (`hexapod_driver`) + kalibrasyon, kanal haritası, donanım kontrolü, CAD araçları | ✅ testli (G1) |
+| 2 | Ters/düz kinematik + gövde pozu (`hexapod_kinematics`) | ✅ testli (G2) |
+| 3 | URDF modeli (`hexapod_description`) | ✅ RViz ve check_urdf'ten geçti (G3) |
+| 4 | Gazebo dünyası + ROS 2 eklem arayüzü (`hexapod_gazebo`, docs/ARAYUZ.md) | ✅ (G5). ROS'lu sim 09-26'dan beri **tork servo modelinde** |
+| 5 | Klasik yürüyüş (tripod) | ✅ Samet: `hexapod_gait` (S2), `hexapod_teleop` (S3) |
+| 6 | Gerçek robot sürücü düğümü (`hexapod_hardware`) | ✅ Samet (S4); yalnız dry-run, donanımda denenmedi |
+| 7 | RL ortamı (`hexapod_rl`) | ✅ (G6); tripod aynı ortamda ölçüldü |
+| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_res_250k`; zeminler S5'i bekliyor |
+| 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu Gazebo'da yürüdü; son G7 politikasıyla tekrar aktarılacak |
+| 10 | Pi 4'e aktarma | ⛔ donanım vardiyası (D11) |
 
-**Görev dağılımı:** [GOREVLER.md](../GOREVLER.md). İki bölüm: şimdiki
-**yazılım aşaması** (G = Görkem, S = Samet) ve **⏸ durdurulmuş donanım
-vardiyası** (D1–D12). Her görev hangi görevi beklediğini ve hangisini
-açtığını söyler. Bir görev bittiğinde durumunu orada güncelle.
+**Görev dağılımı:** [GOREVLER.md](../GOREVLER.md).
+- Yazılım aşaması: G = Görkem, S = Samet.
+- Durdurulmuş donanım vardiyası: D1–D12.
+- Her görev hangi görevi beklediğini ve hangisini açtığını söyler.
+- Bitenler: G1–G6, G8; S1–S4.
+- Sürenler: G7 (Görkem), S5 (zemin üreteci), S6 (ölçüm aracı), S7 (sensör
+  sürücüleri). Son üçü Samet'in.
 
-**Durdurulmuş donanım işleri:** bkz. §13.2 ve GOREVLER.md D1–D12.
+### 3.1 RL'de şu anki en iyi sonuç (2026-09-26)
+
+Ayrıntılı tablolar: [models/README.md](../models/README.md). Koşullar: düz
+zemin, ödül v6, 10 s, deterministik. Hiçbir model devrilmedi.
+
+| 0.10 m/s komut | Tripod (Samet) | `ppo_v7_8M` (mutlak) | **`ppo_res_250k` (tripod + düzeltme)** |
+|---|---|---|---|
+| Gerçek hız | 0.098 | 0.098 | 0.105 |
+| Adım başı ödül | 3.22 | 2.94 | **3.24** |
+| Mekanik güç | 1.9 W | 6.4 W | 2.3 W |
+| Rastgeleleştirmede ödül | 3.08–3.22 | 2.82–3.00 | 3.06–3.18 |
+| 0.05 rad eklem gürültüsünde ödül | 1.46 | 2.23 | 1.78 |
+
+- **Artık eylem modu** (politika tripod'a düzeltme verir) enerji sorununu
+  çözdü. Düz zeminde tripod'la başa baş ya da biraz önde.
+- Kalan kusurlar:
+  - Uzun eğitimde yine hedef hızı aşmaya kayıyor; en iyi ara kayıt 250k.
+  - Hızlıda hafif sola yön kayması: 0.15 m/s'de 10 s'de +12°.
+  - Politika yalnız **ileri 0.05–0.15 m/s** komutunu gördü. Yana, geri ve
+    dönüş eğitilmedi; politika düğümü bu komutlarda ayakta bekler.
+- RL'nin tripod'u açıkça geçmesi beklenen yer zorlu zemin. Bunun için
+  gerekenler: S5 (Samet), gerçek ayak teması (G7) ve S6.
 
 ---
 
@@ -317,7 +457,7 @@ işaretlerinde olabilir; o da kalibrasyonda eklem eklem belirlenir.
 Fiziksel robot başka bir "ön" ile etiketlenirse "aynalı" bilgisi yanlış
 tarafı gösterebilir. IK ve kalibrasyon buna dayanmaz; yalnızca
 simülasyon modeli dayanır (aynalı bacaklarda kütle dağılımı y'de çevrilir,
-bkz. §7.7).
+bkz. §7.6).
 
 ---
 
@@ -347,31 +487,47 @@ Servo sinyali: `pulse_us = center_us + direction × açı × us_per_deg`.
 ### 7.1 Temel ilkeler
 
 1. **Eksik değer uydurulmaz.** `robot.yaml`'da her sayı `{value, source,
-   measured}` üçlüsü. `value: null` bilinmiyor demektir; okunmaya
-   çalışılırsa `MissingValue` fırlar ve değerin nereden geleceğini söyler.
-   Hiçbir katman null'a varsayılan koyamaz.
-2. **`measured: false`** = CAD'den ya da veri sayfasından türetildi,
-   robottan doğrulanmadı. Çalışır ama "doğru" sayılmaz.
+   measured}` üçlüsü. `value: null` bilinmiyor demektir. Okunmaya çalışılırsa
+   `MissingValue` fırlar ve değerin nereden geleceğini söyler. Hiçbir katman
+   null'a varsayılan koyamaz.
+2. **`measured: false`** = CAD'den ya da veri sayfasından türetildi, robottan
+   doğrulanmadı. Çalışır ama "doğru" sayılmaz. Simülasyon tahminleri
+   `robot.yaml` → `simulation` altında, "TAHMİN" işaretli.
 3. **Donanıma dokunan çekirdek saf Python, ROS'a bağımlı değil.** Paketler
-   ROS 2 `ament_python` olarak derlenir ama tezgâh üstü araçlar ve
-   testler ROS kurulu olmadan çalışır. ROS sarmalayıcıları ayrı olmalı.
+   ROS 2 `ament_python` olarak derlenir ama tezgâh üstü araçlar ve testler ROS
+   kurulu olmadan çalışır. Her ROS düğümü aynı desende yazılır:
+   - `controller.py`: ROS'suz çekirdek, testli.
+   - `node.py`: ince rclpy kabuğu.
 4. **Aynı anda tek servo** (kalibrasyon ve kanal haritasında). Brownout
    riskine karşı.
 5. **Mutlak darbe sınırı:** `servo.pulse_us_hard_limits` (500–2500 µs)
    dışına hiçbir koşulda darbe gitmez.
 6. **Kırpma yok:** IK erişilemeyen hedefi en yakın noktaya kırpmaz,
    `ReachError` fırlatır.
-7. **Donanımsız geliştirme:** `DryRunBackend` I2C yazmalarını kaydeder;
-   bütün testler ve `--dry-run` bayrakları bunu kullanır.
+7. **Donanımsız geliştirme:** `DryRunBackend` I2C yazmalarını kaydeder.
+   Bütün testler ve `--dry-run` bayrakları bunu kullanır.
+8. **Simülasyonla robot aynı arayüzü konuşur** (docs/ARAYUZ.md):
+   - `/leg_controller/commands`: 18 değer, radyan.
+   - `/joint_states`: gerçek robotta ölçüm değil, son komut.
+   - `/imu`.
+   Yayınlayan kod (tripod, politika) sim → robot geçişinde değişmez.
+9. **Politikanın gözlemi yalnız gerçek robotta da olanlar:**
+   - IMU: yerçekimi yönü ve açısal hız,
+   - son eklem komutları,
+   - hız komutu,
+   - adım saati.
+   Ayak teması ve ölçülen eklem açısı yalnız ödülde ve değerlendirmede.
 
-### 7.2 Katman sırası
+### 7.2 Katmanlar
 
 ```
-Otonomi / davranış          (ileride: RL politikası, sensör füzyonu)
-Kumanda + telemetri         (ileride)
-Gait motoru                 (ileride: tripod, sonra RL)
-Ters kinematik + gövde pozu (hexapod_kinematics)   ✅
-Servo sürücü katmanı        (hexapod_driver)       ✅
+Politika düğümü (hexapod_policy)  ← RL politikası (hexapod_rl ile eğitilir)     ✅
+Tripod düğümü (hexapod_teleop)    ← tripod çekirdeği (hexapod_gait)             ✅
+        │ /leg_controller/commands (docs/ARAYUZ.md)
+        ▼
+Simülasyon: Gazebo + ros2_control (hexapod_gazebo + hexapod_description)       ✅
+Gerçek robot: sürücü düğümü (hexapod_hardware) → ServoBus (hexapod_driver)      ✅ (dry-run)
+Ters kinematik + gövde pozu (hexapod_kinematics)                                ✅
 ```
 
 Her katman altındakine bağımlı, üstündekinden habersiz.
@@ -381,153 +537,238 @@ Her katman altındakine bağımlı, üstündekinden habersiz.
 ```
 hexapod/
 ├── CLAUDE.md               kısa özet + kurallar (Claude Code otomatik okur)
-├── README.md               insanlar için genel bakış
+├── README.md               insanlar için genel bakış + çalıştırma adımları
+├── GOREVLER.md             görev dağılımı (G/S/D), bağımlılıklar, durum
 ├── docs/
 │   ├── PROJE_DEVIR.md      bu belge
+│   ├── ARAYUZ.md           eklem komut arayüzü (konular, sıra, birim, sim-robot farkları)
 │   ├── hexapod-proje-brifi.md  ilk brif (bir kısmı geçersiz, bkz. §2)
-│   └── malzeme/            Malzeme Listesi.txt, gömülü malzemeler listesi*.txt (güvenilmez, §4.2)
+│   └── malzeme/            malzeme listeleri (güvenilmez, §4.2)
 ├── config/
-│   ├── robot.yaml          robotun fiziksel tanımı (geometri, kablolama, limitler, simulation)
+│   ├── robot.yaml          robotun fiziksel tanımı + simulation (TAHMİN) bölümü
 │   └── calibration.yaml    (henüz yok) calibrate.py üretecek; GİT'TE TUTULMALI
-├── src/
-│   ├── hexapod_driver/     servo sürücü katmanı (ament_python)
-│   │   └── hexapod_driver/
-│   │       ├── config.py       robot.yaml yükleyici, Value, unknowns()/unverified()/wiring_gaps()
-│   │       ├── calibration.py  calibration.yaml okuma/yazma (atomik)
-│   │       ├── pca9685.py      NXP PCA9685 sürücüsü (25 MHz, 12 bit, 50 Hz -> prescale 121)
-│   │       ├── backends.py     SMBusBackend (smbus2) ve DryRunBackend
-│   │       ├── servo_bus.py    eklem adı -> kart/kanal -> darbe
-│   │       └── errors.py       HexapodError, ConfigError, MissingValue, LimitError, BackendError
-│   ├── hexapod_kinematics/ ters/düz kinematik + gövde pozu (ament_python)
-│   │   └── hexapod_kinematics/
-│   │       ├── leg.py      tek bacak IK/FK, sıfır duruşu ve yön tanımları
-│   │       ├── body.py     altı bacak, gövde çerçevesi, BodyPose
-│   │       └── errors.py   ReachError
-│   └── hexapod_description/ simülasyon modeli, URDF'in girdisi (ament_python)
-│       ├── hexapod_description/
-│       │   ├── model.py    RobotModel: kütle/atalet/çarpışma/limit, SI birimleri
-│       │   └── meshes.yaml görsel mesh yerleşimi (cad_sim_model.py üretir)
-│       └── meshes/         STL kopyaları (cad_sim_model.py --copy-meshes üretir)
-├── tools/                  komut satırı araçları
-│   ├── map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
-│   ├── calibrate.py        etkileşimli servo kalibrasyonu
-│   ├── hwcheck.py          I2C tarama + robot.yaml karşılaştırma
-│   ├── cad_extract.py      CAD'den geometri türetme
-│   ├── cad_sim_model.py    CAD'den kütle, atalet, çarpışma kutuları, mesh yerleşimi
-│   └── cadlib/             iki CAD aracının ortak kütüphanesi
-│       ├── step.py         minimal STEP AP214 ayrıştırıcı
-│       ├── assembly.py     montaj ağacı -> Assembly / Occurrence
-│       ├── transform.py    3x4 katı dönüşüm cebiri
-│       ├── mesh.py         STL okuma, Box, MassProps
-│       └── frames.py       CAD <-> IK/gövde çerçeveleri
-├── tests/
-│   ├── test_servo_layer.py   30 test
-│   ├── test_kinematics.py    17 test
-│   ├── test_map_channels.py   9 test
-│   └── test_description.py    7 test
+├── src/                    ROS 2 ament_python paketleri
+│   ├── hexapod_driver/     servo sürücü katmanı (G1): config, calibration, pca9685, backends, servo_bus
+│   ├── hexapod_kinematics/ IK/FK + gövde pozu (G2): leg.py, body.py
+│   ├── hexapod_description/ simülasyon modeli (G3, G5): model.py (RobotModel), urdf.py,
+│   │                        interface.py (arayüz sabitleri), control.py (ros2_control ayarı),
+│   │                        launch/display.launch.py, meshes/
+│   ├── hexapod_gazebo/     worlds/flat.sdf, launch/sim.launch.py, pose.py, stand.py (G5)
+│   ├── hexapod_gait/       tripod çekirdeği, TripodGait (S2, Samet)
+│   ├── hexapod_teleop/     /cmd_vel -> TripodGait -> komut (S3, Samet)
+│   ├── hexapod_hardware/   gerçek sürücü düğümü, komut -> ServoBus (S4, Samet)
+│   ├── hexapod_rl/         RL (G6, G7): sim, state, task, env, demo, pretrain, train,
+│   │                        evaluate, export, baseline, math3d
+│   └── hexapod_policy/     politika düğümü (G8): mlp, controller, tripod, node
+├── models/                 kayda değer modeller: model.zip (SB3) + policy.npz (torch'suz) + README (tablolar)
+├── egitim_kayitlari/       bütün eğitimlerin progress.csv/ayarlar/değerlendirmeleri (hafif)
+├── tools/
+│   ├── map_channels.py, calibrate.py, hwcheck.py     donanım araçları (§8)
+│   ├── cad_extract.py, cad_sim_model.py, cadlib/     CAD'den geometri ve simülasyon verisi
+│   ├── make_urdf.py, preview_urdf.py                 ROS'suz URDF üretimi/önizleme
+│   └── wsl/ ros_kurulum.sh, derle.sh, rl_kurulum.sh  WSL kurulum betikleri
+├── tests/                  pytest; ROS/Gazebo/SB3 gerekenler Windows'ta atlanır
 ├── conftest.py             src/ paketlerini sys.path'e ekler (ROS'suz test için)
 ├── pytest.ini, .gitignore, .gitattributes
 └── cad/                    CAD ve baskı dosyaları (depoda, ~345 MB)
-    ├── Hexapod/            STEP/3MF/F3Z/STL + 606030-*.pdf (Printables lisans/atıf)
-    └── Baskı Dosyaları/    basılan STL'ler
-
-Git'e GİRMEYENLER: faturalar, ekran görüntüleri (kişisel veri), Python
-önbellekleri. CAD 2026-09-24'ten beri depoda (§10).
 ```
 
 ### 7.4 `hexapod_driver`
 
 - `RobotConfig.load(path=None)`: `config/robot.yaml`'ı bulur
   (`HEXAPOD_CONFIG_DIR` ortam değişkeni ya da yukarı doğru arama).
-  `segments`, `coxa_axis_radius`, `femur_joint_z_offset`,
-  `forward_offset_deg`, `standing_height`, `total_mass_kg` (hepsi `Value`),
-  `legs` (`LegSpec`), `drivers` (`DriverSpec`), `joints` (`JointSpec`:
-  driver, channel, limit_min, limit_max). Yardımcılar: `joint(leg, name)`,
-  `unknowns()`, `unverified()`, `wiring_is_complete()`, `wiring_gaps()`.
-  Not: `sensors` bölümündeki null'lar (IMU adresi, VL53L0X pinleri)
-  `unknowns()` tarafından henüz izlenmiyor, sadece `raw` içinde.
-- `Calibration`: `config/calibration.yaml`. Eklem anahtarı `leg{N}_{eklem}`
-  (ör. `leg0_coxa`). Alanlar: `center_us`, `direction` (+1/−1),
-  `us_per_deg`, `limit_min_us`, `limit_max_us`, `calibrated_at`.
-  `set_center`, `set_direction`, `set_limit`, `set_span(pulse, derece)`,
-  `limits_deg()` (eksik bilgiyle None döner, uydurmaz), `save()` (.tmp
-  sonra rename).
-- `ServoBus(config, calibration, backend=None, dry_run=False)`: `start()`
-  kart adreslerini `require()` eder. `set_pulse_us(leg, eklem, us)` ham
-  darbe (sadece kalibrasyon araçları). `set_angle(leg, eklem, derece)`
-  kalibrasyon ve limitler tam değilse `MissingValue`/`LimitError` fırlatır.
-  `release`, `release_all`, `active_joints`.
+  - Alanlar: `segments`, `coxa_axis_radius`, `femur_joint_z_offset`,
+    `forward_offset_deg`, `standing_height`, `total_mass_kg` (hepsi `Value`);
+    `legs`, `drivers`, `joints`.
+  - Yardımcılar: `joint(leg, name)`, `unknowns()`, `unverified()`,
+    `wiring_is_complete()`, `wiring_gaps()`.
+- `Calibration`: `config/calibration.yaml`.
+  - Anahtar `leg{N}_{eklem}`.
+  - Alanlar: `center_us`, `direction`, `us_per_deg`, `limit_min_us`,
+    `limit_max_us`.
+  - `limits_deg()` eksik bilgiyle None döner; `save()` atomik yazar.
+- `ServoBus(config, calibration, backend=None, dry_run=False)`:
+  - `set_pulse_us`: ham darbe, yalnız kalibrasyon araçları kullanır.
+  - `set_angle`: kalibrasyon ya da limit eksikse `MissingValue`/`LimitError`.
+  - `set_angles`: hep ya da hiç; Samet ekledi (S4).
+  - `release_all`.
 
 ### 7.5 `hexapod_kinematics`
 
-- `LegGeometry(coxa, femur, tibia)`, `JointAngles(coxa, femur, tibia)`
-  (derece), `ZERO`.
-- `forward(geom, angles) -> (x, y, z)` ve `inverse(geom, x, y, z) ->
-  JointAngles`, bacak çerçevesinde.
-  - Diz-yukarıda çözüm dalı.
-  - Erişim dışında `ReachError` (kırpmaz).
-  - Femur açısı (−180, 180] aralığına sarılır (bkz. §12, 300° hatası).
-  - Varsayım: ayak coxa ekseninin dışında. Eksenin arkasındaki hedef
-    "bacak 180° dönmüş" pozdan geometrik olarak ayırt edilemez; gerçek
-    robotta o bölge gövdenin altı.
+- `LegGeometry`, `JointAngles` (derece). `forward`/`inverse` bacak
+  çerçevesinde; diz-yukarıda çözüm dalı. Erişim dışında `ReachError`; femur
+  açısı (−180, 180]'e sarılır.
 - `HexapodKinematics.from_config(config)`: `mounts` (her bacak için
-  `LegMount(x, y, z, yaw)`, gövde çerçevesinde; z = −10.05).
-  `to_leg_frame`, `to_body_frame`, `neutral_stance()` (bütün eklemler 0
-  iken ayaklar; yürüyüş duruşu DEĞİL), `forward(açılar)`,
-  `inverse(ayaklar, pose=BodyPose())`. Hata bacak numarasını söyler.
-- `BodyPose(x, y, z, roll, pitch, yaw)`: mm ve derece. Ayaklar dünyada
-  sabit, gövde kayar/döner. Dönme sırası ZYX (REP-103).
+  `LegMount(x, y, z, yaw)`; z = −10.05 mm). `inverse(ayaklar, pose=BodyPose())`
+  hata verirse bacak numarasını söyler.
+- `BodyPose(x, y, z, roll, pitch, yaw)`: mm ve derece, ZYX (REP-103).
 
-### 7.6 Testler
+### 7.6 `hexapod_description` (G3, G5)
+
+- `RobotModel.from_config`: SI birimleri. Geometri `HexapodKinematics`'ten,
+  kütle/atalet/çarpışma `robot.yaml → simulation.links`'ten (TAHMİN).
+  - `limits`: kalibrasyon limitleri varsa onlar, yoksa geçici ±90°.
+  - Servo sabitleri: `effort` 1.08 N·m, `velocity` 7.48 rad/s,
+    `servo_stiffness` 20 N·m/rad, `servo_damping` 0.05.
+- `build_urdf(model, meshes=None, gazebo=None)`:
+  - `base_link` ataletsiz; gövde sabit eklemle bağlı.
+  - Eklemler `leg{i}_{coxa,femur,tibia}_joint`; coxa ekseni +z,
+    femur/tibia ekseni −y.
+  - Ayak küresi tibia'nın ilk çarpışması (`leg{i}_tibia_foot`).
+  - `GazeboOptions(controllers_yaml, servo="torque"|"velocity")`:
+    ros2_control bloğu, IMU ve ayak temas sensörleri.
+- `interface.py`: arayüz sabitleri ve dönüşümler. Bkz. docs/ARAYUZ.md.
+- `control.py`: kontrolcü ayarı.
+  - `servo="torque"` (varsayılan): `leg_controller` →
+    `servo_controller` (pid_controller, P = sertlik, çıkış ±durma torku,
+    1 kHz) → eklem eforu. Sönüm URDF'te eklem sönümü.
+  - `servo="velocity"`: eski konum/hız modeli.
+
+### 7.7 `hexapod_gazebo` (G5)
+
+- `ros2 launch hexapod_gazebo sim.launch.py [gui:=false] [servo:=velocity]
+  [world:=...]`.
+  - Fizik adımı 1 ms.
+  - Köprüler: `/clock`, `/imu`, `/leg{i}/foot_contact`.
+- `ros2 run hexapod_gazebo stand`: 100 mm'ye kalkış.
+- Ölçülen (tork modeli, düz zemin): tripod 0.08 m/s komutta 0.079 m/s;
+  politika 0.10'da 0.096–0.106 m/s.
+
+### 7.8 `hexapod_rl` (G6, G7) — pekiştirmeli öğrenme
+
+**Simülasyon (`sim.py`, `HexapodSim`):** ROS'suz, süreç içi Gazebo (gz.sim
+Python bağları, TestFixture).
+- Fizik adımı 2 ms, eylem 50 Hz (kontrol adımı başına 10 fizik adımı).
+- 8 paralel süreçte eski PC'de saniyede ~500–690 adım.
+- **Servo modeli, her fizik adımında Python'da:**
+  `tork = Kp·(hedef−konum) − Kd·hız`. Hareket yönünde
+  `durma torku·(1−|hız|/yüksüz hız)`, frenlerken durma torkuyla sınırlı.
+- Rastgeleleştirme düğmeleri: `set_servo(strength, stiffness)`,
+  `latency_steps`, `push(force, seconds)`.
+- `terrain_sdf`: düz zemin yerine statik bir `<model>` SDF parçası (S5 için).
+- Her süreç kendi gz-transport bölümünde (`GZ_PARTITION=hexapod_rl_<pid>`,
+  §12.22).
+- Ayak teması şu an **geometrik**: ayak ucu dünya z=0'ın 2 mm yakınında mı.
+  Engebeli zeminde yanlış olur (§13).
+
+**Görev (`task.py`):**
+
+| | |
+|---|---|
+| Gözlem (29) | yerçekimi yönü (3), açısal hız (3), son eklem hedefleri (18, (hedef−duruş)/0.5), hız komutu (3), adım saati sin/cos (2) |
+| Eylem (18) | [-1, 1]. `action_mode="absolute"`: ayakta duruş + 0.5 rad × eylem. `"residual"`: `PhaseTripod(saat, komut)` + 0.2 rad × eylem |
+| Duruş | ayak erişimi 130 mm, gövde yüksekliği 100 mm |
+| Adım saati | 1.5 Hz; ilk yarıda tripod grubu 0 havada |
+| Bölüm | 20 s (+1 s yerleşme); devrilme: gövde < 45 mm ya da > 45° yatık |
+| Komut aralığı | vx 0.05–0.15 m/s, vy = wz = 0 (şimdilik yalnız ileri) |
+
+Ödül (şimdiki: v6, `TaskConfig.w`):
+- lin_vel 1.0 × exp(−(hız hatası/0.05)²)
+- progress 10 × komut yönündeki hız (komutla kırpılı)
+- gait 0.5 × tripod ritmine uyum
+- yaw_rate 1.0 × exp(−(dönüş hatası/0.1)²)
+- orientation −2, height −20
+- power −0.05 × Σ|τ·ω| (W)
+- action_rate −0.01, fall −10
+- residual −0.5 × ortalama eylem karesi (yalnız artık eylem modunda)
+
+İzleme terimleri gövde hızının 0.5 s'lik üstel ortalamasına bakar
+(`VelocityFilter`). Ödülün v1'den v6'ya nasıl ve neden değiştiği `task.py`
+modül açıklamasında ve karar günlüğünde (§11).
+
+**Alan rastgeleleştirme (`Randomization`, `--randomize`):** hepsi TAHMİN
+aralıklar.
+- Durma torku ×0.8–1.1, sertlik ×0.7–1.3.
+- Komut gecikmesi 0–18 ms.
+- 2–5 s'de bir 0–4 N yatay itme.
+- IMU gürültüsü.
+- Kütle ve sürtünme yok (§13).
+
+**Ortam (`env.py`, `HexapodEnv`):** Gymnasium. `make_env(rank, task,
+terrain_sdf)`, `SubprocVecEnv` ile.
+
+**Taklit (`demo.py`, `pretrain.py`):** politika PPO'dan önce bir gösterimi
+taklit eder.
+- Gösterim `PhaseTripod`'dur; artık eylem modunda etiket 0.
+- Veri toplanırken uygulanan eyleme gürültü eklenir, etiket gürültüsüzdür.
+- Aktör MSE ile, kritik indirimli getirilerle eğitilir; std ayarlanır.
+- `--sde`: gSDE; bu kurulumda bozuldu (§12.24).
+
+**Eğitim (`train.py`):**
+- `--steps --envs --name --init-from --randomize --residual --lr --target-kl
+  --std --power-weight`.
+- Çıktılar `~/hexapod_runs/<ad>/`: model.zip, checkpoints/ (250k'da bir),
+  progress.csv, ayarlar.txt, degerlendirme.txt.
+
+**Değerlendirme (`evaluate.py`):**
+- `python -m hexapod_rl.evaluate <zip|tripod> [--vx] [--noise] [--randomize]
+  [--residual] [--seed]`.
+- Ölçtükleri: hız, yön sapması, adım başı ödül, mekanik güç, devrilme,
+  ritim.
+- `tripod`, Samet'in `TripodGait`'ini ölçer (`baseline.py`).
+- Gürültü eylem biriminde: artık eylemde aynı eklem gürültüsü için ×2.5
+  (0.1 mutlak = 0.25 artık = 0.05 rad).
+
+**Aktarma (`export.py`):** `python -m hexapod_rl.export <zip> [--residual]`
+→ `policy.npz` (aktör ağı + sözleşme). Aktarım SB3 çıktısıyla karşılaştırılarak
+doğrulanır.
+
+**En iyi modelin tarifi (`ppo_res_250k`):**
 
 ```bash
-python -m pytest -q          # depo kökünden; 88 test, ~2.5 sn, donanım gerekmez
+python -m hexapod_rl.pretrain --name bc_res --episodes 64 --workers 8 --noise 0.25 --std 0.15 --randomize --residual
 ```
 
-Öne çıkan testler: eksik değerde `MissingValue`; PCA9685 prescale (50 Hz
-→ 121) ve darbe→sayaç (1500 µs → 307); iki kart arası yönlendirme; her
-kanalın kıpırdatma sonrası kapatıldığı (yazmaç düzeyinde); IK gidiş-dönüş
-(270 poz, 1e-6°); "sol" etiketli bacakların gerçekten +y'de olması; gövde
-pozu gidiş-dönüşü; simülasyon ataletlerinin fiziksel olması (pozitif
-tanımlı, üçgen eşitsizliği); aynalı bacakta y'nin çevrilmesi.
+```bash
+python -m hexapod_rl.train --steps 3000000 --envs 8 --name v9_res --randomize --residual --lr 1e-4 --target-kl 0.02 --init-from ~/hexapod_runs/bc_res/model.zip
+```
 
-### 7.7 `hexapod_description`
+En iyi sonucu 250k ara kaydı verdi; uzun eğitimde hedef hızı aşmaya kayıyor.
 
-Simülasyon modeli: veri katmanı (`model.py`) + URDF üreticisi (`urdf.py`).
-Gazebo/RL ortamı da sayıları buradan alacak.
+### 7.9 `hexapod_policy` (G8) — politika düğümü
 
-- `build_urdf(model, meshes=None)`: URDF metni. Ağaç: `base_link` (ataletsiz;
-  KDL ataletli kökü desteklemiyor) → sabit `body` (gövde kütlesi) ve her
-  bacak için `leg{i}_coxa|femur|tibia` + sabit `leg{i}_foot` (yalnız
-  çerçeve). Eklemler `leg{i}_coxa_joint` vb. Ayak küresi tibia linkinde.
-  `meshes` yoksa görseller çarpışma kutularından.
-- `MeshSet.load(uri_prefix)`: `meshes.yaml` + `package://...` ya da `file://...`.
-- CLI: `python tools/make_urdf.py -o x.urdf [--meshes none|package|file]`
-  (ROS'ta `ros2 run hexapod_description make_urdf`).
-- `launch/display.launch.py`: robot_state_publisher + eklem kaydırıcıları
-  + RViz; URDF açılışta robot.yaml'dan üretilir. **Henüz denenmedi** (ROS yok).
-- `tests/test_urdf.py`: URDF'i üreticiden bağımsız bir zincir hesaplayıcıyla
-  okur; ayak konumları `hexapod_kinematics.forward` ile 300 pozda 1e-9 m
-  içinde aynı. Kasıtlı bozulmalar (eksen ters, tibia +1 mm) yakalanıyor.
+- `ros2 run hexapod_policy policy --ros-args -p policy:=models/ppo_res_250k/policy.npz [-p use_sim_time:=true]`.
+- Dinlediği ve yayınladığı: `/imu` + `/cmd_vel` → `/leg_controller/commands`,
+  50 Hz.
+- **Torch'suz:** `mlp.py` numpy ile MLP çalıştırır. `.npz` politikanın
+  eğitildiği sözleşmeyi taşır: eylem ölçeği, varsayılan duruş, adım saati,
+  komut hızı, komut aralıkları, eylem modu, artık eylem tabanı. Eski
+  dosyalar mutlak modda yüklenir.
+- `controller.py`: gözlemi eğitimdekiyle birebir kurar (testle
+  karşılaştırılıyor).
+  - Güvenlik: şu durumlarda politika koşmaz, ayakta duruş yayınlanır ve adım
+    saati sıfırlanır:
+    - komut yok ya da 0.5 s zaman aşımı,
+    - vx eğitim aralığının yarısının altında,
+    - IMU yok ya da 0.2 s bayat,
+    - gövde 45°'den fazla yatık.
+  - Aralık dışı komut kırpılır.
+- `tripod.py`, `PhaseTripod`: adım saatinin fonksiyonu olan tripod. Eğitim ve
+  robot aynı kodu kullanır.
+- Çıkarım: PC'de tick başına 44 µs; Pi 4 için <0.5 ms tahmini.
 
-Veri katmanı:
+### 7.10 Testler
 
+```bash
+python -m pytest -q          # depo kökünden
+```
 
-- `RobotModel.from_config(config)`: SI birimlerinde (m, kg, kg·m², rad).
-  Geometri ve bacak montajları **doğrudan `HexapodKinematics`'ten**; robot.yaml
-  ikinci kez okunmuyor ki simülasyon ile IK ayrışmasın.
-- `links`: body/coxa/femur/tibia için `Inertial` (kütle, ağırlık merkezi,
-  atalet) + `CollisionBox` listesi; normal bacak için. `leg_link(id, ad)`
-  aynalı bacaklarda y'yi çevirir (com.y, ixy, iyz, kutu merkezi).
-- `limits[(bacak, eklem)]`: kalibrasyon limitleri varsa onlar, yoksa
-  `simulation.provisional_joint_limits_deg` (`provisional=True`).
-  `provisional_joints()` hangilerinin geçici olduğunu söyler.
-- `effort` / `velocity`: MG996R katalog (6 V).
-- `meshes.yaml`: görsel mesh yerleşimi, `tools/cad_sim_model.py` üretir.
-  STL'ler `--copy-meshes` ile `meshes/` altına kopyalanır (depoda).
-- Link çerçeveleri (URDF ile aynı olacak): coxa = bacak çerçevesi; femur
-  orijini J2'de, +x femur boyunca; tibia orijini J3'te, tibia −z boyunca.
-  Femur ve tibia eksenleri **−y** (femur + = yukarı, tibia + = ayak dışarı).
+- Windows: 178 geçti, 8 atlandı, ~5 s.
+- WSL (ROS + venv kaynaklı): 208 geçti, ~1 dk.
+
+Öne çıkanlar:
+- Eksik değerde `MissingValue`.
+- IK gidiş-dönüş.
+- URDF ↔ IK ayak konumları.
+- Gazebo'da ayakta duruş ve sıfırlama.
+- `test_simulasyon_yurumeye_izin_veriyor`: elle tripod beklenen hızın
+  %70'inden hızlı olmalı; servo modeli bozulursa yakalar.
+- Ödül sürümlerinin istenen davranışı.
+- Rastgeleleştirme düğmeleri.
+- Gözlem sözleşmesi (düğüm = eğitim).
+- Uçtan uca: export → düğüm çekirdeği → Gazebo'da yürüyüş (mutlak ve artık
+  eylem).
+- ROS düğümleri gerçek süreç olarak: SIGTERM'de çıkış 0, eksik dosyada çıkış 2.
 
 ---
 
@@ -600,6 +841,17 @@ erişimi engelliyor). Paketlerin resolute deposunda var olduğu doğrulandı.
 sudo'yu bir kez sorar, tekrar çalıştırmak güvenli, sonunda kendini test
 eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 
+### `wsl/derle.sh` — paketleri derle
+Depodaki her ROS paketini `~/hexapod_ws/src`'ye sembolik bağlar, kırık
+bağlantıları temizler, `colcon build --symlink-install`. Ek argümanlar
+colcon'a gider (ör. `--packages-select hexapod_policy`). Yeni paket eklenince
+tekrar çalıştır. Python dosyası değişikliği yeniden derleme istemez.
+
+### `wsl/rl_kurulum.sh` — RL ortamı
+`~/hexapod_venv` (sistem paketlerini görür, ROS'un Python'u ve gz.sim
+bağları için): torch 2.14.0 CPU, stable-baselines3 2.9.0, gymnasium 1.3.0.
+`python3-venv` yoksa get-pip ile sudo'suz kurar. GPU sürümü için §0.3.
+
 ---
 
 ## 9. Çalışma ortamı
@@ -609,46 +861,74 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | Geliştirme + simülasyon + RL eğitimi | Kullanıcının PC'si, **WSL2** | **Ubuntu 26.04** |
 | Robot | Raspberry Pi 4 | **Ubuntu Server 26.04 arm64** (planlanan) |
 
-- **ROS 2: Lyrical Luth** (LTS, Mayıs 2031'e kadar), Ubuntu 26.04'ün
-  birincil sürümü. **Gazebo Jetty** `ros-lyrical-desktop` ile birlikte
-  geliyor. (İlk taslakta Jazzy/24.04 varsayılmıştı; PC'de 26.04 olduğu
-  için değiştirildi.)
-- **RL sanal ortamı** `~/hexapod_venv` (torch 2.14 CPU, SB3 2.9, Gymnasium 1.3;
-  `tools/wsl/rl_kurulum.sh`). Kullanım: `source /opt/ros/lyrical/setup.bash;
-  source ~/hexapod_ws/install/setup.bash; source ~/hexapod_venv/bin/activate`.
-  python3-venv sistemde yoktu (sudo ister); betik get-pip.py ile sudo'suz kurdu.
-  Eğitim çıktıları `~/hexapod_runs/<ad>/` (depoda değil).
-- **WSL'de ROS 2 Lyrical + Gazebo 10.5 (Jetty) KURULU** (2026-09-24,
-  `tools/wsl/ros_kurulum.sh`). Python 3.14, 8 çekirdek, 7 GB RAM (PC'nin yarısı).
-  Kullanıcı adı `gorkem`. Paketler: `bash tools/wsl/derle.sh` → `~/hexapod_ws`
-  (kaynaklar depoya sembolik bağlı, `--symlink-install`).
-- Claude WSL'de sudo gerektirmeyen her şeyi çalıştırabilir: `wsl -e bash <betik>`.
-  Tırnaklı uzun komutlar PowerShell→wsl geçişinde bozuluyor; betiği dosyaya yazıp
-  çalıştır. Aynı anda birkaç simülasyon koşacaksa farklı `ROS_DOMAIN_ID` ver.
-- **colcon derlemesini OneDrive klasöründe yapma**: `build/ install/ log/`
-  OneDrive'a senkronlanır ve /mnt/c yavaştır. Çalışma alanı WSL'in kendi
-  diskinde (ör. `~/hexapod_ws`) olmalı, kaynaklar depodan bağlanmalı.
-- **PC:** Windows 11 Pro, Intel i5-10300H (8 thread), 16 GB RAM, NVIDIA
-  GTX 1650 + Intel UHD. Gazebo ve PPO eğitimi için yeterli.
-- **Depo yolu (Windows):** `C:\Users\gorke\OneDrive\Masaüstü\hexapod`
-  (OneDrive altında). **GitHub:** https://github.com/g0rkm/hexapod
-  (varsayılan dal `main`).
+**Bilgisayarlar:**
+- **Eski PC** (1–3. oturum): Windows 11 Pro, i5-10300H (8 iş parçacığı),
+  16 GB RAM (WSL'e 7 GB), GTX 1650.
+- **Yeni PC** (2026-09-26'dan sonra): RTX 5070. Diğer özellikleri bu belge
+  yazılırken bilinmiyordu; ilk oturumda `nproc`, `free -g` ile bak ve buraya
+  yaz. Kurulum §0.2'de.
+
+**Yazılım:**
+- **ROS 2: Lyrical Luth** (LTS, Mayıs 2031'e kadar), Ubuntu 26.04'ün birincil
+  sürümü. **Gazebo Jetty (10.5)** `ros-lyrical-desktop` ile geliyor. Python 3.14.
+- Kurulum betikleri: `tools/wsl/ros_kurulum.sh` (sudo),
+  `tools/wsl/derle.sh`, `tools/wsl/rl_kurulum.sh`.
+- **RL sanal ortamı** `~/hexapod_venv`: torch 2.14 CPU, SB3 2.9.0,
+  Gymnasium 1.3.0. `python3-venv` yoksa betik get-pip ile sudo'suz kurar.
+- Her yeni terminalde:
+  ```bash
+  source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash; source ~/hexapod_venv/bin/activate
+  ```
+- Eğitim çıktıları `~/hexapod_runs/<ad>/` (depoda değil; hafif kısmı
+  `egitim_kayitlari/`'na kopyalanır).
+- Paketler `bash tools/wsl/derle.sh` ile `~/hexapod_ws`'te derlenir.
+  Kaynaklar depoya sembolik bağlı (`--symlink-install`); yeni paket
+  eklenince betiği tekrar çalıştır.
+- **colcon derlemesini OneDrive ya da depo klasöründe yapma:** `build/`,
+  `install/`, `log/` senkronlanır ve /mnt/c yavaştır.
+
+**Claude'un WSL'de çalışma notları:**
+- sudo gerektirmeyen her şeyi çalıştırabilirsin: `wsl -e bash <betik>`.
+  PowerShell'den ver (Git Bash'ten `wsl -e bash /mnt/...` yolu Windows yoluna
+  çevrilip bozuluyor).
+- Tırnaklı uzun komutlar PowerShell → wsl geçişinde bozuluyor. Betiği
+  scratchpad'e **Write aracıyla** yaz, sonra çalıştır. Uzun heredoc'lar da
+  Bash aracında bozuluyor (§12.12). Python ile dosya yamasında
+  `write_bytes(s.encode())` kullan; `write_text` Windows'ta CRLF'e çevirir.
+- Aynı anda birden fazla ROS'lu simülasyon ya da test koşacaksa:
+  - farklı `ROS_DOMAIN_ID`,
+  - ROS'lu sim eğitimle aynı anda koşacaksa ayrı bir `GZ_PARTITION`
+    (§12.22).
+- `pkill -f <desen>` kendi kabuğunu öldürebilir. Desenler bir betik
+  dosyasında olsun ya da `pgrep` sonucundan kendi PID'ini çıkar.
+- WSL, içinde süreç kalmayınca bir dakika sonra kendini kapatır; eğitim
+  sürerken açık kalır.
+
+**Uzun eğitim:** bilgisayar uyumasın diye eğitimi, Windows'ta
+`SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)` tutan bir
+PowerShell sarmalayıcısıyla başlat. Arka plan görevi bitince bildirim gelir.
+Ara kontrol için `progress.csv`'yi sütun **adıyla** oku; sütun sırası
+eğitimden eğitime değişiyor.
+
+```powershell
+param([string]$Script)
+Add-Type -Namespace W -Name P -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
+[void][W.P]::SetThreadExecutionState([uint32]"0x80000001")
+try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint32]"0x80000000") }
+```
+
+**Diğer:**
 - **WSL'de `sudo` şifre ister.** Kurulum komutlarını kullanıcıya ver,
-  şifreyi asla sen girme. Kullanıcı terminalde deneyimsiz; komutları tek
-  tek, açıklamalı ver.
+  şifreyi asla sen girme.
 - **Ubuntu 24.04+ sistem Python'una `pip install` engelli** (PEP 668).
-  Paketleri `apt` ile kur (`python3-yaml`, `python3-smbus2`) ya da venv
-  kullan.
+  `apt` ya da venv kullan.
 - **Pi'de I2C:** Ubuntu'da genelde açık gelir (`ls /dev/i2c-1`); kullanıcı
-  `i2c` grubuna eklenmeli (`sudo usermod -aG i2c $USER`). Raspberry Pi OS'ta
-  `raspi-config` ile açılır.
+  `i2c` grubuna eklenmeli.
 - **Satır sonları:** `.gitattributes` `eol=lf` zorluyor. Windows'ta CRLF ile
   commit'lenen bir betiğin shebang'i Linux'ta `python3\r` olur ve "bad
   interpreter" verir.
-- **Kodlama:** Windows konsolu cp1254/cp857; Türkçe çıktı basan
-  betiklerde `sys.stdout.reconfigure(encoding="utf-8")` kullanılıyor.
-  Kabuktan uzun ve özel karakterli heredoc'lar bazen bozuluyor; o
-  durumda dosyayı doğrudan yaz.
+- **Kodlama:** Windows konsolu cp1254/cp857. Türkçe çıktı basan betiklerde
+  `sys.stdout.reconfigure(encoding="utf-8")` kullanılıyor.
 
 ---
 
@@ -891,117 +1171,117 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 
 ## 13. Açık kalan işler
 
-### 13.1 `robot.yaml`'da boş alanlar (76)
+### 13.1 `robot.yaml`'da boş alanlar (donanım vardiyası doldurur)
 
-- `drivers[0].address`, `drivers[1].address` — kart adresleri (muhtemelen
+- `drivers[0].address`, `drivers[1].address`: kart adresleri (muhtemelen
   0x40 ve 0x41, A0 lehimlenince). `map_channels.py`/`hwcheck.py` bulur.
-- `joints[*].driver`, `joints[*].channel` (36) — kanal haritası,
+- `joints[*].driver`, `joints[*].channel` (36): kanal haritası;
   `map_channels.py` çıkarır.
-- `joints[*].limits_deg.min/max` (36) — `calibrate.py` içinde `span` +
-  `limit` ile bulunur. Simülasyon şimdilik `simulation.provisional_joint_
-  limits_deg` (±90°) kullanıyor. İlk RL eğitimi (G7) bununla yapılır;
-  **gerçek limitlerle yeniden eğitim şart** (D10), coxa ±90'da komşu
-  bacağa girer.
-- `body.standing_height` — ölçüm değil, IK/gait çalışınca seçilecek
-  hedef.
-- `body.total_mass_kg` — terazi (D7, donanım vardiyası). Simülasyon şimdilik CAD tahmini
-  kullanıyor: 2.13 kg (`simulation.links`). Tartım gelince doluluk oranı
-  ve elektronik kütlesi (`simulation.mass_inputs`) buna göre düzeltilip
-  `tools/cad_sim_model.py` yeniden çalıştırılır.
-- `sensors.imu.address`, `sensors.imu.mount_rotation_deg`,
-  `sensors.range_finders.devices[*]` (XSHUT GPIO, adres, bakış yönü) —
-  otonomi katmanında gerekecek.
+- `joints[*].limits_deg.min/max` (36): `calibrate.py` içinde `span` +
+  `limit` ile bulunur. Simülasyon şimdilik geçici ±90° kullanıyor.
+  **Gerçek limitlerle yeniden eğitim şart** (D10); coxa ±90'da komşu bacağa
+  girer.
+- `body.standing_height`: hedef değer, ölçüm değil. Simülasyon ve RL 100 mm
+  kullanıyor.
+- `body.total_mass_kg`: terazi (D7). Simülasyon CAD tahmini kullanıyor:
+  2.13 kg.
+- `sensors.imu.*`, `sensors.range_finders.devices[*]`: otonomi katmanında
+  gerekecek.
 
-### 13.1b Yazılım tarafı
+### 13.2 Yazılım (Görkem, G7)
 
-- ~~ROS'lu simülasyon hız komutlu servo modelinde~~ **ÇÖZÜLDÜ (09-26):**
-  `servo:=torque` varsayılan (pid_controller zinciri, karar günlüğü). Kalan fark:
-  ROS'lu simde tork-hız doğrusu yok (gz_ros2_control hız sınırında torku
-  kesiyor; RL simi doğrusal azaltıyor). Ölçülen hızlar iki simde aynı düzeyde
-  (tripod %98, politika %96), şimdilik yeterli.
-- **RL (G7), 09-26 sabahı:** en iyi model `models/ppo_res_250k` (artık
-  eylem: tripod + düzeltme). Düz zeminde tripod'la başa baş ya da biraz
-  önde, enerji ~%20 fazla. Uzun eğitimde hedef hızı aşmaya kayıyor (en iyi
-  ara kayıt 250k; std düşürme ya da erken kesme denenebilir); hızlıda
-  hafif sola kayma. Mutlak modun en iyisi `ppo_v7_8M` (3 kat enerji).
-  Kütle rastgeleleştirmesi yok. Sürtünme düz zeminde etkisiz (ölçüldü).
-  Asıl sınav zeminler: S5 (üreteç) + gerçek ayak teması (şu an geometrik,
-  G7) + S6 (ölçüm). Karşılaştırma: `models/README.md`.
+1. **Gerçek ayak teması.** RL simindeki temas geometrik (ayak ucu z=0'a
+   2 mm yakın mı). Engebeli ya da eğimli zeminde yanlış olur; ödülün ritim
+   terimi ve değerlendirme buna bakıyor. S5'le birlikte gz Contact sistemine
+   ya da zemin yüksekliğine geçilmeli.
+2. **Zeminli eğitim** (S5'i bekler). Süreç başına ayrı `terrain_sdf`,
+   kolaydan zora müfredat. Robot orijinde düz zemine göre doğuyor; orijin
+   çevresi z=0'da olmalı.
+3. **Komut aralığı.** Politika yalnız ileri 0.05–0.15 m/s gördü.
+   - `PhaseTripod` vy ve wz'yi zaten destekliyor; artık eylem modunda taban
+     hazır.
+   - `TaskConfig.vy_range`/`wz_range` genişletilip taklit + eğitim
+     yapılmalı.
+   - Politika düğümü aralıkları `.npz`'den okur, kod değişmez.
+4. **Uzun eğitimde hedef hızı aşma** (ders 25). En iyi ara kayıt erken.
+   Seçenekler:
+   - std'yi zamanla düşürmek,
+   - deterministik değerlendirmeyle en iyi ara kaydı seçen bir
+     `EvalCallback`,
+   - daha kısa eğitim.
+5. **Hızlıda yön kayması:** 0.15 m/s'de 10 s'de +12°.
+6. **Kütle rastgeleleştirmesi yok.** Süreç başına gövde kütlesi çarpanı:
+   `RobotModel.links["body"]` ölçeklenip `HexapodSim`'e verilir. Sürtünme düz
+   zeminde etkisiz ölçüldü; eğimle anlamlı.
+7. **G8'i son G7 politikasıyla tekrarla:** aktar, ROS'lu simde dene. Düğüm
+   modelden bağımsız, yalnız dosya değişir.
+8. ROS'lu simde tork-hız doğrusu yok. gz_ros2_control hız sınırında torku
+   kesiyor, RL simi doğrusal azaltıyor. Ölçülen hızlar iki simde aynı
+   düzeyde; şimdilik yeterli.
 
-### 13.2 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)
+### 13.3 Yazılım (Samet)
+
+- **S5:** zemin üreteci. Entegrasyon notu GOREVLER.md'de: `terrain_sdf`
+  statik `<model>` parçası, orijin çevresi z=0.
+- **S6:** ölçüm aracı. Çekirdeği `hexapod_rl.evaluate` + `baseline.TripodPolicy`
+  hazır; eksik olanlar zemin seçimi, N tekrar ve tablo.
+- **S7:** sensör sürücüleri (saf Python, dry-run testli).
+
+### 13.4 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)
 
 1. Bacaklara "ÖN" + 1–6 bandı (§5.5).
 2. Kartlardan birinin A0'ını lehimle.
 3. Kartları Pi'ye bağla (VCC 3.3 V!), servoları kartlara tak (sıra fark
    etmez), servo gücü ~6 V buck'tan.
-4. Pi'ye Ubuntu Server 26.04 kur; `git clone`; `python3
-   tools/map_channels.py` → çıktıyı robot.yaml'a işle.
+4. Pi'ye Ubuntu Server 26.04 kur; `git clone`; `python3 tools/map_channels.py`
+   → çıktıyı robot.yaml'a işle.
 5. `python3 tools/calibrate.py` ile 18 eklemin merkez/yön/span/limitleri.
-6. Güç bağlantısını kontrol et: servo hattı Pi'den ayrı mı, topraklar
-   ortak mı, sigorta nerede.
-7. **S4'ten devredilenler:** sürücü düğümü (`hexapod_hardware`) donanımda hiç
-   denenmedi (gerçek I2C yolu, I2C yazma süresi, ilk komutta 18 servonun aynı
-   anda beslenmesi, sert çökmede servoların bırakılamaması). Ayrıntılı kontrol
-   listesi: GOREVLER.md, "S4'ten devredilen, robotta doğrulanacaklar".
+6. Güç bağlantısını kontrol et: servo hattı Pi'den ayrı mı, topraklar ortak
+   mı, sigorta nerede.
+7. **S4'ten devredilenler:** sürücü düğümü donanımda hiç denenmedi. Ayrıntılı
+   liste: GOREVLER.md, "S4'ten devredilen, robotta doğrulanacaklar".
 
 ---
 
-## 14. Sıradaki iş için hazır plan: URDF + Gazebo
+## 14. Sıradaki iş için hazır plan
 
-**Durum (2. oturum sonu): 1–7 BİTTİ.** URDF RViz ve check_urdf'ten geçti; robot
-Gazebo'da doğuyor, kontrolcüler açılıyor, sensörler yayında, `stand` ile
-istenen 100 mm'ye kalkıyor (ayrıntı GOREVLER.md G3–G5). **Sıradaki: 8 — ama
-tripod Samet'in (S2/S3); Görkem'in sıradaki işi G6 (RL ortamı).** G6'nın
-tasarımını belirleyen hız ölçümü GOREVLER.md G6'da: ROS'lu simülasyon ~1.3x,
-yalın Gazebo ~3–5x gerçek zaman; öneri ROS'suz, süreç içi `gz.sim` ile adımlama
-ve paralel ortamlar. Yalın Gazebo'da adımı 1→2 ms yapmak hızlandırmadı; darboğaz
-fizik değil, incelenmedi (G6'nın ilk işi).
+**Görkem'in işi G7 (PPO + alan rastgeleleştirme).** Bitti şartı: politika
+S6'nın ölçümünde tripod'u geçiyor; eğim, engebe ve kaygan zeminde ayrı ayrı
+ölçüldü. Düz zeminde bu neredeyse sağlandı (§3.1). Eksik olan zeminler.
 
-Asıl plan:
+**S5 gelmeden yapılabilecekler (sırayla önerilen):**
 
-1. **Yeni paket `src/hexapod_description`** (ament_python ya da
-   ament_cmake + xacro). URDF'i elle yazma; `robot.yaml`'dan **üreten** bir
-   betik/xacro kullan ki geometri tek kaynaktan gelsin.
-2. **Link/joint yapısı IK sözleşmesiyle birebir aynı olmalı** (§6):
-   - `base_link` = gövde çerçevesi (REP-103).
-   - Her bacak için: `coxa_joint` (revolute, eksen +z) → `femur_joint`
-     (+x yönünde coxa=50 mm ötede; femur + = yukarı olduğu için eksen
-     **−y**) → `tibia_joint` (+x yönünde femur=80 mm ötede, eksen **−y**,
-     0'da tibia dümdüz aşağı) → ayak ucu tibia linkinde (0, 0, −126.6).
-   - Bacak montajı: (100·cos φ, 100·sin φ, −10.05), yaw = φ (§5.5 gövde
-     azimutları).
-3. **Görsel mesh:** `cad/Hexapod/leg/*.stl` ve `cad/Hexapod/body/*.stl`
-   (mm → `scale="0.001 0.001 0.001"`). STL'ler parçanın kendi çerçevesinde;
-   STEP'teki montaj dönüşümleri `tools/cadlib/assembly.py` ile alınır
-   (✅ `tools/cad_sim_model.py` yapıyor, sonuç `meshes.yaml`). Çarpışma için basit geometri (silindir,
-   kutu, ayakta küre r≈5 mm) daha hızlı ve kararlı.
-4. **Kütle/atalet:** config'de yok. Simülasyon için tahmin gerekiyor:
-   MG996R 55 g (katalog), parçalar STL hacmi × PETG yoğunluğu × doluluk
-   oranı. Bunları "simülasyon tahmini" olarak açıkça işaretle, gerçek
-   değer gibi sunma.
-5. **Eklem limitleri/hız/tork (sim):** MG996R katalogundan hız ~0.14 s/60°
-   (@6 V), tork ~11 kg·cm; açı limitleri kalibrasyon gelene kadar geçici
-   ve işaretli.
-6. **Doğrulama testi (ROS'suz yazılabilir):** URDF'i Python'da parse edip
-   ileri kinematiği hesapla, `hexapod_kinematics.forward` ile aynı ayak
-   konumlarını verdiğini test et. Simülasyon ile IK'nın ayrışmasını
-   baştan engeller.
-7. **Gazebo:** Jetty + `ros_gz` köprüsü; eklem pozisyon kontrolü için
-   `gz_ros2_control` ya da Gazebo'nun joint position controller
-   eklentisi. IMU ve ayak temas sensörleri (RL gözlemi için).
-8. **Sonra:** tripod gait (`hexapod_gait`, IK üzerinden) → RL ortamı
-   (Gymnasium, ros_gz üzerinden; gözlem: IMU + eklem açıları + temaslar;
-   eylem: eklem hedefleri ya da gait parametre düzeltmeleri; ödül:
-   ileri hız − enerji − devrilme cezası) → PPO (Stable-Baselines3) →
-   alan rastgeleleştirme (zemin, sürtünme, kütle, itme, gecikme).
-   Not: Gazebo RL için yavaş olabilir; headless ve paralel ortamlar
-   gerekebilir. Başka bir simülatöre geçiş TÜBİTAK başvurusundan sapma
-   olur, kullanıcıya sormadan yapma.
+1. **Gerçek ayak teması** (§13.2-1).
+   - Önce gz.sim Python bağlarında temas verisinin okunabildiğini dene.
+     `Joint.transmitted_wrench` bozuk (§12.18); Contact sistemi ya da
+     `ContactSensorData` bileşeni denenebilir.
+   - Olmazsa zemin yüksekliği fonksiyonu kullan: S5 üreteci her zemin için
+     z(x, y) verebilir.
+2. **Komut aralığını genişletme** (§13.2-3).
+   - Artık eylem modunda: vy, wz, geri.
+   - Taklit (etiket 0) + PPO + değerlendirmeye yön ve yana komut.
+3. **En iyi ara kaydı otomatik seçme** (§13.2-4). Deterministik
+   değerlendirmeyle 250k'da bir ölçüp en iyisini `best_model.zip` olarak
+   kaydet.
+4. **Kütle rastgeleleştirmesi** (§13.2-6).
+5. Kendi test zeminin: basit bir eğim ya da basamak `terrain_sdf`'i ile artık
+   eylem politikasının ve tripod'un nasıl davrandığına bak. S5'in yerine
+   geçmez; beklenti oluşturur.
 
-**Çalıştırmak için WSL'e kurulum gerekecek** (şifre ister, kullanıcı
-çalıştırır): ROS 2 Lyrical apt deposunu ekle, `sudo apt install
-ros-lyrical-desktop` (Gazebo Jetty dahil). Güncel resmi kurulum adımlarını
-kullanmadan önce doğrula.
+**S5 gelince:** zeminli eğitim, müfredat, sonra S6 tablosu (tripod ve
+politika her zeminde) → G7 bitti → G8'i son politikayla tekrarla.
+
+**Yöntem notları (bu projede işe yarayanlar):**
+- Yeni bir ödül ya da ayar denemeden önce elle yazılmış iyi bir davranışı
+  (tripod) aynı ödülde ölç. Hem gürültüsüz hem eğitimdeki gürültüyle ölç
+  (ders 20).
+- PPO'yu sıfırdan değil, taklitten başlat (ders 21). Artık eylem modu
+  varsayılan tercih.
+- Devam eğitimlerinde lr 1e-4, target_kl 0.02, düşük std (ders 25).
+- Her ölçümü gürültüsüz, eklem gürültülü ve rastgeleleştirmeli ayrı raporla.
+  Tabloyu `models/README.md`'ye yaz.
+- Uzun eğitimde ara kayıtları (250k'da bir) değerlendir; kötüye gidiyorsa
+  erken durdur. gSDE'de böyle oldu.
 
 ---
 
@@ -1039,25 +1319,31 @@ servo karşılaştırması (25 kg·cm). **DS3225 alınmadı**, robot MG996R ile.
 
 **Faturalar:** içerik §4.1'de. Kişisel veri nedeniyle depoda değil.
 
+**Eğitim ara kayıtları:** eski PC'de WSL içinde `~/hexapod_runs/` (~100 MB,
+her eğitimin `checkpoints/` klasörü). Hafif kısmı (progress.csv, ayarlar,
+değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
+
 ---
 
 ## 16. Yeni oturumda ilk adımlar
 
-1. Bu belgeyi (`docs/PROJE_DEVIR.md`), `CLAUDE.md`'yi ve `GOREVLER.md`'yi oku.
-2. Durumu doğrula:
+1. Bu belgeyi (`docs/PROJE_DEVIR.md`), `CLAUDE.md`'yi, `GOREVLER.md`'yi ve
+   `models/README.md`'yi oku.
+2. Yeni bilgisayardaysan ve kurulum yapılmadıysa §0.2'yi uygula. sudo'lu
+   adımları kullanıcıya ver; her adım tek eylem, komutlar ayrı kod
+   bloklarında.
+3. Depoyu güncelle ve durumu doğrula:
    ```bash
+   git pull --rebase
    git log --oneline | head -5
    python -m pytest -q
    ```
-   73 test geçmeli.
-3. CAD depoda (`cad/Hexapod/`). Eksikse `git status` ile bak; yine yoksa
-   Printables 606030'dan indirilebileceğini söyle (indirme için izin al).
-4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının olabilir;
-   dokunmadan incele (§12, madde 7–8).
-5. Kullanıcı başka bir şey istemediyse: ROS kurulu mu bak
-   (`wsl -e bash -lc "ls /opt/ros"`). Değilse kullanıcıdan
-   `bash tools/wsl/ros_kurulum.sh`'ı çalıştırmasını iste (G4). Kuruluysa
-   G3'ün son kontrolü (colcon build + RViz), sonra G5 (Gazebo). Hangi işin
-   kimde olduğu ve neyi beklediği GOREVLER.md'de.
-   Kullanıcıdan donanım/ölçüm işi isteme.
-6. Önemli bir karar ya da biten aşama olduğunda bu belgeyi güncelle.
+   - Windows: 178 geçti, 8 atlandı. WSL: 208 geçti.
+   - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
+4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
+   olabilir; dokunmadan incele (§12, madde 7–8).
+5. GOREVLER.md'de Samet'in ilerlemesine bak (S5, S6, S7). S5 geldiyse zeminli
+   eğitime geç, gelmediyse §14'teki "S5 gelmeden" listesinden devam et.
+6. Kullanıcıdan donanım ya da ölçüm işi isteme.
+7. Önemli bir karar ya da biten aşama olduğunda bu belgeyi, GOREVLER.md'yi ve
+   gerekiyorsa `models/README.md`'yi güncelle. Commit + push'la.

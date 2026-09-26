@@ -5,6 +5,9 @@
 > git tercihleri (Türkçe detaylı commit, **Claude imzası yok**), alınan
 > kararlar ve gerekçeleri, bulunan hatalar, donanım özeti, açık işler ve
 > sıradaki adımın planı. Bu dosya onun kısa özetidir.
+>
+> **Yeni bilgisayardaysan** (2026-09-26'da RTX 5070'li PC'ye geçildi):
+> kurulum ve doğrulama adımları PROJE_DEVIR §0'da.
 
 Bu depoda çalışırken bilmen gerekenler. Ayrıntılı bağlam:
 [docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md), ilk brif:
@@ -102,7 +105,9 @@ src/hexapod_teleop/       /cmd_vel -> hexapod_gait -> eklem komut arayüzü, ROS
 src/hexapod_hardware/     gerçek robot sürücü düğümü: eklem komutu -> ServoBus (dry-run destekli)
 src/hexapod_description/  simülasyon modeli, URDF, eklem arayüzü (interface.py)
 src/hexapod_gazebo/       Gazebo dünyaları, sim.launch.py, stand komutu
-src/hexapod_rl/           RL: süreç içi Gazebo (sim), Gymnasium ortamı (env, task), PPO (train)
+src/hexapod_rl/           RL: süreç içi Gazebo (sim), ortam (env, task), taklit (demo, pretrain),
+                          PPO (train), ölçüm (evaluate, baseline), aktarma (export)
+src/hexapod_policy/       politika düğümü: torch'suz (numpy) MLP, /imu + /cmd_vel -> komut
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma
@@ -117,6 +122,8 @@ tools/cadlib/             CAD araçlarının ortak kütüphanesi
 tests/
 docs/                     PROJE_DEVIR.md, ARAYUZ.md (eklem arayüzü), brif, malzeme/
 cad/                      CAD + baskı dosyaları (depoda)
+models/                   kayda değer modeller (model.zip + policy.npz) ve karşılaştırma tabloları
+egitim_kayitlari/         bütün eğitimlerin progress.csv/ayarlar kayıtları
 ```
 
 `hexapod_driver` ROS 2 paketi olarak derlenir ama **ROS'a bağımlı değildir**.
@@ -193,9 +200,10 @@ donanım bilgileri config'e sonradan girilir.
 4. ✅ Gazebo dünyası + eklem komut arayüzü (`hexapod_gazebo`, docs/ARAYUZ.md)
 5. ✅ Klasik yürüyüş (tripod) — çekirdek (`hexapod_gait`) + ROS düğümü
    (`hexapod_teleop`), Gazebo'da doğrulandı
-6. 🔄 RL ortamı (Gymnasium, ✅) + PPO eğitimi (düz zeminde yürüyor,
-   `models/`), değişken zeminler S5'i bekliyor
-7. Pi 4'e aktarma: eğitilmiş politika + ROS 2 düğümleri + gerçek sürücü
+6. 🔄 RL ortamı (✅) + PPO eğitimi: en iyi `models/ppo_res_250k` (tripod +
+   öğrenilmiş düzeltme, düz zeminde tripod'la başa baş); zeminler S5'i bekliyor
+7. 🔄 Pi 4'e aktarma: politika düğümü (`hexapod_policy`) ve sürücü düğümü
+   (`hexapod_hardware`) yazıldı, simde çalışıyor; Pi'de denenmedi
 
 Gerçekçi beklenti: RL politikası eğitimde gördüğü zorluk türlerine karşı
 sağlam olur, "her koşula" değil. Eğitim senaryoları neyi kapsarsa sistem
