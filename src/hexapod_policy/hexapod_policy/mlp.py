@@ -40,6 +40,11 @@ class PolicyContract:
     action_mode: str = "absolute"
     residual_scale: float = 0.0
     base_gait: dict | None = None       # residual: groups, reach_mm, height_mm, lift_mm
+    # Ölü bölge: komutun büyüklüğü (her eksen aralığının en uç değerine bölünür,
+    # en büyüğü) bunun altındaysa "dur" (düğüm ayakta bekler). Eğitimde bu kadar
+    # küçük komut hiç görülmedi. 0: yok (eski, yalnız ileri eğitilmiş dosyalar;
+    # onlarda "dur" ileri hızın alt sınırından çıkar).
+    command_deadband: float = 0.0
 
     def __post_init__(self) -> None:
         if self.action_mode not in ("absolute", "residual"):
@@ -57,6 +62,8 @@ class PolicyContract:
             lo, hi = self.command_ranges[axis]
             if lo > hi:
                 raise ValueError(f"{axis} aralığı ters: {lo} > {hi}")
+        if not 0.0 <= self.command_deadband < 1.0:
+            raise ValueError(f"ölü bölge [0, 1) olmalı: {self.command_deadband}")
 
 
 class MlpPolicy:
@@ -123,6 +130,7 @@ class MlpPolicy:
             action_mode=c.get("action_mode", "absolute"),
             residual_scale=float(c.get("residual_scale", 0.0)),
             base_gait=c.get("base_gait"),
+            command_deadband=float(c.get("command_deadband", 0.0)),
         )
         return cls(layers, meta["activation"], contract, meta.get("source", ""))
 

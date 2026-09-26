@@ -116,3 +116,16 @@ def test_eski_dosyalar_mutlak_modda_yuklenir(tmp_path):
     arrays["meta"] = np.array(json.dumps(meta))
     np.savez(tmp_path / "eski2.npz", **arrays)
     assert MlpPolicy.load(tmp_path / "eski2.npz").contract.action_mode == "absolute"
+
+
+def test_olu_bolge_kaydet_yukle_ve_eski_dosyada_sifir(tmp_path):
+    from dataclasses import replace
+
+    p = random_policy()
+    c = replace(p.contract, command_ranges={"vx": (-0.15, 0.15), "vy": (-0.08, 0.08),
+                                            "wz": (-0.5, 0.5)}, command_deadband=1 / 6)
+    q = MlpPolicy.load(MlpPolicy(p.layers, "tanh", c).save(tmp_path / "omni.npz"))
+    assert q.contract.command_deadband == pytest.approx(1 / 6)
+    assert random_policy().contract.command_deadband == 0.0     # eski dosyalar: ölü bölge yok
+    with pytest.raises(ValueError):
+        replace(c, command_deadband=1.0)

@@ -17,8 +17,10 @@ bekler. Adım saati de sıfırlanır; yürüyüş yeniden başlarken politika,
 eğitimdeki bölüm başıyla aynı durumu görür.
   - hız komutu yok ya da zaman aşımı (deadman; komut veren taraf çökerse
     robot yürümeye devam etmesin),
-  - ileri hız eğitimde görülen aralığın yarısının altında (dur komutu; geri,
-    yana ya da yerinde dönüş gibi eğitilmemiş komutlar da buraya düşer),
+  - dur komutu: yalnız ileri eğitilmiş politikada ileri hız eğitim
+    aralığının yarısının altında (geri, yana ya da yerinde dönüş gibi
+    eğitilmemiş komutlar da buraya düşer); her yöne eğitilmiş politikada
+    komut, sözleşmenin ölü bölgesinde (command_deadband; _stop_reason),
   - IMU verisi yok ya da bayat (politika kör koşmasın),
   - gövde max_tilt_deg'den fazla yatmış (eğitimde bölüm burada biterdi).
 Eğitim aralığının dışındaki komut aralığa kırpılır (clipped_command).
@@ -138,9 +140,9 @@ class PolicyController:
             return "komut yok"
         if now - self._command_at > self.cmd_timeout_s:
             return "komut zaman aşımı"
-        vx_lo = self.policy.contract.command_ranges["vx"][0]
-        if self._command[0] < 0.5 * vx_lo:
-            return f"dur (vx < {0.5 * vx_lo:g} m/s)"
+        stop = self._stop_reason(self._command)
+        if stop is not None:
+            return stop
         if self._imu is None:
             return "IMU yok"
         if now - self._imu_at > self.imu_timeout_s:
@@ -149,6 +151,27 @@ class PolicyController:
         tilt = math.degrees(math.acos(max(-1.0, min(1.0, -g[2]))))
         if tilt > self.max_tilt_deg:
             return f"devrildi ({tilt:.0f}°)"
+        return None
+
+    def _stop_reason(self, command) -> str | None:
+        """Eğitilmemiş küçük ya da ters komut: politika koşmaz, robot ayakta bekler.
+
+        Aralığı 0'ı içermeyen eksende (eski dosyalarda ileri hız 0.05-0.15)
+        aralığın alt ucunun yarısının altı; aralığı 0'ı içeren eksenlerde ise
+        komutun büyüklüğü sözleşmenin ölü bölgesinin altıysa (her yöne
+        eğitilmiş dosyalar; eğitimde bu kadar küçük komut yoktu)."""
+        c = self.policy.contract
+        size = 0.0
+        for axis, v in zip(("vx", "vy", "wz"), command):
+            lo, hi = c.command_ranges[axis]
+            if lo > 0 and v < 0.5 * lo:
+                return f"dur ({axis} < {0.5 * lo:g})"
+            if hi < 0 and v > 0.5 * hi:
+                return f"dur ({axis} > {0.5 * hi:g})"
+            if hi > lo:
+                size = max(size, abs(v) / max(abs(lo), abs(hi)))
+        if size < c.command_deadband:
+            return f"dur (komut ölü bölgede, {size:.2f} < {c.command_deadband:.2f})"
         return None
 
     def _effective_command(self) -> tuple[float, float, float]:

@@ -202,3 +202,37 @@ def test_artik_eylemde_sifir_duzeltme_tripodun_kendisi():
             assert ctl.tick(0.0) == pytest.approx(expected)
     with pytest.raises(ValueError):
         PolicyController(policy, [(-3.0, 3.0)] * ACTION_SIZE)
+
+
+# --- her yöne eğitilmiş politika (2026-09-26) -------------------------------------
+
+
+OMNI = {"vx": (-0.15, 0.15), "vy": (-0.08, 0.08), "wz": (-0.5, 0.5)}
+
+
+def omni_walking() -> PolicyController:
+    from dataclasses import replace
+
+    p = constant_policy([0.2] * ACTION_SIZE)
+    c = replace(p.contract, command_ranges=OMNI, command_deadband=1 / 6)
+    ctl = PolicyController(MlpPolicy(p.layers, "tanh", c), LIMITS)
+    ctl.on_imu(LEVEL, (0.0, 0.0, 0.0), 0.0)
+    return ctl
+
+
+@pytest.mark.parametrize("command", [(-0.1, 0.0, 0.0), (0.0, 0.05, 0.0), (0.0, 0.0, -0.3),
+                                     (0.03, 0.0, 0.2)])
+def test_her_yon_politikasi_geri_yana_donuste_yurur(command):
+    c = omni_walking()
+    c.on_command(*command, 0.0)
+    c.tick(0.0)
+    assert c.status == "yürüyor"
+    assert c.observation(c._effective_command())[24:27] == pytest.approx(list(command))
+
+
+@pytest.mark.parametrize("command", [(0.0, 0.0, 0.0), (0.02, 0.01, 0.05)])
+def test_her_yon_politikasi_olu_bolgede_durur(command):
+    c = omni_walking()
+    c.on_command(*command, 0.0)
+    assert c.tick(0.0) == pytest.approx(list(DEFAULT))
+    assert c.status.startswith("dur (komut ölü bölgede")
