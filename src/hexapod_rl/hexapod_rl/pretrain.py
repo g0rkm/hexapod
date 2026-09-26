@@ -31,13 +31,15 @@ import math
 import multiprocessing
 import time
 import warnings
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 
 from .demo import TripodDemo
 from .evaluate import eval_commands, evaluate_set, format_result
-from .task import ACTION_SIZE, OBS_SIZE, body_mass_scales, task_from_flags
+from .task import (ACTION_SIZE, OBS_SIZE, TASK_FILE, body_mass_scales, task_from_flags,
+                   task_to_json)
 
 
 def demo_for(env) -> TripodDemo:
@@ -63,8 +65,13 @@ def _collect(job) -> list[dict]:
     """Bir işçi süreç: kendi Gazebo'suyla verilen tohumlardaki bölümleri koşar."""
     from .env import HexapodEnv
 
-    seeds, noise, gamma, tail, task, mass = job
-    env = HexapodEnv(task=task, body_mass_scale=mass)
+    seeds, noise, gamma, tail, task, mass, terrain = job
+    sdf, height = "", None
+    if terrain is not None:   # (set adı, ortam sayısı, sıra): yükseklik fonksiyonu burada kurulur
+        from .terrain_probe import training_terrains
+        name, n, i = terrain
+        _, sdf, height = training_terrains(name, n)[i]
+    env = HexapodEnv(task=task, body_mass_scale=mass, terrain_sdf=sdf, terrain_height=height)
     demo = demo_for(env)
     episodes = []
     for seed in seeds:
@@ -193,6 +200,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="artık eylem modu: politika tripod'a düzeltme verir (etiket 0)")
     parser.add_argument("--omni", action="store_true",
                         help="her yöne komut (task.OMNI_COMMANDS); PPO da --omni ile")
+    parser.add_argument("--lift-mm", type=float, default=None,
+                        help="artık eylemde taban tripod'un ayak kaldırması; PPO da aynı")
+    parser.add_argument("--terrains", default=None,
+                        help="işçi başına zemin seti (terrain_probe.TRAIN_SETS)")
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--batch", type=int, default=1024)
@@ -214,10 +225,14 @@ def main(argv: list[str] | None = None) -> int:
     gamma = PPO_KWARGS["gamma"]
     tail = int(round(3 / (1 - gamma)))    # getirinin %95'i bu kadar adımda birikir
     seeds = [args.seed * 1000 + i for i in range(args.episodes)]
-    task = task_from_flags(args.residual, args.omni, args.randomize)
+    task = task_from_flags(args.residual, args.omni, args.randomize, args.lift_mm)
     masses = body_mass_scales(args.workers, task)   # işçi başına gövde kütlesi
-    jobs = [(seeds[i::args.workers], args.noise, gamma, tail, task, masses[i])
+    terrains = [None] * args.workers
+    if args.terrains:   # işçi başına zemin (train.py --terrains ile aynı dağılım)
+        terrains = [(args.terrains, args.workers, i) for i in range(args.workers)]
+    jobs = [(seeds[i::args.workers], args.noise, gamma, tail, task, masses[i], terrains[i])
             for i in range(args.workers)]
+    (out / TASK_FILE).write_text(task_to_json(task), encoding="utf-8")
     t0 = time.time()
     with multiprocessing.get_context("fork").Pool(args.workers) as pool:
         episodes = [ep for part in pool.map(_collect, jobs) for ep in part]
@@ -252,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
     log(f"std {args.std} (gerçekleşen {actual:.3f}{', gSDE' if args.sde else ''}); doğrulama: "
         + ", ".join(f"{k} {v:.4f}" for k, v in final.items()))
 
-    eval_task = task_from_flags(args.residual, args.omni)
+    eval_task = replace(task, randomization=None)   # ölçüm: rastgeleleştirmesiz, düz zemin
     commands = eval_commands(eval_task)
     for c, result in zip(commands, evaluate_set(model, commands, task=eval_task)):
         log(f"--- değerlendirme, komut (vx, vy, wz) = {c}\n" + format_result(result))

@@ -4,8 +4,9 @@
     python -m hexapod_rl.terrain_probe tripod phase AD/best_model.zip:residual --vx 0.1
 
 Model tanımı: "tripod" (Samet'in TripodGait'i), "phase" (düzeltmesiz
-PhaseTripod = artık eylem modunda eylem 0), "<zip>" (mutlak eylem) ya da
-"<zip>:residual" (artık eylem).
+PhaseTripod = artık eylem modunda eylem 0; "phase:50" ayağı 50 mm
+kaldıran), "<zip>" ya da "<zip>:residual". Modelin yanında gorev.json varsa
+(train.py yazar) eylem modu ve taban yürüyüş ondan okunur.
 
 Bu S5'in (Samet, zemin üreteci) yerine geçmez: G7'nin zeminli eğitimi ve
 "bitti" ölçümü S5 + S6 ile yapılacak. Buradaki zeminler yalnız beklenti
@@ -170,23 +171,38 @@ class _ZeroResidual:
 
 
 def load(spec: str):
-    """Model tanımı -> (model, artık eylem mi)."""
+    """Model tanımı -> (model, görev ayarı; rastgeleleştirmesiz).
+
+    "tripod", "phase" (düzeltmesiz PhaseTripod), "phase:50" (ayak 50 mm
+    kalkan), "<zip>" ya da "<zip>:residual". Modelin yanında gorev.json varsa
+    görev ondan (eylem modu, taban yürüyüş); yoksa ":residual" eki."""
+    from dataclasses import replace
+
+    from .task import TaskConfig, find_task
+
     if spec == "tripod":
         from .baseline import TripodPolicy
-        return TripodPolicy(), False
-    if spec == "phase":
-        return _ZeroResidual(), True
+        return TripodPolicy(), TaskConfig()
+    if spec.startswith("phase"):
+        _, _, lift = spec.partition(":")
+        task = TaskConfig(action_mode="residual")
+        return _ZeroResidual(), replace(task, lift_mm=float(lift)) if lift else task
     from stable_baselines3 import PPO
     path, _, mode = spec.partition(":")
-    return PPO.load(path, device="cpu"), mode == "residual"
+    trained = find_task(path)
+    if trained is not None:
+        return PPO.load(path, device="cpu"), replace(trained, randomization=None,
+                                                     w=dict(TaskConfig().w))
+    return PPO.load(path, device="cpu"), TaskConfig(
+        action_mode="residual" if mode == "residual" else "absolute")
 
 
 def main(argv: list[str] | None = None) -> int:
     from .evaluate import evaluate
-    from .task import TaskConfig
 
     parser = argparse.ArgumentParser(description="Eğim ve basamakta karşılaştırma")
-    parser.add_argument("models", nargs="+", help='"tripod", "phase", "<zip>" ya da "<zip>:residual"')
+    parser.add_argument("models", nargs="+",
+                        help='"tripod", "phase[:lift_mm]", "<zip>" ya da "<zip>:residual"')
     parser.add_argument("--vx", type=float, default=0.1)
     parser.add_argument("--seconds", type=float, default=10.0)
     args = parser.parse_args(argv)
@@ -197,8 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, make in TERRAINS:
         sdf, height = make() if make else ("", None)
         cells = []
-        for model, residual in loaded:
-            task = TaskConfig(action_mode="residual" if residual else "absolute")
+        for model, task in loaded:
             r = evaluate(model, args.seconds, args.vx, task=task, terrain_sdf=sdf,
                          terrain_height=height)
             cell = (f"{r['ortalama_hiz_m_s']:.3f} m/s, {r['yon_sapmasi_derece']:+.0f}°, "

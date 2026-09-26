@@ -25,7 +25,7 @@ import numpy as np
 
 from hexapod_policy.mlp import MlpPolicy, PolicyContract
 
-from .task import ACTION_SIZE, OBS_SIZE, TaskConfig, task_from_flags
+from .task import ACTION_SIZE, OBS_SIZE, TaskConfig, find_task, task_from_flags
 
 _ACTIVATIONS = {"Tanh": "tanh", "ReLU": "relu"}
 
@@ -101,7 +101,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--omni", action="store_true",
                         help="politika her yöne eğitildi (task.OMNI_COMMANDS)")
     args = parser.parse_args(argv)
-    out = export(args.model, args.out, task=task_from_flags(args.residual, args.omni))
+    # Eğitimin gorev.json'ı varsa sözleşme ondan (bayraklar yok sayılır): eylem
+    # modu, komut aralıkları ve taban yürüyüş eğitimdekiyle aynı olmalı.
+    task = find_task(args.model) or task_from_flags(args.residual, args.omni)
+    out = export(args.model, args.out, task=task)
     print(f"yazıldı -> {out} ({out.stat().st_size / 1024:.0f} KB); SB3 ile aynı (fark < 1e-5)")
     return 0
 

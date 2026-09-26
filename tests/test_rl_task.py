@@ -317,3 +317,42 @@ def test_govde_kutlesi_ortamlara_esit_dagitilir():
     assert len(s) == 16 and s == sorted(s)
     assert lo < s[0] < s[-1] < hi
     assert sum(s) / 16 == pytest.approx((lo + hi) / 2)
+
+
+# --- görev ayarı dosyası (gorev.json, 2026-09-26) ---------------------------------
+
+
+def test_gorev_ayari_json_gidis_donus(tmp_path):
+    from hexapod_rl.task import (TASK_FILE, find_task, task_from_flags, task_from_json,
+                                 task_to_json)
+
+    for cfg in (TaskConfig(),
+                task_from_flags(residual=True, omni=True, randomize=True, lift_mm=50.0,
+                                w={**TaskConfig().w, "power": -0.1})):
+        back = task_from_json(task_to_json(cfg))
+        assert back == cfg and isinstance(back.vx_range, tuple)
+    cfg = task_from_flags(residual=True, lift_mm=50.0)
+    (tmp_path / TASK_FILE).write_text(task_to_json(cfg), encoding="utf-8")
+    (tmp_path / "checkpoints").mkdir()
+    assert find_task(tmp_path / "best_model.zip") == cfg                  # yanında
+    assert find_task(tmp_path / "checkpoints" / "ppo_250000_steps.zip") == cfg   # bir üstünde
+    assert find_task(tmp_path / "checkpoints" / "x" / "y.zip") is None
+
+
+def test_gorev_dosyasinda_bilinmeyen_alan_reddedilir():
+    import json
+
+    from hexapod_rl.task import task_from_json, task_to_json
+
+    raw = json.loads(task_to_json(TaskConfig()))
+    raw["yeni_alan"] = 1
+    with pytest.raises(ValueError, match="yeni_alan"):
+        task_from_json(json.dumps(raw))
+
+
+def test_deneme_zemini_phase_ayak_kaldirma():
+    from hexapod_rl.terrain_probe import load
+
+    _, task = load("phase:50")
+    assert task.action_mode == "residual" and task.lift_mm == 50.0
+    assert load("phase")[1].lift_mm == TaskConfig().lift_mm

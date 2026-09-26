@@ -157,15 +157,63 @@ OMNI_COMMANDS = dict(vx_range=(-0.15, 0.15), vy_range=(-0.08, 0.08), wz_range=(-
 
 
 def task_from_flags(residual: bool = False, omni: bool = False,
-                    randomize: bool = False, **overrides) -> TaskConfig:
-    """Komut satırı bayraklarından (--residual, --omni, --randomize) görev ayarı;
-    train, pretrain, evaluate ve export aynı yolu kullanır."""
+                    randomize: bool = False, lift_mm: float | None = None,
+                    **overrides) -> TaskConfig:
+    """Komut satırı bayraklarından (--residual, --omni, --randomize, --lift-mm)
+    görev ayarı; train, pretrain, evaluate ve export aynı yolu kullanır."""
     kwargs = dict(action_mode="residual" if residual else "absolute",
                   randomization=Randomization() if randomize else None)
     if omni:
         kwargs.update(OMNI_COMMANDS)
+    if lift_mm is not None:
+        kwargs["lift_mm"] = float(lift_mm)
     kwargs.update(overrides)
     return TaskConfig(**kwargs)
+
+
+#: Eğitimin görev ayarı modelin yanında bu adla (train.py yazar).
+TASK_FILE = "gorev.json"
+
+
+def task_to_json(cfg: TaskConfig) -> str:
+    """Görev ayarı -> JSON (ödül ağırlıkları, komut aralıkları, taban
+    yürüyüş, rastgeleleştirme dahil)."""
+    import json
+    from dataclasses import asdict
+    return json.dumps(asdict(cfg), ensure_ascii=False, indent=1)
+
+
+def task_from_json(text: str) -> TaskConfig:
+    """task_to_json'ın tersi. Bilinmeyen alan varsa reddeder (yeni sürümün
+    dosyası eski kodla sessizce yanlış okunmasın); eksik alan varsayılanı alır."""
+    import json
+    from dataclasses import fields
+
+    def tuples(d: dict) -> dict:
+        return {k: tuple(v) if isinstance(v, list) else v for k, v in d.items()}
+
+    raw = json.loads(text)
+    unknown = set(raw) - {f.name for f in fields(TaskConfig)}
+    if unknown:
+        raise ValueError(f"görev dosyasında bilinmeyen alanlar: {sorted(unknown)}")
+    r = raw.pop("randomization", None)
+    if r is not None:
+        unknown = set(r) - {f.name for f in fields(Randomization)}
+        if unknown:
+            raise ValueError(f"rastgeleleştirmede bilinmeyen alanlar: {sorted(unknown)}")
+        r = Randomization(**tuples(r))
+    return TaskConfig(**tuples(raw), randomization=r)
+
+
+def find_task(model_path) -> "TaskConfig | None":
+    """Model dosyasının yanındaki (ya da ara kayıtsa bir üstündeki) gorev.json."""
+    from pathlib import Path
+    p = Path(model_path).resolve()
+    for d in (p.parent, p.parent.parent):
+        f = d / TASK_FILE
+        if f.is_file():
+            return task_from_json(f.read_text(encoding="utf-8"))
+    return None
 
 
 def body_mass_scales(n: int, cfg: TaskConfig) -> list[float]:

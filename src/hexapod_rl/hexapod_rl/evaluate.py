@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import sys
 from pathlib import Path
 
 
@@ -140,13 +141,21 @@ def main(argv: list[str] | None = None) -> int:
                         help="gövde kütlesi çarpanı (eğitim aralığı task.Randomization)")
     parser.add_argument("--seed", type=int, default=123)
     args = parser.parse_args(argv)
+    from dataclasses import replace
+
+    from .task import Randomization, find_task, task_from_flags
+    task = task_from_flags(args.residual, randomize=args.randomize)
     if args.model == "tripod":
         from .baseline import TripodPolicy
         model = TripodPolicy()
     else:
         model = PPO.load(Path(args.model), device="cpu")
-    from .task import task_from_flags
-    task = task_from_flags(args.residual, randomize=args.randomize)
+        trained = find_task(args.model)   # eğitimin gorev.json'ı: eylem modu, taban yürüyüş
+        if trained is not None:
+            task = replace(trained, randomization=Randomization() if args.randomize else None,
+                           w=task.w)
+            print(f"# görev ayarı modelin gorev.json'ından (eylem modu {task.action_mode}, "
+                  f"ayak kaldırma {task.lift_mm:g} mm)", file=sys.stderr)
     print(format_result(evaluate(model, args.seconds, args.vx, seed=args.seed,
                                  noise=args.noise, task=task, vy=args.vy, wz=args.wz,
                                  body_mass_scale=args.mass)))

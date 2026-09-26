@@ -1,0 +1,71 @@
+{
+ "action_scale": 0.5,
+ "stand_reach_mm": 130.0,
+ "stand_height_mm": 100.0,
+ "vx_range": [
+  -0.15,
+  0.15
+ ],
+ "vy_range": [
+  -0.08,
+  0.08
+ ],
+ "wz_range": [
+  -0.5,
+  0.5
+ ],
+ "gait_hz": 1.5,
+ "episode_s": 20.0,
+ "settle_s": 1.0,
+ "min_height_m": 0.045,
+ "max_tilt_deg": 45.0,
+ "w": {
+  "lin_vel": 1.0,
+  "progress": 10.0,
+  "gait": 0.5,
+  "yaw_rate": 1.0,
+  "orientation": -2.0,
+  "height": -20.0,
+  "power": -0.05,
+  "action_rate": -0.01,
+  "fall": -10.0,
+  "residual": -0.5
+ },
+ "lin_vel_sigma": 0.05,
+ "yaw_rate_sigma": 0.1,
+ "vel_filter_s": 0.5,
+ "action_mode": "residual",
+ "residual_scale": 0.2,
+ "lift_mm": 25.0,
+ "randomization": {
+  "servo_strength": [
+   0.8,
+   1.1
+  ],
+  "servo_stiffness": [
+   0.7,
+   1.3
+  ],
+  "latency_ms": [
+   0.0,
+   18.0
+  ],
+  "push_force_n": [
+   0.0,
+   4.0
+  ],
+  "push_s": 0.2,
+  "push_every_s": [
+   2.0,
+   5.0
+  ],
+  "gyro_noise": 0.05,
+  "gravity_noise": 0.02,
+  "body_mass_scale": [
+   1.0,
+   1.0
+  ]
+ },
+ "command_zero_prob": 0.5,
+ "min_command_frac": 0.3333333333333333
+}

@@ -37,7 +37,14 @@ olarak saklanır, bütün ölçümler ara_degerlendirme.csv'ye yazılır.
 Çıktılar ~/hexapod_runs/<ad>/ altında (OneDrive'a senkronlanmasın diye
 depoda değil): model.zip (son), best_model.zip (en iyi ara kayıt), ara
 kayıtlar (checkpoints/), progress.csv (SB3 günlüğü), ara_degerlendirme.csv,
-degerlendirme.txt. Ortam: tools/wsl/rl_kurulum.sh.
+degerlendirme.txt, gorev.json (görev ayarı: eylem modu, komut aralıkları,
+taban yürüyüş, ödül, rastgeleleştirme; evaluate/export/terrain_probe modeli
+bununla ölçer ve aktarır, bayrak gerekmez). Ortam: tools/wsl/rl_kurulum.sh.
+
+--lift-mm: artık eylemde taban tripod'un ayak kaldırması (varsayılan 25).
+Ölçüldü (2026-09-26, düzeltmesiz tripod): 25 mm'de 45 mm basamak ve 50 mm
+yayladan iniş takılıyor; 40 mm'de ikisi de geçiliyor, 60 mm'de 60 mm basamak
+da; düz zeminde ödül aynı, güç 1.9 -> 3.3 W.
 
 Sonda kısa bir değerlendirme yapılır (evaluate.py); ara kayıtlar da
 `python -m hexapod_rl.evaluate <zip>` ile değerlendirilebilir.
@@ -117,8 +124,10 @@ def main(argv: list[str] | None = None) -> int:
     from stable_baselines3.common.logger import configure
     from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 
+    from dataclasses import replace
+
     from .env import make_env
-    from .task import TaskConfig, body_mass_scales, task_from_flags
+    from .task import TASK_FILE, TaskConfig, body_mass_scales, task_from_flags, task_to_json
 
     parser = argparse.ArgumentParser(description="Hexapod PPO eğitimi")
     parser.add_argument("--steps", type=int, default=1_000_000)
@@ -136,6 +145,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="her yöne komut (task.OMNI_COMMANDS)")
     parser.add_argument("--terrains", default=None,
                         help="ortam başına zemin seti (terrain_probe.TRAIN_SETS; S5 gelince onunki)")
+    parser.add_argument("--lift-mm", type=float, default=None,
+                        help="artık eylemde taban tripod'un ayak kaldırması (varsayılan TaskConfig)")
     parser.add_argument("--power-weight", type=float, default=None,
                         help="güç cezası ağırlığı, W başına (varsayılan: TaskConfig)")
     parser.add_argument("--std", type=float, default=None,
@@ -151,8 +162,11 @@ def main(argv: list[str] | None = None) -> int:
     weights = dict(TaskConfig().w)
     if args.power_weight is not None:
         weights["power"] = args.power_weight
-    task = task_from_flags(args.residual, args.omni, args.randomize, w=weights)
-    eval_task = task_from_flags(args.residual, args.omni)   # ölçüm: rastgeleleştirmesiz
+    task = task_from_flags(args.residual, args.omni, args.randomize, args.lift_mm, w=weights)
+    # ölçüm: rastgeleleştirmesiz ve standart ödülle (eğitimler karşılaştırılabilsin)
+    eval_task = replace(task, randomization=None, w=dict(TaskConfig().w))
+    # Görev ayarı modelin yanında: evaluate/export/terrain_probe bayraksız okur.
+    (out / TASK_FILE).write_text(task_to_json(task), encoding="utf-8")
     masses = body_mass_scales(args.envs, task)   # ortam başına gövde kütlesi çarpanı
     terrains = [("düz", "", None)] * args.envs
     if args.terrains:
