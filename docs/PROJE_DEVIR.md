@@ -103,9 +103,17 @@ Bu projede eğitimin darboğazı **GPU değil, CPU**.
 - SB3 de MlpPolicy'li PPO için CPU'yu öneriyor.
 - Eski PC'de 8 ortamla saniyede ~500–690 adım; 3M adım ~75 dk sürüyordu.
 
-Yeni PC'de eğitimi hızlandıran şey **çekirdek sayısı**. Daha çok çekirdek
-varsa `--envs` artırılır (ör. 16; `n_steps 256 × envs`, batch 512'nin katı
-olmalı).
+Yeni PC'de eğitimi hızlandıran şey **çekirdek sayısı**. Ryzen 7 7700X:
+8 çekirdek / 16 iş parçacığı. Eski i5-10300H 4 / 8'di, çekirdek başına da
+~1.7–2 kat yavaştı.
+- **Öneri:** `--envs 16`. `n_steps 256 × 16 = 4096`, batch 512'ye bölünür.
+- **Beklenti (tahmin):** ~3 kat hız; 3M adım ~75 dk yerine ~25 dk. İlk
+  eğitimde gerçek adım/s'yi ölç ve buraya yaz.
+- Ortam sayısı değişince PPO'nun güncelleme başına verisi de değişir
+  (2048 → 4096 adım). Eski eğitimlerle karşılaştırırken bunu belirt.
+- Her ortam ayrı bir Gazebo süreci. Eski PC'de 8 ortam birkaç GB kullanıyordu;
+  16 ortamdan önce WSL'e ayrılan belleğe bak (`free -g`; gerekirse
+  `.wslconfig` ile `memory=`).
 
 GPU ancak GPU'da paralel çalışan bir simülatöre (Isaac Lab, MuJoCo MJX gibi)
 geçilirse işe yarar. Bu, TÜBİTAK başvurusundaki Gazebo'dan sapma olur;
@@ -864,9 +872,9 @@ bağları için): torch 2.14.0 CPU, stable-baselines3 2.9.0, gymnasium 1.3.0.
 **Bilgisayarlar:**
 - **Eski PC** (1–3. oturum): Windows 11 Pro, i5-10300H (8 iş parçacığı),
   16 GB RAM (WSL'e 7 GB), GTX 1650.
-- **Yeni PC** (2026-09-26'dan sonra): RTX 5070. Diğer özellikleri bu belge
-  yazılırken bilinmiyordu; ilk oturumda `nproc`, `free -g` ile bak ve buraya
-  yaz. Kurulum §0.2'de.
+- **Yeni PC** (2026-09-26'dan sonra): **AMD Ryzen 7 7700X** (8 çekirdek /
+  16 iş parçacığı, masaüstü, Zen 4) + RTX 5070. RAM bu belge yazılırken
+  bilinmiyordu; ilk oturumda `free -g` ile bak ve buraya yaz. Kurulum §0.2'de.
 
 **Yazılım:**
 - **ROS 2: Lyrical Luth** (LTS, Mayıs 2031'e kadar), Ubuntu 26.04'ün birincil
