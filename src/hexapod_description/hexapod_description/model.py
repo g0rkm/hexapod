@@ -14,7 +14,7 @@ tutulurlar; aynalı bacaklarda y ekseni burada ters çevrilir.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from hexapod_driver.config import JOINT_NAMES, RobotConfig, Value
 from hexapod_driver.errors import ConfigError
@@ -154,6 +154,20 @@ class RobotModel:
     def total_mass(self) -> float:
         legs = sum(self.links[n].inertial.mass for n in ("coxa", "femur", "tibia"))
         return self.links["body"].inertial.mass + len(self.mounts) * legs
+
+    def with_body_mass_scale(self, scale: float) -> "RobotModel":
+        """Gövde bağlantısının kütlesi ve ataleti x scale olan kopya (ağırlık
+        merkezi ve çarpışma aynı: fark gövdeye yayılmış kabul edilir). RL alan
+        rastgeleleştirmesi için (hexapod_rl.task.Randomization.body_mass_scale);
+        robot.yaml değişmez."""
+        if scale == 1.0:
+            return self
+        if not scale > 0:
+            raise ValueError(f"kütle çarpanı pozitif olmalı: {scale}")
+        body = self.links["body"]
+        inertial = replace(body.inertial, mass=body.inertial.mass * scale,
+                           inertia=tuple(v * scale for v in body.inertial.inertia))
+        return replace(self, links={**self.links, "body": replace(body, inertial=inertial)})
 
 
 def _links(raw: dict) -> dict[str, LinkModel]:

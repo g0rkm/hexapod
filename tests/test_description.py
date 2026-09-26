@@ -101,3 +101,19 @@ def test_ters_limit_reddedilir(tmp_path):
 
     with pytest.raises(ConfigError):
         RobotModel.from_config(config_with(tmp_path, edit))
+
+
+def test_govde_kutlesi_olceklenir(model):
+    """RL kütle rastgeleleştirmesi: yalnız gövde, kütle ve atalet birlikte; robot.yaml'a dokunmaz."""
+    heavy = model.with_body_mass_scale(1.5)
+    body, base = heavy.links["body"], model.links["body"]
+    assert body.inertial.mass == pytest.approx(1.5 * base.inertial.mass)
+    assert body.inertial.inertia == pytest.approx(tuple(1.5 * v for v in base.inertial.inertia))
+    assert body.inertial.com == base.inertial.com and body.boxes == base.boxes
+    for name in ("coxa", "femur", "tibia"):
+        assert heavy.links[name] == model.links[name]
+    assert heavy.total_mass() == pytest.approx(model.total_mass() + 0.5 * base.inertial.mass)
+    assert model.links["body"] is base                      # asıl model değişmedi
+    assert model.with_body_mass_scale(1.0) is model
+    with pytest.raises(ValueError):
+        model.with_body_mass_scale(0.0)

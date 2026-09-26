@@ -15,7 +15,9 @@ kurar): SubprocVecEnv([make_env(i) for i in range(8)]).
 Alan rastgeleleştirme (TaskConfig.randomization, varsayılan kapalı): her
 bölüm başında servo gücü/sertliği ve komut gecikmesi çekilir; bölüm boyunca
 rastgele aralıklarla gövde yandan itilir; gözlemdeki IMU değerlerine gürültü
-eklenir. Çekilen değerler reset()'in info'sunda ("dynamics").
+eklenir. Çekilen değerler reset()'in info'sunda ("dynamics"). Gövde kütlesi
+ortam başına sabit (body_mass_scale; train.py ortamlara task.body_mass_scales
+ile dağıtır).
 """
 
 from __future__ import annotations
@@ -52,14 +54,18 @@ class HexapodEnv(gym.Env):
 
     def __init__(self, task: TaskConfig | None = None, physics_step: float = 0.002,
                  config_path: str | Path | None = None, workdir: Path | None = None,
-                 terrain_sdf: str = "", terrain_height: TerrainHeight | None = None) -> None:
+                 terrain_sdf: str = "", terrain_height: TerrainHeight | None = None,
+                 body_mass_scale: float = 1.0) -> None:
         """terrain_sdf: düz zeminin yerine geçen statik <model> SDF parçası (S5'in
         zemin üreteci; boşsa düz zemin); terrain_height(x, y): aynı zeminin üst
-        yüzeyinin z'si, m (ikisi birlikte). Kısıtlar HexapodSim açıklamasında."""
+        yüzeyinin z'si, m (ikisi birlikte). Kısıtlar HexapodSim açıklamasında.
+        body_mass_scale: gövde kütlesi (ve ataleti) bu çarpanla; bu ortamın
+        ömrü boyunca sabit (task.body_mass_scales)."""
         super().__init__()
         self.task = task or TaskConfig()
         config = RobotConfig.load(config_path)
-        model = RobotModel.from_config(config)
+        model = RobotModel.from_config(config).with_body_mass_scale(body_mass_scale)
+        self.body_mass_scale = body_mass_scale
         self.sim = HexapodSim(model, physics_step=physics_step, workdir=workdir,
                               terrain_sdf=terrain_sdf, terrain_height=terrain_height)
         self.dt = self.sim.dt
@@ -148,7 +154,7 @@ class HexapodEnv(gym.Env):
         if r is None:
             self.sim.set_servo(1.0, 1.0)
             self.sim.latency_steps = 0
-            self.dynamics = {}
+            self.dynamics = {"body_mass_scale": self.body_mass_scale}
             return
         u = self.np_random.uniform
         strength, stiffness = float(u(*r.servo_strength)), float(u(*r.servo_stiffness))
@@ -156,7 +162,8 @@ class HexapodEnv(gym.Env):
         latency = int(round(u(*r.latency_ms) / 1000.0 / self.sim.physics_step))
         self.sim.latency_steps = min(latency, self.sim.steps_per_action - 1)
         self.dynamics = {"servo_strength": strength, "servo_stiffness": stiffness,
-                         "latency_ms": self.sim.latency_steps * self.sim.physics_step * 1000.0}
+                         "latency_ms": self.sim.latency_steps * self.sim.physics_step * 1000.0,
+                         "body_mass_scale": self.body_mass_scale}
 
     def _push_gap(self) -> float:
         """Bir sonraki itmeye kadar kontrol adımı (rastgeleleştirme kapalıysa hiç)."""
@@ -174,11 +181,12 @@ class HexapodEnv(gym.Env):
 
 
 def make_env(rank: int, task: TaskConfig | None = None, physics_step: float = 0.002,
-             terrain_sdf: str = "", terrain_height: TerrainHeight | None = None):
+             terrain_sdf: str = "", terrain_height: TerrainHeight | None = None,
+             body_mass_scale: float = 1.0):
     """SubprocVecEnv için fabrika; her süreç kendi Gazebo dünyasını kurar."""
     def _init():
         env = HexapodEnv(task=task, physics_step=physics_step, terrain_sdf=terrain_sdf,
-                         terrain_height=terrain_height)
+                         terrain_height=terrain_height, body_mass_scale=body_mass_scale)
         env.reset(seed=rank)
         return env
     return _init

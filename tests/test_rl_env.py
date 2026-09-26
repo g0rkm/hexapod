@@ -253,3 +253,21 @@ def test_en_iyi_ara_kayit_saklanir(tmp_path):
     assert len(rows) == 2 and len(rows[0]) == 3 + 3             # adım, skor, devrilen + 3 komut
     assert (tmp_path / "best_model.zip").stat().st_mtime_ns == stamp
     assert cb.best_step == 0
+
+
+def test_agir_govde_servolari_daha_cok_yukler(tmp_path_factory):
+    """Kütle rastgeleleştirmesi fiziğe gerçekten giriyor: aynı duruşu tutmak için
+    servolar ağır gövdede daha çok tork uygular (gövde 0.70 -> 1.12 kg, robot
+    2.13 -> 2.55 kg: +%20); ortamın dynamics bilgisi çarpanı söyler."""
+    loads = []
+    for scale in (1.0, 1.6):
+        e = HexapodEnv(workdir=tmp_path_factory.mktemp(f"kutle{scale}"), body_mass_scale=scale)
+        try:
+            _, info = e.reset(seed=0)
+            assert info["dynamics"]["body_mass_scale"] == scale
+            for _ in range(50):
+                e.step(np.zeros(18, dtype=np.float32))
+            loads.append(sum(abs(t) for t in e._state.joint_effort))
+        finally:
+            e.close()
+    assert loads[1] > 1.1 * loads[0]

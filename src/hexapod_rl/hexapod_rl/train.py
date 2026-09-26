@@ -8,7 +8,8 @@
 eder (ödül değişince yeniden öğrenmek yerine uyum sağlasın diye). PPO'nun
 ayarları o modelden gelir; yalnızca ortam ve günlük yeni. Taklit ile
 başlatılmış model de böyle verilir (pretrain.py). --randomize: alan
-rastgeleleştirme açık (task.Randomization; servo, gecikme, itme, IMU gürültüsü).
+rastgeleleştirme açık (task.Randomization; servo, gecikme, itme, IMU gürültüsü;
+gövde kütlesi ortamlara eşit dağıtılır, task.body_mass_scales).
 --power-weight: ödülün güç cezası ağırlığını (W başına) bu eğitim için
 değiştirir; varsayılan ödül (task.TaskConfig) değişmez. Enerji deneyleri için.
 --std: keşif gürültüsünü (eylem biriminde) kurar; devam eğitiminde
@@ -112,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 
     from .env import make_env
-    from .task import TaskConfig, task_from_flags
+    from .task import TaskConfig, body_mass_scales, task_from_flags
 
     parser = argparse.ArgumentParser(description="Hexapod PPO eğitimi")
     parser.add_argument("--steps", type=int, default=1_000_000)
@@ -145,8 +146,9 @@ def main(argv: list[str] | None = None) -> int:
         weights["power"] = args.power_weight
     task = task_from_flags(args.residual, args.omni, args.randomize, w=weights)
     eval_task = task_from_flags(args.residual, args.omni)   # ölçüm: rastgeleleştirmesiz
-    venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task)
-                                     for i in range(args.envs)],
+    masses = body_mass_scales(args.envs, task)   # ortam başına gövde kütlesi çarpanı
+    venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task, body_mass_scale=m)
+                                     for i, m in enumerate(masses)],
                                     start_method="fork"))
     if args.init_from:
         model = PPO.load(args.init_from, env=venv, device="cpu", seed=args.seed)
@@ -168,7 +170,8 @@ def main(argv: list[str] | None = None) -> int:
         f"learning_rate: {model.learning_rate}\ntarget_kl: {model.target_kl}\n"
         f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\nstd: {args.std}\n"
         f"power_weight: {task.w['power']}\naction_mode: {task.action_mode}\n"
-        f"omni: {args.omni}\nenvs: {args.envs}\n",
+        f"omni: {args.omni}\nenvs: {args.envs}\n"
+        f"body_mass_scales: {[round(m, 3) for m in masses]}\n",
         encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt

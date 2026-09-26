@@ -305,3 +305,15 @@ def test_komut_buyuklugu_sabit_eksenleri_saymaz():
 
     cfg = TaskConfig()                                  # yalnız ileri: vy, wz sabit 0
     assert command_fraction((0.05, 0.3, 1.0), cfg) == pytest.approx(1 / 3)
+
+
+def test_govde_kutlesi_ortamlara_esit_dagitilir():
+    from hexapod_rl.task import Randomization, body_mass_scales
+
+    assert body_mass_scales(4, TaskConfig()) == [1.0] * 4        # rastgeleleştirme kapalı
+    r = Randomization()
+    s = body_mass_scales(16, TaskConfig(randomization=r))
+    lo, hi = r.body_mass_scale
+    assert len(s) == 16 and s == sorted(s)
+    assert lo < s[0] < s[-1] < hi
+    assert sum(s) / 16 == pytest.approx((lo + hi) / 2)

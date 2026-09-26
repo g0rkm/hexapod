@@ -37,7 +37,7 @@ import numpy as np
 
 from .demo import TripodDemo
 from .evaluate import eval_commands, evaluate_set, format_result
-from .task import ACTION_SIZE, OBS_SIZE, task_from_flags
+from .task import ACTION_SIZE, OBS_SIZE, body_mass_scales, task_from_flags
 
 
 def demo_for(env) -> TripodDemo:
@@ -63,8 +63,8 @@ def _collect(job) -> list[dict]:
     """Bir işçi süreç: kendi Gazebo'suyla verilen tohumlardaki bölümleri koşar."""
     from .env import HexapodEnv
 
-    seeds, noise, gamma, tail, task = job
-    env = HexapodEnv(task=task)
+    seeds, noise, gamma, tail, task, mass = job
+    env = HexapodEnv(task=task, body_mass_scale=mass)
     demo = demo_for(env)
     episodes = []
     for seed in seeds:
@@ -215,7 +215,9 @@ def main(argv: list[str] | None = None) -> int:
     tail = int(round(3 / (1 - gamma)))    # getirinin %95'i bu kadar adımda birikir
     seeds = [args.seed * 1000 + i for i in range(args.episodes)]
     task = task_from_flags(args.residual, args.omni, args.randomize)
-    jobs = [(seeds[i::args.workers], args.noise, gamma, tail, task) for i in range(args.workers)]
+    masses = body_mass_scales(args.workers, task)   # işçi başına gövde kütlesi
+    jobs = [(seeds[i::args.workers], args.noise, gamma, tail, task, masses[i])
+            for i in range(args.workers)]
     t0 = time.time()
     with multiprocessing.get_context("fork").Pool(args.workers) as pool:
         episodes = [ep for part in pool.map(_collect, jobs) for ep in part]

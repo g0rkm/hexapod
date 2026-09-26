@@ -86,8 +86,9 @@ sim.py'deki terrain_height). Düz zeminde ödül değişmedi.
 
 Alan rastgeleleştirme (G7): Randomization, bölüm başında env.py çeker;
 TaskConfig.randomization None ise kapalı (değerlendirmenin varsayılanı).
-Zemin ve sürtünme S5'in (Samet) dünyalarıyla gelecek; kütle dünyanın
-yeniden kurulmasını gerektirdiği için henüz yok.
+Zemin ve sürtünme S5'in (Samet) dünyalarıyla gelecek. Gövde kütlesi
+dünyanın yeniden kurulmasını gerektirdiği için bölüm başına değil ortam
+başına (body_mass_scales; 2026-09-26).
 """
 
 from __future__ import annotations
@@ -167,6 +168,17 @@ def task_from_flags(residual: bool = False, omni: bool = False,
     return TaskConfig(**kwargs)
 
 
+def body_mass_scales(n: int, cfg: TaskConfig) -> list[float]:
+    """n paralel ortama gövde kütlesi çarpanları: rastgeleleştirme açıksa
+    aralık n eşit dilime bölünür, her ortam kendi diliminin ortasını alır
+    (her eğitimde aynı kapsama); kapalıysa hepsi 1."""
+    r = cfg.randomization
+    if r is None:
+        return [1.0] * n
+    lo, hi = r.body_mass_scale
+    return [lo + (hi - lo) * (i + 0.5) / n for i in range(n)]
+
+
 def command_fraction(command, cfg: TaskConfig) -> float:
     """Komutun büyüklüğü, her eksen kendi aralığının en uç değerine bölünerek
     (0..1); eğitimde sabit tutulan (genişliği 0) eksenler sayılmaz."""
@@ -209,6 +221,14 @@ class Randomization:
     push_every_s: tuple[float, float] = (2.0, 5.0)     # itmeler arası
     gyro_noise: float = 0.05       # rad/s, gözlemdeki jiroskop gürültüsü (std)
     gravity_noise: float = 0.02    # gözlemdeki yerçekimi yönü, bileşen başına (std)
+    # Gövde kütlesi çarpanı (2026-09-26). Bölüm başında değil, ORTAM başına:
+    # kütle dünya kurulurken URDF'e yazılıyor, gz.sim Python'dan sonradan
+    # değiştirilemiyor. train.py ortamlara aralığı eşit dağıtır
+    # (body_mass_scales). Gövde CAD tahmini 0.70 kg (PETG ~0.30 + elektronik
+    # 0.40, tek batarya ve tek buck varsayımıyla). Üst uç: faturadaki ikinci
+    # batarya (~160 g), iki buck daha (~180 g) ve kapak (43 g) de üstündeyse
+    # +0.38 kg = x1.55, dolgu 0.7 ise ~x1.6. Alt uç: dolgu 0.5 ise ~x0.9.
+    body_mass_scale: tuple[float, float] = (0.9, 1.6)
 
 
 class VelocityFilter:

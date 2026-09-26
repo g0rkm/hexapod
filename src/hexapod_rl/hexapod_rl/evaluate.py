@@ -57,17 +57,19 @@ def _yaw(q) -> float:
 
 def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123,
              noise: float = 0.0, task=None, terrain_sdf: str = "",
-             terrain_height=None, vy: float = 0.0, wz: float = 0.0, env=None) -> dict:
+             terrain_height=None, vy: float = 0.0, wz: float = 0.0, env=None,
+             body_mass_scale: float = 1.0) -> dict:
     """env: yeniden kullanılacak bir HexapodEnv (eğitimde ara kayıt seçimi her
-    seferinde Gazebo kurmasın diye); verilirse task/terrain yok sayılır ve
-    kapatılmaz."""
+    seferinde Gazebo kurmasın diye); verilirse task/terrain/kütle yok sayılır
+    ve kapatılmaz."""
     import numpy as np
 
     from .env import HexapodEnv
 
     own = env is None
     if own:
-        env = HexapodEnv(task=task, terrain_sdf=terrain_sdf, terrain_height=terrain_height)
+        env = HexapodEnv(task=task, terrain_sdf=terrain_sdf, terrain_height=terrain_height,
+                         body_mass_scale=body_mass_scale)
     obs, _ = env.reset(seed=seed, options={"command": (vx, vy, wz)})
     if hasattr(model, "reset"):   # iç durumu olan denetleyici (baseline.TripodPolicy)
         model.reset()
@@ -134,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--randomize", action="store_true", help="alan rastgeleleştirme açık")
     parser.add_argument("--residual", action="store_true",
                         help="politika artık eylem modunda (tripod + düzeltme)")
+    parser.add_argument("--mass", type=float, default=1.0,
+                        help="gövde kütlesi çarpanı (eğitim aralığı task.Randomization)")
     parser.add_argument("--seed", type=int, default=123)
     args = parser.parse_args(argv)
     if args.model == "tripod":
@@ -144,7 +148,8 @@ def main(argv: list[str] | None = None) -> int:
     from .task import task_from_flags
     task = task_from_flags(args.residual, randomize=args.randomize)
     print(format_result(evaluate(model, args.seconds, args.vx, seed=args.seed,
-                                 noise=args.noise, task=task, vy=args.vy, wz=args.wz)))
+                                 noise=args.noise, task=task, vy=args.vy, wz=args.wz,
+                                 body_mass_scale=args.mass)))
     return 0
 
 
