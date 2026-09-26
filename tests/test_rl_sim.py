@@ -202,3 +202,24 @@ def test_surec_ici_dunya_ayri_gz_bolumunde(sim):
 
     from hexapod_rl.sim import PARTITION_PREFIX
     assert os.environ["GZ_PARTITION"] == f"{PARTITION_PREFIX}{os.getpid()}"
+
+
+def test_kapatinca_gazebo_birakilir(model, tmp_path):
+    """close() sunucuyu bırakmalı: aynı süreçte kur/kapat tekrarlanınca iş
+    parçacığı sayısı büyümemeli. Düzeltmeden önce her dünya 2 iş parçacığı ve
+    ~31 MB bırakıyordu (eğitim içi zemin ölçümü süreçte onlarca dünya kurar)."""
+    import gc
+    import os
+
+    def threads() -> int:
+        return len(os.listdir(f"/proc/{os.getpid()}/task"))
+
+    counts = []
+    for i in range(4):
+        s = HexapodSim(model, workdir=tmp_path / f"w{i}")
+        s.reset()
+        s.close()
+        del s
+        gc.collect()
+        counts.append(threads())
+    assert counts[-1] <= counts[1], counts

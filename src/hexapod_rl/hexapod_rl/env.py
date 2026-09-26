@@ -138,6 +138,11 @@ class HexapodEnv(gym.Env):
                 "base_pos": state.base_pos, "foot_contact": state.foot_contact}
         return self._obs(), float(r), fell, self._steps >= self.max_steps, info
 
+    def close(self) -> None:
+        """Gazebo dünyasını bırak (HexapodSim.close)."""
+        self.sim.close()
+        super().close()
+
     def _obs(self) -> np.ndarray:
         obs = np.asarray(observation(self._state, self._command, self._phase, self.default,
                                      self.task.action_scale), dtype=np.float32)

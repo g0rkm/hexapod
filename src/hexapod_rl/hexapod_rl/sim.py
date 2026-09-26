@@ -229,6 +229,17 @@ class HexapodSim:
                          for t, lim in zip(targets, self._limits)]
         return self._advance(self.steps_per_action)
 
+    def close(self) -> None:
+        """Gazebo sunucusunu bırak. Geri çağrılar (bound method) fixture'ın C++
+        tarafında tutulduğu için Python'un çöp toplayıcısı döngüyü göremiyor;
+        referansları elle kesmezsek her dünya ~31 MB ve 2 iş parçacığı olarak
+        süreçte kalıyor (ölçüldü, 2026-09-26)."""
+        self._joints = None
+        self._base = None
+        self._tibias = []
+        self._server = None
+        self._fixture = None
+
     @property
     def workdir(self) -> Path:
         return self._dir
