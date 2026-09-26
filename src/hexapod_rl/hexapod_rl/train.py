@@ -9,6 +9,8 @@ eder (ödül değişince yeniden öğrenmek yerine uyum sağlasın diye). PPO'nu
 ayarları o modelden gelir; yalnızca ortam ve günlük yeni. Taklit ile
 başlatılmış model de böyle verilir (pretrain.py). --randomize: alan
 rastgeleleştirme açık (task.Randomization; servo, gecikme, itme, IMU gürültüsü).
+--power-weight: ödülün güç cezası ağırlığını (W başına) bu eğitim için
+değiştirir; varsayılan ödül (task.TaskConfig) değişmez. Enerji deneyleri için.
 --std: keşif gürültüsünü (eylem biriminde) kurar; devam eğitiminde
 gürültüyü küçültmek için (gSDE'li modelde desteklenmez).
 --lr, --target-kl: modelden gelen ayarların üstüne yazar. Neden (2026-09-26):
@@ -61,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lr", type=float, default=None, help="öğrenme hızı (modeldekini ezer)")
     parser.add_argument("--target-kl", type=float, default=None,
                         help="güncelleme KL'si bunu aşınca dönemleri kes")
+    parser.add_argument("--power-weight", type=float, default=None,
+                        help="güç cezası ağırlığı, W başına (varsayılan: TaskConfig)")
     parser.add_argument("--std", type=float, default=None,
                         help="keşif gürültüsü std'si (eylem birimi; modeldekini ezer)")
     parser.add_argument("--init-from", type=Path, default=None,
@@ -71,7 +75,11 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(1)  # paralellik süreçlerde; torch'un iş parçacıkları yarışmasın
 
-    task = TaskConfig(randomization=Randomization()) if args.randomize else TaskConfig()
+    weights = dict(TaskConfig().w)
+    if args.power_weight is not None:
+        weights["power"] = args.power_weight
+    task = TaskConfig(w=weights,
+                      randomization=Randomization() if args.randomize else None)
     venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task)
                                      for i in range(args.envs)],
                                     start_method="fork"))
@@ -93,7 +101,8 @@ def main(argv: list[str] | None = None) -> int:
             model.policy.log_std.fill_(math.log(args.std))
     (out / "ayarlar.txt").write_text(
         f"learning_rate: {model.learning_rate}\ntarget_kl: {model.target_kl}\n"
-        f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\nstd: {args.std}\n",
+        f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\nstd: {args.std}\n"
+        f"power_weight: {task.w['power']}\n",
         encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
