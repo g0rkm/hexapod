@@ -9,10 +9,77 @@ kayda değer modeller tutulur.
 Değerlendirmek için (WSL, ortam: `tools/wsl/rl_kurulum.sh`):
 
 ```bash
-python -m hexapod_rl.evaluate models/ppo_v4_4M/model.zip --vx 0.1
+python -m hexapod_rl.evaluate models/ppo_omni_250k/model.zip --residual --vx -0.1   # geri
+python -m hexapod_rl.evaluate models/ppo_omni_250k/model.zip --residual --vx 0 --wz 0.4
 python -m hexapod_rl.evaluate models/ppo_v4_4M/model.zip --vx 0.1 --noise 0.1
 python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Samet'in tripod'u
+python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip:residual
 ```
+
+## Her yöne yürüyüş — `ppo_omni_250k` (2026-09-26 öğlen, yeni PC)
+
+Politika artık ileri/geri (vx ±0.15), yana (vy ±0.08) ve dönüş (wz ±0.5)
+komutlarının hepsini görüyor (`--omni`). Artık eylem modu, ödül v6,
+rastgeleleştirme açık; 16 ortam. En iyi ara kayıt otomatik seçildi
+(`best_model.zip`: her ara kayıtta yedi komutluk deterministik ölçüm).
+Robotta: `policy.npz` sözleşmesinde her yön aralıkları ve ölü bölge (1/6)
+var; düğüm sıfıra yakın komutta ayakta bekler, geri/yana/dönüşte yürür
+(`tests/test_policy_sim.py`, robottaki denetleyiciyle Gazebo'da).
+
+Ölçüm koşulları: düz zemin, 10 s, deterministik, hiçbiri devrilmedi. Her yön
+seti: (0.1,0,0), (−0.1,0,0), (0,±0.06,0), (0,0,±0.4), (0.1,0.04,0.25).
+
+| Model | Her yön seti ortalama ödül | İleri 0.05/0.10/0.15 ödül | Yön (ileri) | Güç 0.10 | Rastgeleleştirmede (0.10, 3 tohum) | Eklem gürültüsü 0.05 rad | Gövde ×1.6 |
+|---|---|---|---|---|---|---|---|
+| tripod (Samet) | 2.848 | 2.83 / 3.22 / 3.57 | ~0° | 1.9 W | 3.08–3.21 | 1.46 (0.067 m/s) | 3.22 |
+| PhaseTripod (düzeltme 0) | 2.846 | 2.80 / 3.20 / 3.58 | ≤2° | 1.9 W | 3.04–3.23 | 1.83 (0.106 m/s) | 3.22 |
+| ppo_res_250k (yalnız ileri) | 2.800 | 2.82 / 3.24 / 3.61 | +5..+12° | 2.3 W | 3.06–3.18 | 1.78 | 3.24 |
+| **ppo_omni_250k** (v10) | **2.868** | 2.82 / **3.25 / 3.64** | −2..−4° | 2.0 W | 3.07–3.24 | **1.84** (0.114 m/s) | **3.25** |
+| v11_omni 750k (std 0.05) | 2.850 | 2.83 / 3.23 / 3.62 | ≤1° | 2.0 W | 3.07–3.24 | 1.84 | 3.25 |
+
+- Her yön politikası bütün komutları tripod kadar izliyor (gövde hızı
+  komutun %95–100'ü); ppo_res_250k ileri eğitildiği için geri/yana/dönüşte
+  geride (2.800).
+- **Düz zeminde tripod'u anlamlı geçmiyor**: ortalama +%0.7. Rastgeleleştirme
+  açıkken (3 tohum × 7 komut, deterministik) v11'in bütün ara kayıtları
+  2.566–2.581, PhaseTripod 2.580, Samet'in tripod'u 2.609. Düz zeminde
+  iyi bir tripod'un üstüne öğrenilecek çok şey yok; beklenen.
+- Eklem gürültüsünde tripod'dan açık ara iyi (1.84'e 1.46): açık döngü tripod
+  titreşimde hızının üçte birini kaybediyor.
+
+**Eğitim:** taklit `bc_omni` (128 bölüm, 16 işçi, gürültü 0.25, std 0.15) →
+PPO `v10_omni` (lr 1e-4, target_kl 0.02, std 0.15), 2.1M'de durduruldu; en
+iyi ara kayıt 250k. Deterministik skor 250k'dan sonra düştü (1M'de 2.779,
+tripod'un altı) ama eğitim ödülü %6 arttı: politika std 0.15'lik keşif
+gürültüsüne uyuyor (ders 25). İkinci deneme `v11_omni` (std 0.05, kütle
+rastgeleleştirmeli taklit `bc_omni_m`, 3M, 30 dk): düşüş yok ama tripod
+düzeyinden de çıkmadı (2.829–2.850). Kayıtlar `egitim_kayitlari/`.
+
+### Deneme zeminleri (`python -m hexapod_rl.terrain_probe`)
+
+S5'in yerine geçmez; beklenti için. Komut 0.10 m/s ileri, 10 s; hız / ödül.
+Hiçbiri devrilmedi.
+
+| Zemin | tripod | PhaseTripod | ppo_res_250k | ppo_omni_250k | v11 750k |
+|---|---|---|---|---|---|
+| düz | 0.098 / 3.22 | 0.096 / 3.20 | 0.105 / 3.24 | 0.100 / 3.25 | 0.099 / 3.23 |
+| yokuş yukarı 10° | 0.092 / 3.09 | 0.090 / 3.06 | 0.099 / 3.15 | 0.094 / 3.13 | 0.093 / 3.10 |
+| yokuş aşağı 10° | 0.100 / 3.18 | 0.100 / 3.19 | 0.108 / 3.16 | 0.102 / 3.20 | 0.102 / 3.20 |
+| yan eğim 10° | 0.098 / 3.15 | 0.097 / 3.14 | 0.105 / 3.17 | 0.100 / 3.17 | 0.099 / 3.16 |
+| yokuş yukarı 20° | 0.077 / 2.70 | 0.079 / 2.75 | **0.089 / 2.90** | 0.084 / 2.83 | 0.082 / 2.81 |
+| yokuş aşağı 20° | 0.099 / 3.02 | 0.100 / 3.03 | 0.109 / 2.94 | 0.102 / 3.02 | 0.103 / 3.02 |
+| basamak 15 mm | 0.091 / 3.05 | 0.088 / 2.99 | 0.099 / 3.15 | 0.093 / 3.05 | 0.091 / 3.02 |
+| basamak 30 mm | 0.071 / 2.46 | 0.076 / 2.62 | **0.086 / 2.79** | 0.081 / 2.71 | 0.077 / 2.63 |
+| basamak 45 mm | **0.009 / 1.45** | 0.008 / 1.40 | 0.008 / 1.38 | 0.008 / 1.39 | 0.008 / 1.40 |
+
+- Politikalar zorlaştıkça tripod'u geçiyor: 20° yokuşta ve 30 mm basamakta
+  %6–21 daha hızlı. Hiçbiri zemin görmedi; fark düzeltmelerin genel
+  sağlamlığından (ppo_res_250k'nın önü kısmen hedef hızı aşmasından).
+- **45 mm basamağı hiçbiri çıkamıyor**: tripod ayağı 25 mm kaldırıyor, ön
+  ayaklar basamağın yüzüne takılıyor. Zeminle eğitimin (S5) çözmesi
+  gereken ilk somut örnek.
+
+**Gerçek robotta DENENMEDİ.**
 
 ## Artık eylem (tripod + düzeltme) — en iyi sonuç (2026-09-26 sabah)
 

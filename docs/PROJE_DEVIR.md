@@ -6,9 +6,10 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum tamam
-> §0.5; zemine göre ayak teması §7.8)
-> · Testler: **Linux 211/211**, Windows 179 geçti + 8 atlandı (Gazebo/ROS/SB3
+> Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum §0.5;
+> zemine göre ayak teması §7.8; her yöne politika `ppo_omni_250k` §3.2;
+> kütle rastgeleleştirmesi; deneme zeminleri)
+> · Testler: **Linux 234/234**, Windows 195 geçti + 8 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -94,12 +95,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 179 geçti, 8 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 195 geçti, 8 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 211 geçti, ~30 s (kurulum günü 208).
+     Beklenen: 234 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -308,7 +309,7 @@ artık geçersiz ya da güncellendi:
 | 5 | Klasik yürüyüş (tripod) | ✅ Samet: `hexapod_gait` (S2), `hexapod_teleop` (S3) |
 | 6 | Gerçek robot sürücü düğümü (`hexapod_hardware`) | ✅ Samet (S4); yalnız dry-run, donanımda denenmedi |
 | 7 | RL ortamı (`hexapod_rl`) | ✅ (G6); tripod aynı ortamda ölçüldü |
-| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_res_250k`; zeminler S5'i bekliyor |
+| 8 | PPO eğitimi | 🔄 (G7). En iyisi `models/ppo_omni_250k` (her yöne; düz zeminde tripod'la başa baş, eğim/basamakta önde); zeminli eğitim S5'i bekliyor |
 | 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu Gazebo'da yürüdü; son G7 politikasıyla tekrar aktarılacak |
 | 10 | Pi 4'e aktarma | ⛔ donanım vardiyası (D11) |
 
@@ -340,9 +341,29 @@ zemin, ödül v6, 10 s, deterministik. Hiçbir model devrilmedi.
   - Hızlıda hafif sola yön kayması: 0.15 m/s'de 10 s'de +12°.
   - Politika yalnız **ileri 0.05–0.15 m/s** komutunu gördü. Yana, geri ve
     dönüş eğitilmedi; politika düğümü bu komutlarda ayakta bekler.
+    → §3.2'de çözüldü.
 - RL'nin tripod'u açıkça geçmesi beklenen yer zorlu zemin. Bunun için
   gerekenler: S5 (Samet) ve S6. Zemine göre ayak teması (G7) hazır
   (2026-09-26, §7.8).
+
+### 3.2 Her yöne yürüyen politika (2026-09-26 öğlen, yeni PC)
+
+`models/ppo_omni_250k`: ileri/geri, yana ve dönüş komutlarının hepsini
+görmüş artık eylem politikası. Tablolar [models/README.md](../models/README.md).
+
+- Yedi komutluk her yön setinde ortalama ödül **2.868**; tripod 2.848,
+  PhaseTripod 2.846, yalnız ileri eğitilmiş `ppo_res_250k` 2.800. Bütün
+  komutları %95–100 izliyor. Hiçbiri devrilmedi.
+- Robottaki denetleyiciyle (düğüm çekirdeği) Gazebo'da geri, yana ve
+  dönüşte yürüyor; sıfır komutta ayakta bekliyor (`tests/test_policy_sim.py`).
+- **Düz zeminde tripod'u anlamlı geçmiyor** (+%0.7). Rastgeleleştirme
+  açıkken ölçünce de eşit ya da ~%1 geride. Düz zeminde iyi bir tripod'un
+  üstüne öğrenilecek çok şey yok.
+- Eklem gürültüsünde açık ara önde: 1.84'e 1.46.
+- **Deneme zeminleri** (`terrain_probe`, zemin görmeden): 20° yokuşta ve
+  30 mm basamakta politikalar tripod'dan %6–21 hızlı. **45 mm basamağı
+  hiçbiri çıkamıyor**: ayak 25 mm kalkıyor. Zeminli eğitimin çözmesi
+  gereken ilk somut örnek.
 
 ---
 
@@ -738,7 +759,7 @@ Python bağları, TestFixture).
 | Duruş | ayak erişimi 130 mm, gövde yüksekliği 100 mm |
 | Adım saati | 1.5 Hz; ilk yarıda tripod grubu 0 havada |
 | Bölüm | 20 s (+1 s yerleşme); devrilme: gövde < 45 mm ya da > 45° yatık |
-| Komut aralığı | vx 0.05–0.15 m/s, vy = wz = 0 (şimdilik yalnız ileri) |
+| Komut aralığı | Varsayılan: vx 0.05–0.15 m/s, vy = wz = 0 (yalnız ileri). `--omni` (`OMNI_COMMANDS`, 2026-09-26): vx ±0.15, vy ±0.08 m/s, wz ±0.5 rad/s; her bileşen %50 sıfırlanır, aralığın 1/3'ünden küçük komut çekilmez (`sample_command`) |
 
 Ödül (şimdiki: v6, `TaskConfig.w`):
 - lin_vel 1.0 × exp(−(hız hatası/0.05)²)
@@ -760,7 +781,14 @@ aralıklar.
 - Komut gecikmesi 0–18 ms.
 - 2–5 s'de bir 0–4 N yatay itme.
 - IMU gürültüsü.
-- Kütle ve sürtünme yok (§13).
+- **Gövde kütlesi ×0.9–1.6** (2026-09-26). Bölüm başına değil **ortam
+  başına**: kütle dünya kurulurken URDF'e yazılıyor, gz.sim Python'dan
+  sonradan değiştirilemiyor. `task.body_mass_scales` aralığı ortamlara eşit
+  dağıtır (16 ortamda 0.92…1.58). Gerekçe: gövde CAD tahmini 0.70 kg (tek
+  batarya, tek buck varsayımı); faturadaki ikinci batarya, iki buck daha ve
+  kapak da üstündeyse +0.38 kg. Robot toplamı 2.06–2.55 kg. Değerlendirme:
+  `evaluate --mass 1.4`.
+- Sürtünme yok: düz zeminde etkisiz ölçüldü, eğimle (S5) anlamlı.
 
 **Ortam (`env.py`, `HexapodEnv`):** Gymnasium. `make_env(rank, task,
 terrain_sdf=..., terrain_height=...)`, `SubprocVecEnv` ile.
@@ -773,23 +801,35 @@ taklit eder.
 - `--sde`: gSDE; bu kurulumda bozuldu (§12.24).
 
 **Eğitim (`train.py`):**
-- `--steps --envs --name --init-from --randomize --residual --lr --target-kl
-  --std --power-weight`.
-- Çıktılar `~/hexapod_runs/<ad>/`: model.zip, checkpoints/ (250k'da bir),
-  progress.csv, ayarlar.txt, degerlendirme.txt.
+- `--steps --envs --name --init-from --randomize --residual --omni --lr
+  --target-kl --std --power-weight`. Görev ayarı bayraklardan
+  `task.task_from_flags` ile kurulur (train, pretrain, export aynı yol).
+- Çıktılar `~/hexapod_runs/<ad>/`: model.zip (son), **best_model.zip**,
+  checkpoints/ (250k'da bir), progress.csv, ara_degerlendirme.csv,
+  ayarlar.txt, degerlendirme.txt.
+- **En iyi ara kayıt otomatik** (2026-09-26): her ara kayıtta politika
+  deterministik ölçülür (düz zemin, rastgeleleştirmesiz, 10 s;
+  `evaluate.eval_commands`: ileri modelde 0.05/0.10/0.15, her yön modelinde
+  yedi komut). Adım başı ödül ortalaması en yüksek olan `best_model.zip`.
+  Ölçüm tek bir ortamı yeniden kullanır; sonucu yeni ortamdakiyle aynı
+  (test).
 
 **Değerlendirme (`evaluate.py`):**
-- `python -m hexapod_rl.evaluate <zip|tripod> [--vx] [--noise] [--randomize]
-  [--residual] [--seed]`.
+- `python -m hexapod_rl.evaluate <zip|tripod> [--vx] [--vy] [--wz] [--noise]
+  [--randomize] [--residual] [--seed]`.
 - Ölçtükleri: hız, yön sapması, adım başı ödül, mekanik güç, devrilme,
-  ritim.
+  ritim; gövde çerçevesinde ortalama vx/vy ve açılmış dönüş hızı (yana ve
+  dönüş komutlarında komutla karşılaştırmak için).
+- `evaluate_set(model, komutlar, env=...)`: aynı ortamda birkaç komut.
 - `tripod`, Samet'in `TripodGait`'ini ölçer (`baseline.py`).
 - Gürültü eylem biriminde: artık eylemde aynı eklem gürültüsü için ×2.5
   (0.1 mutlak = 0.25 artık = 0.05 rad).
 
-**Aktarma (`export.py`):** `python -m hexapod_rl.export <zip> [--residual]`
-→ `policy.npz` (aktör ağı + sözleşme). Aktarım SB3 çıktısıyla karşılaştırılarak
-doğrulanır.
+**Aktarma (`export.py`):** `python -m hexapod_rl.export <zip> [--residual]
+[--omni]` → `policy.npz` (aktör ağı + sözleşme). Aktarım SB3 çıktısıyla
+karşılaştırılarak doğrulanır. `--omni`'de sözleşmeye ölü bölge
+(`command_deadband` = 1/6) yazılır: komut bunun altındaysa düğüm ayakta
+bekler.
 
 **En iyi modelin tarifi (`ppo_res_250k`):**
 
@@ -803,9 +843,25 @@ python -m hexapod_rl.train --steps 3000000 --envs 8 --name v9_res --randomize --
 
 En iyi sonucu 250k ara kaydı verdi; uzun eğitimde hedef hızı aşmaya kayıyor.
 
+**Her yön modelinin tarifi (`ppo_omni_250k`, yeni PC, 16 ortam):**
+
+```bash
+python -m hexapod_rl.pretrain --name bc_omni --episodes 128 --workers 16 --noise 0.25 --std 0.15 --randomize --residual --omni
+```
+
+```bash
+python -m hexapod_rl.train --steps 5000000 --envs 16 --name v10_omni --randomize --residual --omni --lr 1e-4 --target-kl 0.02 --init-from ~/hexapod_runs/bc_omni/model.zip
+```
+
+2.1M'de elle durduruldu; `best_model.zip` = 250k. (Bu eğitimde kütle
+rastgeleleştirmesi henüz yoktu. std 0.05 + kütleyle tekrarı `v11_omni`:
+düşüş yok, tripod düzeyinde.) Aktarma: `python -m hexapod_rl.export
+models/ppo_omni_250k/model.zip --residual --omni`.
+
 ### 7.9 `hexapod_policy` (G8) — politika düğümü
 
-- `ros2 run hexapod_policy policy --ros-args -p policy:=models/ppo_res_250k/policy.npz [-p use_sim_time:=true]`.
+- `ros2 run hexapod_policy policy --ros-args -p policy:=models/ppo_omni_250k/policy.npz [-p use_sim_time:=true]`
+  (her yöne; yalnız ileri eğitilmiş eskisi `models/ppo_res_250k/policy.npz`).
 - Dinlediği ve yayınladığı: `/imu` + `/cmd_vel` → `/leg_controller/commands`,
   50 Hz.
 - **Torch'suz:** `mlp.py` numpy ile MLP çalıştırır. `.npz` politikanın
@@ -817,7 +873,9 @@ En iyi sonucu 250k ara kaydı verdi; uzun eğitimde hedef hızı aşmaya kayıyo
   - Güvenlik: şu durumlarda politika koşmaz, ayakta duruş yayınlanır ve adım
     saati sıfırlanır:
     - komut yok ya da 0.5 s zaman aşımı,
-    - vx eğitim aralığının yarısının altında,
+    - dur komutu: yalnız ileri eğitilmiş dosyada vx eğitim aralığının
+      alt ucunun yarısının altında; her yöne eğitilmiş dosyada komut
+      sözleşmenin ölü bölgesinde (`command_deadband`),
     - IMU yok ya da 0.2 s bayat,
     - gövde 45°'den fazla yatık.
   - Aralık dışı komut kırpılır.
@@ -831,8 +889,8 @@ En iyi sonucu 250k ara kaydı verdi; uzun eğitimde hedef hızı aşmaya kayıyo
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 179 geçti, 8 atlandı, ~4 s.
-- WSL (ROS + venv kaynaklı): 211 geçti, ~30 s (yeni PC).
+- Windows: 195 geçti, 8 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 234 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1098,6 +1156,11 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | **Artık eylem modu (`--residual`): hedef = adım saatinin tripod'u (`hexapod_policy.tripod.PhaseTripod`, eğitim ve robot aynı kod) + 0.2 rad x eylem; düzeltme cezası −0.5 x ortalama eylem karesi.** En iyi model `models/ppo_res_250k` | Mutlak modda PPO 3 kat enerji harcıyordu, güç cezası düzeltmedi. Artık eylemde eylem 0 = tripod: enerji tripod'dan ~%20 fazla; gürültüsüz ödülde tripod'u 0.10/0.15'te geçiyor, rastgeleleştirmede eşit, gürültüde önde. G7 için önerilen yol |
 | 09-26 | **Süreç içi Gazebo her süreçte ayrı gz-transport bölümünde** (`GZ_PARTITION=hexapod_rl_<pid>`) | Eğitim sürerken açılan ROS'lu simin `ros_gz_sim create` isteği eğitimin "rl" dünyasına gitti, ROS'lu simde robot doğmadı (§12.22) |
 | 09-26 | Yeni PC: Ubuntu-26.04 mevcut Ubuntu-24.04'ün yanına kuruldu, varsayılan yapıldı; eğitim `--envs 16` | 24.04'te başka veriler var ve Lyrical yok. 16 ortam 1818 adım/s, eski PC'nin 2.7 katı (§0.5) |
+| 09-26 | **Her yöne komutla eğitim** (`--omni`: vx ±0.15, vy ±0.08, wz ±0.5; bileşenler %50 sıfırlanır; aralığın 1/3'ünden küçük komut çekilmez) ve **düğümde ölü bölge** (`command_deadband` 1/6) | Robotta geri/yana/dönüş gerekiyor; sınırlar Samet'in teleop'unun, tripod bunlarda test edildi. "Dur"u politika değil düğüm karşılar |
+| 09-26 | **En iyi ara kayıt eğitim içinde otomatik** (`best_model.zip`, her ara kayıtta deterministik ölçüm) | Uzun eğitimde deterministik davranış kötüleşiyor, en iyi ara kayıt elle aranıyordu |
+| 09-26 | v10_omni (std 0.15) 2.1M'de durduruldu; `ppo_omni_250k` depoya | Deterministik skor 250k'dan sonra düştü (1M'de tripod'un altı), rastgeleleştirme açıkken de; eğitim ödülü artıyordu (ders 25). Kalan 3M boşa giderdi |
+| 09-26 | Gövde kütlesi rastgeleleştirmesi ×0.9–1.6, **ortam başına** | Faturadaki fazla batarya/buck ve kapak tahmine girmemişti; gz.sim kütleyi sonradan değiştiremediği için bölüm başına olamıyor |
+| 09-26 | Deneme zeminleri (`terrain_probe`) S5'ten ayrı, yalnız beklenti için | Plan §14-5. Zeminli eğitim ve "bitti" ölçümü S5 + S6 ile |
 | 09-26 | **Ayak teması ve gövde yüksekliği zemin yüksekliği fonksiyonuna göre** (`terrain_height(x, y)`, `terrain_sdf` ile zorunlu çift); fizik motorunun temas sensörü değil | Sensör yolu (Contact sistemi + gz.transport) tek süreci 381 → 182 adım/s yavaşlattı ve mesajlar eşzamansız (tekrarlanabilirlik bozulur). Yükseklik yolu bedava, sensörle 0–20° eğimde %97.8–98.8 uyumlu (§12.26). Yüksekliksiz zemin reddedilir: z=0 varsaymak değer uydurmak olur |
 
 ---
@@ -1267,6 +1330,23 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     "ayak 2 mm içinde ama değmiyor" (iniş/kalkış); fiziğin gördüğü temas hiç
     kaçmadı; temasta dikey boşluk en çok 0.73 mm. Deneme betiği depoda
     değil; yöntemi bu madde anlatıyor.
+27. **Süreç içi Gazebo SIGTERM'i yakalıyor.** Eğitimi durdurmak için ana
+    sürece `kill -TERM` gönderildi; 30 s sonra 17 süreç (ana + 16 ortam)
+    hâlâ çalışıyordu: gz-sim sunucusu SIGINT/SIGTERM için kendi işleyicisini
+    kuruyor. `kill -KILL` ile durdu; ara kayıtlar (250k'da bir) ve
+    progress.csv sağlam kaldı. Pratik: uzun eğitimi durdurmak gerekirse
+    `pgrep -f "name <ad>"` ile bütün süreçleri bul, `kill -KILL` gönder
+    (betik dosyasından; ders 19'daki pkill uyarısı). Sarmalayıcı betik bunu
+    hata olarak kaydeder ("EĞİTİM HATASI"), beklenen.
+28. **Düz zeminde tripod tavanı.** Her yön eğitiminde de ders 25 tekrarlandı:
+    std 0.15'le eğitim ödülü %6 artarken deterministik skor tripod'un
+    altına indi; std 0.05'le düşüş olmadı ama tripod düzeyinden de
+    çıkılmadı (±%1). Rastgeleleştirme açıkken ölçmek aynı sonucu verdi.
+    Çıkarım: düz zeminde tripod'u geçmek için daha çok eğitim anlamsız;
+    ölçülebilir kazanç eğim/basamakta (§3.2) ve eklem gürültüsünde. Ara
+    kayıt seçimi için deterministik düz zemin ölçümü şimdilik yeterli:
+    rastgeleleştirmeli ölçüm v10'da aynı sırayı verdi (250k > 2M > 1M),
+    v11'de ara kayıtlar ikisinde de gürültü düzeyinde farklı.
 
 ---
 
@@ -1299,24 +1379,20 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
    buna bakılmalı, gerekirse zemin normaline göre ölçülür.
 2. **Zeminli eğitim** (S5'i bekler). Süreç başına ayrı `terrain_sdf` +
    `terrain_height`, kolaydan zora müfredat. Robot zemine göre doğuyor.
-3. **Komut aralığı.** Politika yalnız ileri 0.05–0.15 m/s gördü.
-   - `PhaseTripod` vy ve wz'yi zaten destekliyor; artık eylem modunda taban
-     hazır.
-   - `TaskConfig.vy_range`/`wz_range` genişletilip taklit + eğitim
-     yapılmalı.
-   - Politika düğümü aralıkları `.npz`'den okur, kod değişmez.
-4. **Uzun eğitimde hedef hızı aşma** (ders 25). En iyi ara kayıt erken.
-   Seçenekler:
-   - std'yi zamanla düşürmek,
-   - deterministik değerlendirmeyle en iyi ara kaydı seçen bir
-     `EvalCallback`,
-   - daha kısa eğitim.
-5. **Hızlıda yön kayması:** 0.15 m/s'de 10 s'de +12°.
-6. **Kütle rastgeleleştirmesi yok.** Süreç başına gövde kütlesi çarpanı:
-   `RobotModel.links["body"]` ölçeklenip `HexapodSim`'e verilir. Sürtünme düz
-   zeminde etkisiz ölçüldü; eğimle anlamlı.
+3. ~~**Komut aralığı.**~~ ✅ 2026-09-26: `--omni`, `models/ppo_omni_250k`
+   (§3.2). Düğüm aralıkları ve ölü bölgeyi `.npz`'den okur.
+4. **Uzun eğitimde deterministik davranışın kötüleşmesi** (ders 25, 28).
+   En iyi ara kayıt artık otomatik seçiliyor (`best_model.zip`); std 0.05
+   düşüşü önlüyor ama iyileşme de yok. std'yi zamanla düşürmek denenmedi.
+5. **Hızlıda yön kayması:** ppo_res_250k'da 0.15 m/s'de 10 s'de +12°;
+   ppo_omni_250k'da −4°, v11'de ≤1°.
+6. ~~**Kütle rastgeleleştirmesi yok.**~~ ✅ 2026-09-26: gövde ×0.9–1.6,
+   ortam başına (`RobotModel.with_body_mass_scale`, §7.8). Sürtünme düz
+   zeminde etkisiz ölçüldü; eğimle (S5) anlamlı, o zaman eklenmeli.
 7. **G8'i son G7 politikasıyla tekrarla:** aktar, ROS'lu simde dene. Düğüm
-   modelden bağımsız, yalnız dosya değişir.
+   modelden bağımsız, yalnız dosya değişir. `ppo_omni_250k` aktarıldı ve
+   düğüm çekirdeğiyle süreç içi Gazebo'da geri/yana/dönüş doğrulandı
+   (test); ROS'lu simde denenmedi (§14-6).
 8. ROS'lu simde tork-hız doğrusu yok. gz_ros2_control hız sınırında torku
    kesiyor, RL simi doğrusal azaltıyor. Ölçülen hızlar iki simde aynı
    düzeyde; şimdilik yeterli.
@@ -1350,25 +1426,36 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 
 **Görkem'in işi G7 (PPO + alan rastgeleleştirme).** Bitti şartı: politika
 S6'nın ölçümünde tripod'u geçiyor; eğim, engebe ve kaygan zeminde ayrı ayrı
-ölçüldü. Düz zeminde bu neredeyse sağlandı (§3.1). Eksik olan zeminler.
+ölçüldü. Düz zeminde tripod'la başa baş; bu tavan (§12.28). Eksik olan
+zeminler.
 
-**S5 gelmeden yapılabilecekler (sırayla önerilen):**
+**S5 gelmeden yapılabilecekler — ilk liste bitti (2026-09-26, 4. oturum):**
 
-1. ✅ **Gerçek ayak teması** (§13.2-1). Fizik sensörü denendi, pahalı ve
-   eşzamansız çıktı; zemin yüksekliği fonksiyonuna geçildi (§12.26).
-2. **Komut aralığını genişletme** (§13.2-3).
-   - Artık eylem modunda: vy, wz, geri.
-   - Taklit (etiket 0) + PPO + değerlendirmeye yön ve yana komut.
-3. **En iyi ara kaydı otomatik seçme** (§13.2-4). Deterministik
-   değerlendirmeyle 250k'da bir ölçüp en iyisini `best_model.zip` olarak
-   kaydet.
-4. **Kütle rastgeleleştirmesi** (§13.2-6).
-5. Kendi test zeminin: basit bir eğim ya da basamak `terrain_sdf`'i ile artık
-   eylem politikasının ve tripod'un nasıl davrandığına bak. S5'in yerine
-   geçmez; beklenti oluşturur.
+1. ✅ Gerçek ayak teması: zemin yüksekliği fonksiyonu (§7.8, §12.26).
+2. ✅ Komut aralığı: her yöne (`--omni`), `models/ppo_omni_250k` (§3.2).
+3. ✅ En iyi ara kayıt otomatik (`best_model.zip`, §7.8).
+4. ✅ Kütle rastgeleleştirmesi (gövde ×0.9–1.6, ortam başına).
+5. ✅ Deneme zeminleri (`terrain_probe`): 20° yokuş ve 30 mm basamakta
+   politika önde, 45 mm basamağı kimse çıkamıyor (§3.2).
 
-**S5 gelince:** zeminli eğitim, müfredat, sonra S6 tablosu (tripod ve
-politika her zeminde) → G7 bitti → G8'i son politikayla tekrarla.
+**Sıradaki (S5 gelmeden):**
+
+6. **G8'i her yön politikasıyla tekrarla:** `ppo_omni_250k/policy.npz` ile
+   ROS'lu simde (`sim.launch.py` + politika düğümü) ileri, geri, yana,
+   dönüş; hız gz poz yayınından, sim zamanıyla (ders 23).
+7. **Zeminli eğitim altyapısı:** ortam başına farklı zemin (`make_env`'e
+   `terrain_sdf`/`terrain_height`; 16 ortama bir zemin listesi dağıtılır,
+   kütle gibi). S5 gelince yalnız liste değişir. Önce `terrain_probe`
+   zeminleriyle (eğimler + 15–60 mm basamaklar) bir deneme: 45 mm basamağı
+   öğrenebiliyor mu? Artık eylem ölçeği 0.2 rad ayağı ~30 mm daha
+   kaldırmaya yetebilir; yetmezse ölçek ya da `lift_mm` gözden geçirilir.
+   Beklenti oluşturur, S5'in yerine geçmez.
+8. Eğimde `orientation` cezası dünyaya göre (§13.2-1); zeminli eğitimde
+   gövdeyi yataya çekmeye zorluyor mu bak.
+
+**S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
+S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son
+politikayla tekrarla.
 
 **Yöntem notları (bu projede işe yarayanlar):**
 - Yeni bir ödül ya da ayar denemeden önce elle yazılmış iyi bir davranışı
@@ -1380,7 +1467,9 @@ politika her zeminde) → G7 bitti → G8'i son politikayla tekrarla.
 - Her ölçümü gürültüsüz, eklem gürültülü ve rastgeleleştirmeli ayrı raporla.
   Tabloyu `models/README.md`'ye yaz.
 - Uzun eğitimde ara kayıtları (250k'da bir) değerlendir; kötüye gidiyorsa
-  erken durdur. gSDE'de böyle oldu.
+  erken durdur. gSDE'de ve v10_omni'de böyle oldu. `ara_degerlendirme.csv`
+  bunu eğitim sürerken gösteriyor; durdurma §12.27.
+- Yeni PC'de: `--envs 16`; 3M adım ~30 dk (ara ölçümler dahil).
 
 ---
 
@@ -1437,7 +1526,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 179 geçti, 8 atlandı. WSL: 211 geçti.
+   - Windows: 195 geçti, 8 atlandı. WSL: 234 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).

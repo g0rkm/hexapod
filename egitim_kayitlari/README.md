@@ -35,3 +35,12 @@ tablolar: `models/README.md`.
 | `v8_power` | v7'den, güç cezası −0.10/W, 2M | enerji değişmedi |
 | `bc_res`, `v9_res` | artık eylem (tripod + düzeltme), 3M | en iyi ara kayıt 250k → `models/ppo_res_250k` |
 | `gece_zinciri_2026-09-26.log` | gece deneylerinin zaman çizelgesi | |
+| `hiz_testi_env8/12/16` | yeni PC hız testi: 8/12/16 ortam, 40 güncelleme turu | 1342 / 1588 / 1818 adım/s (PROJE_DEVIR §0.5) |
+| `bc_omni`, `v10_omni` | her yöne komut (`--omni`), std 0.15, 16 ortam; 2.1M'de durduruldu | en iyi ara kayıt 250k → `models/ppo_omni_250k`; sonra deterministik skor düştü (ders 25) |
+| `bc_omni_m`, `v11_omni` | her yön, std 0.05, kütle rastgeleleştirmeli, 3M | düşüş yok, tripod düzeyinde (en iyi 750k, 2.850) |
+| `omni_olcum_2026-09-26.txt` | v10/v11 ve tabanların ham ölçüm çıktısı (her yön, ileri, rastgeleleştirme, gürültü, kütle, deneme zeminleri) | tablolar `models/README.md`'de |
+
+Yeni PC'den (2026-09-26 öğlen) itibaren her eğitimde ayrıca:
+`ara_degerlendirme.csv` (her ara kayıtta deterministik ölçüm; en iyisi
+`best_model.zip` olarak saklanır) ve elle koşulan
+`ara_degerlendirme_dr*.csv` (ara kayıtların rastgeleleştirme açıkken ölçümü).
