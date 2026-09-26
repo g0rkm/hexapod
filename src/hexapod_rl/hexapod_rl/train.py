@@ -9,6 +9,10 @@ eder (ödül değişince yeniden öğrenmek yerine uyum sağlasın diye). PPO'nu
 ayarları o modelden gelir; yalnızca ortam ve günlük yeni. Taklit ile
 başlatılmış model de böyle verilir (pretrain.py). --randomize: alan
 rastgeleleştirme açık (task.Randomization; servo, gecikme, itme, IMU gürültüsü).
+--lr, --target-kl: modelden gelen ayarların üstüne yazar. Neden (2026-09-26):
+gSDE'li taklitten 3e-4 ile başlayan PPO'da güncellemeler çok büyüktü (KL
+0.06-0.23, kırpılma 0.5-0.7) ve ödül 200 bin adımda 2200'den 1570'e düştü.
+target_kl, bir güncellemedeki dönemleri KL bu değeri aşınca keser.
 
 Çıktılar ~/hexapod_runs/<ad>/ altında (OneDrive'a senkronlanmasın diye
 depoda değil): model.zip, ara kayıtlar (checkpoints/), progress.csv
@@ -51,6 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=Path.home() / "hexapod_runs")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--randomize", action="store_true", help="alan rastgeleleştirme")
+    parser.add_argument("--lr", type=float, default=None, help="öğrenme hızı (modeldekini ezer)")
+    parser.add_argument("--target-kl", type=float, default=None,
+                        help="güncelleme KL'si bunu aşınca dönemleri kes")
     parser.add_argument("--init-from", type=Path, default=None,
                         help="eğitilmiş model.zip'ten devam et")
     args = parser.parse_args(argv)
@@ -69,6 +76,14 @@ def main(argv: list[str] | None = None) -> int:
                                            encoding="utf-8")
     else:
         model = PPO("MlpPolicy", venv, device="cpu", seed=args.seed, verbose=0, **PPO_KWARGS)
+    if args.lr is not None:
+        model.learning_rate = args.lr
+        model._setup_lr_schedule()
+    if args.target_kl is not None:
+        model.target_kl = args.target_kl
+    (out / "ayarlar.txt").write_text(
+        f"learning_rate: {model.learning_rate}\ntarget_kl: {model.target_kl}\n"
+        f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\n", encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
     t0 = time.time()
