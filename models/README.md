@@ -131,6 +131,12 @@ yol (1 m, yanda 0.6 m). Kaygan yokuşta çekiş için en az μ = tan θ gerekir
   eğitimde yoktu; politika genelleşiyor. Samet'in tripod'u kaygan yokuşta
   geriye kayıp 3/3 devriliyor, politika devrilmeden tutunuyor (−0.1…−0.2 m).
 - Payı dar kaygan yokuşları (15° μ 0.3, 20° μ 0.4) kimse çıkamıyor.
+- **ROS'lu simde, robotta koşacak düğümle** (deneme zemini dünyası,
+  `terrain_probe.world_sdf` + `tools/wsl/politika_ros_olcum.sh`, 12 s):
+  `ppo_lift50_3750k` 45 mm basamakta 1.14 m (üstte, z 144 mm), 60 mm
+  basamakta 0.96 m (z 159 mm), 45 mm çukurdan geri 1.17 m; `ppo_omni_250k`
+  üçünde de 0.08–0.13 m'de takılıyor. Zemin becerisi 1 ms fizikli, ros2_control
+  servo zincirli simde de aynı.
 - **Deneme (v17):** eğitim setine kaygan eğim ve engebe eklendi
   (`TRAIN_SETS["deneme2"]`), `ppo_lift50_3750k`'dan 3M adım (49 dk, 1014
   adım/s; engebe simi ~2 kat yavaş). İyileştirmedi: engel skoru ara

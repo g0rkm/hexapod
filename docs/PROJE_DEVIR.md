@@ -9,7 +9,7 @@
 > Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum §0.5;
 > zemine göre ayak teması §7.8; her yöne politika `ppo_omni_250k` §3.2;
 > kütle rastgeleleştirmesi; zeminli eğitim `ppo_lift50_3750k` §3.3)
-> · Testler: **Linux 247/247**, Windows 206 geçti + 8 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 250/250**, Windows 208 geçti + 8 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -95,12 +95,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 206 geçti, 8 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 208 geçti, 8 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 247 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 250 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -398,7 +398,9 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
   50 mm taban 0.628. Engebe ve kaygan eğim eğitimde yoktu, politika
   genelleşiyor. Samet'in tripod'u 15° kaygan yokuşta (μ 0.3) geriye kayıp
   3/3 devriliyor; politika devrilmeden tutunuyor ama çıkamıyor (sürtünme
-  payı %10, fiziksel sınıra yakın). Payı olan kaygan yokuşu (10° μ 0.25)
+  payı %10, fiziksel sınıra yakın). ROS'lu simde gerçek düğümle de
+  45/60 mm basamağı ve çukuru çıkıyor (`ppo_omni_250k` takılıyor; §7.9).
+  Payı olan kaygan yokuşu (10° μ 0.25)
   politika 3/3 çıkıyor, tripod 0/3. Bunları da eğitime katma denemesi
   (v17) iyileştirmedi (ders 34). Tablo: models/README.
 - **Adil karşılaştırma:** Samet'in `TripodGait`'i de 50 mm adımla
@@ -944,6 +946,13 @@ models/ppo_omni_250k/model.zip --residual --omni`.
   gövde 98 mm; sıfır komutta "dur (komut ölü bölgede)", hareket 0.0 mm.
   Ölçüm aracı: `bash tools/wsl/politika_ros_olcum.sh [policy.npz]` (sim +
   düğüm + ölçüm + kapatma, kendi ROS_DOMAIN_ID/GZ_PARTITION'ı ile, ~2 dk).
+- **ROS'lu simde zemin** (2026-09-26): deneme zemini dünya dosyasına gömülür
+  (`terrain_probe.world_sdf`; ROS'lu sim düz zemine göre doğurduğu için
+  orijini z=0'da olanlar: basamak, çukur). `ppo_lift50_3750k` 12 s'de 45 mm
+  basamakta 1.14 m (üstte), 60 mm basamakta 0.96 m, 45 mm çukurdan geri
+  1.17 m; `ppo_omni_250k` üçünde de takılıyor. Kullanım:
+  `WORLD=/yol/dunya.sdf WORLD_NAME=zemin KOMUTLAR="0.1,0,0" SURE=12 bash
+  tools/wsl/politika_ros_olcum.sh models/ppo_lift50_3750k/policy.npz`.
 
 ### 7.10 Testler
 
@@ -951,8 +960,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 206 geçti, 8 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 247 geçti, ~40 s (yeni PC).
+- Windows: 208 geçti, 8 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 250 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1056,7 +1065,12 @@ bağları için): torch 2.14.0 CPU, stable-baselines3 2.9.0, gymnasium 1.3.0.
 kontrolcüleri bekler, ileri/geri/iki yana/iki dönüş/karışık/sıfır komutu
 8'er sim saniyesi verir, gövde hızını gz poz yayınından sim zamanıyla ölçer
 (ders 23; dönerken de gövde çerçevesinde doğru), Markdown tablosu basar ve
-her şeyi kapatır. Kendi `ROS_DOMAIN_ID` (57) ve `GZ_PARTITION`'ı var. Python
+her şeyi kapatır. Her koşu kendi (rastgele) `ROS_DOMAIN_ID`'sinde ve
+`GZ_PARTITION`'ında; sim ve düğüm kendi süreç gruplarında (`setsid`),
+kapatırken bütün grup öldürülür. (İlk sürüm sabit domain 57 kullanıyordu:
+arka arkaya koşularda kapanmakta olan eski `controller_manager` "aktif"
+cevabı verip yeni sim hazır olmadan ölçüm başlıyordu.) Ortam değişkenleri:
+`WORLD`, `WORLD_NAME`, `KOMUTLAR` ("vx,vy,wz;..."), `SURE`. Python
 tarafı çıkışta `os._exit` kullanır: gz.transport + rclpy birlikte kapanırken
 segfault veriyor (ölçüm bittikten sonra).
 
@@ -1674,7 +1688,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 206 geçti, 8 atlandı. WSL: 247 geçti.
+   - Windows: 208 geçti, 8 atlandı. WSL: 250 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).
