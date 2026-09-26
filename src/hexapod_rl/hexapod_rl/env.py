@@ -32,7 +32,7 @@ from hexapod_gazebo.pose import standing_pose
 from hexapod_kinematics import HexapodKinematics
 from hexapod_policy.tripod import PhaseTripod
 
-from .sim import HexapodSim
+from .sim import HexapodSim, TerrainHeight
 from .task import (
     ACTION_SIZE,
     OBS_SIZE,
@@ -51,15 +51,16 @@ class HexapodEnv(gym.Env):
 
     def __init__(self, task: TaskConfig | None = None, physics_step: float = 0.002,
                  config_path: str | Path | None = None, workdir: Path | None = None,
-                 terrain_sdf: str = "") -> None:
+                 terrain_sdf: str = "", terrain_height: TerrainHeight | None = None) -> None:
         """terrain_sdf: düz zeminin yerine geçen statik <model> SDF parçası (S5'in
-        zemin üreteci; boşsa düz zemin). Kısıtlar HexapodSim açıklamasında."""
+        zemin üreteci; boşsa düz zemin); terrain_height(x, y): aynı zeminin üst
+        yüzeyinin z'si, m (ikisi birlikte). Kısıtlar HexapodSim açıklamasında."""
         super().__init__()
         self.task = task or TaskConfig()
         config = RobotConfig.load(config_path)
         model = RobotModel.from_config(config)
         self.sim = HexapodSim(model, physics_step=physics_step, workdir=workdir,
-                              terrain_sdf=terrain_sdf)
+                              terrain_sdf=terrain_sdf, terrain_height=terrain_height)
         self.dt = self.sim.dt
 
         pose = standing_pose(HexapodKinematics.from_config(config),
@@ -174,10 +175,11 @@ class HexapodEnv(gym.Env):
 
 
 def make_env(rank: int, task: TaskConfig | None = None, physics_step: float = 0.002,
-             terrain_sdf: str = ""):
+             terrain_sdf: str = "", terrain_height: TerrainHeight | None = None):
     """SubprocVecEnv için fabrika; her süreç kendi Gazebo dünyasını kurar."""
     def _init():
-        env = HexapodEnv(task=task, physics_step=physics_step, terrain_sdf=terrain_sdf)
+        env = HexapodEnv(task=task, physics_step=physics_step, terrain_sdf=terrain_sdf,
+                         terrain_height=terrain_height)
         env.reset(seed=rank)
         return env
     return _init

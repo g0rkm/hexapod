@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 
@@ -120,25 +122,65 @@ def test_alan_rastgelelestirme(tmp_path_factory):
         e.close()
 
 
-def test_zemin_sdf_ile_kurulur(tmp_path_factory):
-    """S5'in zeminleri buradan girer: düz zemin yerine verilen statik model.
-    Burada üst yüzü z=0'da bir kutu (düzlem değil): robot üstünde ~100 mm durmalı."""
-    terrain = """<model name="ground">
+def _box_ground(top_z: float, pitch: float = 0.0) -> str:
+    """Üst yüzü orijinden geçen (+top_z), y ekseni etrafında pitch kadar eğik kutu.
+    pitch > 0: zemin +x yönünde alçalır, yüzey z = top_z - tan(pitch) x."""
+    cx, cz = -0.1 * math.sin(pitch), top_z - 0.1 * math.cos(pitch)
+    return f"""<model name="ground">
       <static>true</static>
       <link name="link">
         <collision name="collision">
-          <pose>0 0 -0.05 0 0 0</pose>
-          <geometry><box><size>4 4 0.1</size></box></geometry>
+          <pose>{cx} 0 {cz} 0 {pitch} 0</pose>
+          <geometry><box><size>6 6 0.2</size></box></geometry>
         </collision>
       </link>
     </model>"""
-    e = HexapodEnv(workdir=tmp_path_factory.mktemp("zemin"), terrain_sdf=terrain)
+
+
+def test_zemin_sdf_ile_kurulur(tmp_path_factory):
+    """S5'in zeminleri buradan girer: düz zemin yerine verilen statik model +
+    yüzey yüksekliği. Burada üst yüzü z=3 cm'de bir kutu: robot zemine göre
+    doğmalı, zeminin ~100 mm üstünde durmalı, altı ayağı da yerde sayılmalı."""
+    top = 0.03
+    e = HexapodEnv(workdir=tmp_path_factory.mktemp("zemin"), terrain_sdf=_box_ground(top),
+                   terrain_height=lambda x, y: top)
     try:
         e.reset(seed=0)
-        assert e._state.base_pos[2] == pytest.approx(e.task.stand_height_mm / 1000, abs=0.004)
-        assert all(e._state.foot_contact)
+        s = e._state
+        assert s.ground_z == pytest.approx(top)
+        assert s.base_pos[2] == pytest.approx(top + e.task.stand_height_mm / 1000, abs=0.004)
+        assert all(s.foot_contact)
+        for _ in range(50):
+            _, _, terminated, _, info = e.step(np.zeros(18, dtype=np.float32))
+            assert not terminated
+        assert info["reward_terms"]["height"] > -1e-3
     finally:
         e.close()
+
+
+def test_egimli_zeminde_temas_ve_yukseklik(tmp_path_factory):
+    """10° eğimde ayakta: altı ayak yerde (dikey boşluk 0.1 mm), gövde yüzeye dik
+    100 mm'de yani dikeyde 100/cos 10° = 101.5 mm; eğimle birlikte ~10° yatık."""
+    pitch = math.radians(10.0)
+    e = HexapodEnv(workdir=tmp_path_factory.mktemp("egim"), terrain_sdf=_box_ground(0.0, pitch),
+                   terrain_height=lambda x, y: -math.tan(pitch) * x)
+    try:
+        e.reset(seed=0)
+        s = e._state
+        assert all(s.foot_contact)
+        assert s.height_above_ground() == pytest.approx(0.1 / math.cos(pitch), abs=0.004)
+        tilt = math.degrees(math.acos(-s.gravity_in_base()[2]))
+        assert tilt == pytest.approx(10.0, abs=1.5)
+    finally:
+        e.close()
+
+
+def test_zemin_yuksekligi_olmadan_zemin_reddedilir():
+    """Yüksekliği bilinmeyen zeminde temas ölçülemez; z=0 varsayılmaz."""
+    with pytest.raises(ValueError, match="terrain_height"):
+        HexapodEnv(terrain_sdf=_box_ground(0.0))
+    with pytest.raises(ValueError, match="terrain_height"):
+        HexapodEnv(terrain_height=lambda x, y: 0.0)
 
 
 def test_artik_eylem_modunda_sifir_eylem_tripod(tmp_path_factory):

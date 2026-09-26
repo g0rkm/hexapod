@@ -80,6 +80,10 @@ Artık eylemde eylem 0 = tripod; politika düz zeminde tripod'un verimiyle
 başlar, yalnız gerektiğinde düzeltir. "residual" terimi düzeltmenin
 büyüklüğünü (eylem karelerinin ortalaması) cezalandırır; yalnız bu modda.
 
+Zemin (2026-09-26): gövde yüksekliği (height terimi, devrilme) ve ayak
+teması, düz zeminin z=0'ına değil altındaki zemine göre (SimState.ground_z,
+sim.py'deki terrain_height). Düz zeminde ödül değişmedi.
+
 Alan rastgeleleştirme (G7): Randomization, bölüm başında env.py çeker;
 TaskConfig.randomization None ise kapalı (değerlendirmenin varsayılanı).
 Zemin ve sürtünme S5'in (Samet) dünyalarıyla gelecek; kütle dünyanın
@@ -202,7 +206,7 @@ def observation(state: SimState, command: tuple[float, float, float], phase: flo
 
 
 def fallen(state: SimState, cfg: TaskConfig) -> bool:
-    if state.base_pos[2] < cfg.min_height_m:
+    if state.height_above_ground() < cfg.min_height_m:
         return True
     # gövde +z'si ile dünya yukarısı arasındaki açı: yerçekiminin gövdedeki z'si
     tilt = math.degrees(math.acos(max(-1.0, min(1.0, -state.gravity_in_base()[2]))))
@@ -243,7 +247,7 @@ def reward(state: SimState, action, prev_action, command: tuple[float, float, fl
         "gait": gait_score(state.foot_contact, phase, groups),
         "yaw_rate": math.exp(-((command[2] - twz) ** 2) / cfg.yaw_rate_sigma ** 2),
         "orientation": g[0] ** 2 + g[1] ** 2,
-        "height": (state.base_pos[2] - cfg.stand_height_mm / 1000.0) ** 2,
+        "height": (state.height_above_ground() - cfg.stand_height_mm / 1000.0) ** 2,
         "power": sum(abs(t * v) for t, v in zip(state.joint_effort, state.joint_vel)
                      if math.isfinite(v)),
         "action_rate": sum((a - b) ** 2 for a, b in zip(action, prev_action)),

@@ -91,6 +91,18 @@ def test_devrilme():
     assert not fallen(state(quat=(math.cos(a / 2), math.sin(a / 2), 0.0, 0.0)), cfg)
 
 
+def test_yukseklik_altindaki_zemine_gore():
+    """Zeminli dünyada (S5) gövde yüksekliği dünya z'sine değil zemine göre ölçülür."""
+    cfg = TaskConfig()
+    yuksekte = SimState(**{**state(z=0.25).__dict__, "ground_z": 0.15})   # 15 cm'lik platform
+    assert yuksekte.height_above_ground() == pytest.approx(0.1)
+    assert not fallen(yuksekte, cfg)
+    _, terms = reward(yuksekte, [0.0] * 18, [0.0] * 18, (0.1, 0.0, 0.0), cfg, False)
+    assert terms["height"] == pytest.approx(0.0)
+    cukurda = SimState(**{**state(z=0.1).__dict__, "ground_z": 0.07})     # gövde zemine 3 cm
+    assert fallen(cukurda, cfg)
+
+
 def test_eylem_boyutu():
     assert ACTION_SIZE == 18
 

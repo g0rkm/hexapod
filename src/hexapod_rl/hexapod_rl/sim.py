@@ -39,18 +39,36 @@ tripod duruşu ikisinde de 0.6 N·m'de bile çökmüyor; sorun dinamikti.
 ROS'lu simülasyon (sim.launch.py) hâlâ hız modelini kullanıyor; açık iş
 (PROJE_DEVIR §13).
 
-Zemin (terrain_sdf; S5): düz zeminin yerine geçen statik bir <model> SDF
-parçası. Kısıtlar (2026-09-26):
-  - robot orijinde, DÜZ zemine göre doğar (ayaklar z=0'ın 1 cm üstünde):
-    orijin çevresinin üst yüzü z=0'da olmalı, yoksa ayaklar zeminin içinde
-    doğar;
+Zemin (S5): terrain_sdf, düz zeminin yerine geçen statik bir <model> SDF
+parçası; terrain_height(x, y) aynı zeminin üst yüzeyinin dünya z'si (m).
+İkisi birlikte verilir: yüksekliği bilinmeyen bir zeminde temas ve gövde
+yüksekliği ölçülemez, varsayılan uydurulmaz.
+  - robot orijinde doğar; doğma yüksekliği sıfır duruşundaki altı ayağın
+    altındaki zeminden hesaplanır (en yüksek ayak zeminin 1 cm üstünde).
   - ayak teması (SimState.foot_contact; ödülün ritim terimi ve
-    değerlendirme bunu kullanır) geometrik: ayak küresinin alt ucu dünya
-    z=0'ın 2 mm yakınında mı. Engebeli/eğimli zeminde YANLIŞ olur; S5 ile
-    birlikte gerçek temasa (gz Contact) ya da zemin yüksekliğine geçilmeli.
+    değerlendirme bunu kullanır): ayak küresinin alt ucu, altındaki zeminin
+    2 mm yakınında mı (dikey). Eğimde küre yüzeye dik değdiği için dikey
+    boşluk r(1/cos θ - 1): 5.1 mm'lik kürede 20°'de 0.3, 40°'de 1.6 mm;
+    ~40°'ye kadar tolerans içinde. Basamak kenarında birkaç milimetre
+    yanılabilir.
+  - gövde yüksekliği (ödül, devrilme) gövde merkezinin altındaki zemine göre
+    (SimState.ground_z).
   - sürtünme zeminin <surface><friction>'ında. Ölçüldü (gösterim tripod'u,
     0.12 m/s): düz zeminde mu 1.0 ile 0.15 arası fark yok, 0.05'te %8
     yavaşlıyor. Yani sürtünme ancak eğimle birlikte (S5) anlam kazanır.
+
+Neden fizik motorunun temas verisi değil (denendi, 2026-09-26): gz.sim
+Python bağları temas bileşenini (ContactSensorData) okuyamıyor; tek yol
+Contact sistemi + temas sensörü + gz.transport aboneliği. Düz zeminde
+geometrik temasla %97.9 uyuştu ama tek süreç 381 -> 182 adım/s'ye düştü
+(sensör + Contact sistemi tek başına -%17, geri kalanı Python geri
+çağrısı) ve mesajlar ayrı bir iş parçacığında, eşzamansız geliyor: adım
+sonundaki temasın tam olduğu garanti değil, eğitim tekrarlanabilirliği
+bozulur. Zemin yüksekliği bedava ve belirlenimci. Doğrulama (artık eylem
+tripod'u, 10 s, sensör referans): 0°, 10° (aşağı/yukarı/yana) ve 20°
+(aşağı/yukarı) eğimde %97.8-98.8 uyum. Farkların hepsi ayak 2 mm içindeyken
+değmediği anlar (iniş/kalkış); fiziğin gördüğü temas hiç kaçmadı, gerçek
+temasta dikey boşluk en çok 0.73 mm.
 
 Alan rastgeleleştirme düğmeleri (G7; bölüm başında env.py çeker):
 set_servo() durma torkunu ve sertliği ölçekler (akü gerilimi, servo farkı,
@@ -68,7 +86,7 @@ import math
 import os
 import tempfile
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 import gz.math  # noqa: F401  Pose3d/Vector3d tiplerini pybind11 tanısın diye (yoksa çöker)
 from gz.sim import Joint, Link, Model, TestFixture, World, world_entity
@@ -80,12 +98,20 @@ from hexapod_description.urdf import build_urdf, link_name
 from .math3d import Vec3
 from .state import SimState
 
-#: Doğarken sıfır duruşunda ayakların yerden yüksekliği.
+#: Doğarken sıfır duruşunda en yüksek zemindeki ayağın yerden yüksekliği.
 SPAWN_CLEARANCE_M = 0.01
-#: Ayak küresinin alt ucu yere bu kadar yakınsa "temas" sayılır.
+#: Ayak küresinin alt ucu altındaki zemine bu kadar yakınsa "temas" sayılır.
 CONTACT_TOLERANCE_M = 0.002
 #: Her süreç kendi gz-transport bölümünde (GZ_PARTITION + süreç kimliği).
 PARTITION_PREFIX = "hexapod_rl_"
+
+#: Zeminin üst yüzeyi: dünya (x, y) -> z, metre.
+TerrainHeight = Callable[[float, float], float]
+
+
+def flat_height(x: float, y: float) -> float:
+    """Düz zeminin (varsayılan düzlem) yüksekliği."""
+    return 0.0
 
 
 class HexapodSim:
@@ -99,8 +125,13 @@ class HexapodSim:
 
     def __init__(self, model: RobotModel, physics_step: float = 0.002,
                  action_rate: float = COMMAND_RATE_HZ, terrain_sdf: str = "",
-                 workdir: Path | None = None) -> None:
+                 workdir: Path | None = None,
+                 terrain_height: TerrainHeight | None = None) -> None:
+        if bool(terrain_sdf) != (terrain_height is not None):
+            raise ValueError("terrain_sdf ile terrain_height birlikte verilmeli: zeminin "
+                             "yüksekliği bilinmeden ayak teması ve gövde yüksekliği ölçülemez")
         self.model = model
+        self.height = terrain_height or flat_height
         self.physics_step = physics_step
         physics_rate = 1.0 / physics_step
         self.steps_per_action = _whole(physics_rate / action_rate, "fizik hızı / eylem hızı")
@@ -276,7 +307,7 @@ class HexapodSim:
             c = tp.rot().rotate_vector(gz.math.Vector3d(0.0, 0.0, -(self.model.tibia - r)))
             bottom = (tp.pos().x() + c.x(), tp.pos().y() + c.y(), tp.pos().z() + c.z() - r)
             feet.append(bottom)
-            contact.append(bottom[2] <= CONTACT_TOLERANCE_M)
+            contact.append(bottom[2] - self.height(bottom[0], bottom[1]) <= CONTACT_TOLERANCE_M)
         q = pose.rot()
         return SimState(
             time=_seconds(info.sim_time),
@@ -286,6 +317,7 @@ class HexapodSim:
             base_quat=(q.w(), q.x(), q.y(), q.z()),
             base_lin_vel=_vec(lin), base_ang_vel=_vec(ang),
             foot_pos=tuple(feet), foot_contact=tuple(contact),
+            ground_z=self.height(pose.pos().x(), pose.pos().y()),
         )
 
     # -- dünya ------------------------------------------------------------------
@@ -293,8 +325,7 @@ class HexapodSim:
     def _write_world(self, terrain_sdf: str) -> Path:
         urdf = self._dir / "robot.urdf"
         urdf.write_text(build_urdf(self.model), encoding="utf-8")
-        feet_z = min(m.z for m in self.model.mounts.values()) - self.model.tibia
-        spawn_z = -feet_z + SPAWN_CLEARANCE_M
+        spawn_z = self.spawn_height()
         ground = terrain_sdf or _FLAT_GROUND
         world = f"""<?xml version="1.0"?>
 <sdf version="1.9">
@@ -316,6 +347,15 @@ class HexapodSim:
         path = self._dir / "world.sdf"
         path.write_text(world, encoding="utf-8")
         return path
+
+    def spawn_height(self) -> float:
+        """Gövdenin doğduğu z: sıfır duruşunda (bacaklar dümdüz dışarı, tibialar
+        dik) en yüksek zemindeki ayak SPAWN_CLEARANCE_M yukarıda."""
+        reach = self.model.coxa + self.model.femur
+        return SPAWN_CLEARANCE_M + max(
+            self.height(m.x + reach * math.cos(m.yaw), m.y + reach * math.sin(m.yaw))
+            - (m.z - self.model.tibia)
+            for m in self.model.mounts.values())
 
 
 _FLAT_GROUND = """<model name="ground">

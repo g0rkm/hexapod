@@ -22,6 +22,11 @@ class SimState:
     base_ang_vel: Vec3          # rad/s, dünya
     foot_pos: tuple[Vec3, ...]  # m, dünya, ayak küresinin alt ucu (6)
     foot_contact: tuple[bool, ...]  # yalnız simülasyon; politika gözlemine girmemeli
+    ground_z: float = 0.0       # m, gövde merkezinin altındaki zemin yüksekliği (yalnız sim)
+
+    def height_above_ground(self) -> float:
+        """Gövdenin altındaki zeminden yüksekliği (düz zeminde base_pos z'si)."""
+        return self.base_pos[2] - self.ground_z
 
     def gravity_in_base(self) -> Vec3:
         """Yerçekimi yönünün gövde çerçevesindeki birim vektörü (IMU'dan çıkarılabilir)."""
