@@ -88,7 +88,7 @@ def best_checkpoint_callback(every: int, out: Path, task, seconds: float = 10.0)
                 row[f"odul_{c[0]:+.2f}_{c[1]:+.2f}_{c[2]:+.2f}"] = round(r["adim_basi_odul"], 4)
             new = not self.csv.exists()
             with self.csv.open("a", newline="", encoding="utf-8") as f:
-                w = csv.DictWriter(f, fieldnames=list(row))
+                w = csv.DictWriter(f, fieldnames=list(row), lineterminator="\n")
                 if new:
                     w.writeheader()
                 w.writerow(row)
