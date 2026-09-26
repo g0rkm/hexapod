@@ -1,0 +1,141 @@
+veri: 128 bölüm, 127471 adım, 48 s; gürültü 0.25; devrilen 3; rastgeleleştirme açık; gösterimin adım başı ödülü 1.062
+tur 10: aktor_rmse 0.0000, kritik_aciklanan_varyans 0.1905
+tur 20: aktor_rmse 0.0000, kritik_aciklanan_varyans 0.2099
+tur 30: aktor_rmse 0.0001, kritik_aciklanan_varyans 0.3138
+tur 40: aktor_rmse 0.0001, kritik_aciklanan_varyans 0.4064
+tur 50: aktor_rmse 0.0001, kritik_aciklanan_varyans 0.4543
+tur 60: aktor_rmse 0.0001, kritik_aciklanan_varyans 0.4570
+std 0.1 (gerçekleşen 0.100); doğrulama: aktor_rmse 0.0001, kritik_aciklanan_varyans 0.4570
+--- değerlendirme, komut (vx, vy, wz) = (0.1, 0.0, 0.0)
+komut_vx: 0.100
+komut_vy: 0.000
+komut_wz: 0.000
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: 1.000
+yana_kayma_m: 0.005
+ortalama_hiz_m_s: 0.100
+toplam_yol_m: 1.000
+yon_sapmasi_derece: 0.130
+devrildi: False
+adim_basi_odul: 3.209
+ortalama_guc_w: 3.162
+ritim_uyumu: 0.930
+havadaki_ayak_orani: 0.470
+govde_vx_m_s: 0.102
+govde_vy_m_s: -0.000
+donus_hizi_rad_s: 0.000
+--- değerlendirme, komut (vx, vy, wz) = (-0.1, 0.0, 0.0)
+komut_vx: -0.100
+komut_vy: 0.000
+komut_wz: 0.000
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: -1.003
+yana_kayma_m: 0.007
+ortalama_hiz_m_s: -0.100
+toplam_yol_m: 1.003
+yon_sapmasi_derece: -0.371
+devrildi: False
+adim_basi_odul: 3.211
+ortalama_guc_w: 3.161
+ritim_uyumu: 0.930
+havadaki_ayak_orani: 0.470
+govde_vx_m_s: -0.102
+govde_vy_m_s: 0.000
+donus_hizi_rad_s: -0.001
+--- değerlendirme, komut (vx, vy, wz) = (0.0, 0.06, 0.0)
+komut_vx: 0.000
+komut_vy: 0.060
+komut_wz: 0.000
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: -0.004
+yana_kayma_m: 0.596
+ortalama_hiz_m_s: -0.000
+toplam_yol_m: 0.596
+yon_sapmasi_derece: 0.147
+devrildi: False
+adim_basi_odul: 2.867
+ortalama_guc_w: 2.864
+ritim_uyumu: 0.930
+havadaki_ayak_orani: 0.470
+govde_vx_m_s: -0.000
+govde_vy_m_s: 0.061
+donus_hizi_rad_s: 0.000
+--- değerlendirme, komut (vx, vy, wz) = (0.0, -0.06, 0.0)
+komut_vx: 0.000
+komut_vy: -0.060
+komut_wz: 0.000
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: -0.003
+yana_kayma_m: -0.594
+ortalama_hiz_m_s: -0.000
+toplam_yol_m: 0.594
+yon_sapmasi_derece: 0.008
+devrildi: False
+adim_basi_odul: 2.861
+ortalama_guc_w: 2.912
+ritim_uyumu: 0.930
+havadaki_ayak_orani: 0.470
+govde_vx_m_s: -0.000
+govde_vy_m_s: -0.060
+donus_hizi_rad_s: 0.000
+--- değerlendirme, komut (vx, vy, wz) = (0.0, 0.0, 0.4)
+komut_vx: 0.000
+komut_vy: 0.000
+komut_wz: 0.400
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: 0.002
+yana_kayma_m: -0.000
+ortalama_hiz_m_s: 0.000
+toplam_yol_m: 0.002
+yon_sapmasi_derece: -129.095
+devrildi: False
+adim_basi_odul: 2.220
+ortalama_guc_w: 3.145
+ritim_uyumu: 0.930
+havadaki_ayak_orani: 0.470
+govde_vx_m_s: 0.000
+govde_vy_m_s: 0.001
+donus_hizi_rad_s: 0.403
+--- değerlendirme, komut (vx, vy, wz) = (0.0, 0.0, -0.4)
+komut_vx: 0.000
+komut_vy: 0.000
+komut_wz: -0.400
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: -0.002
+yana_kayma_m: 0.002
+ortalama_hiz_m_s: -0.000
+toplam_yol_m: 0.003
+yon_sapmasi_derece: 128.917
+devrildi: False
+adim_basi_odul: 2.221
+ortalama_guc_w: 3.139
+ritim_uyumu: 0.930
+havadaki_ayak_orani: 0.470
+govde_vx_m_s: -0.000
+govde_vy_m_s: -0.000
+donus_hizi_rad_s: -0.403
+--- değerlendirme, komut (vx, vy, wz) = (0.1, 0.04, 0.25)
+komut_vx: 0.100
+komut_vy: 0.040
+komut_wz: 0.250
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: -0.067
+yana_kayma_m: 0.805
+ortalama_hiz_m_s: -0.007
+toplam_yol_m: 0.808
+yon_sapmasi_derece: 145.245
+devrildi: False
+adim_basi_odul: 3.218
+ortalama_guc_w: 3.461
+ritim_uyumu: 0.930
+havadaki_ayak_orani: 0.470
+govde_vx_m_s: 0.102
+govde_vy_m_s: 0.041
+donus_hizi_rad_s: 0.254

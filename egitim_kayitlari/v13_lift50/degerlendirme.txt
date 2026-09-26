@@ -1,0 +1,21 @@
+adım: 3000000, ortam: 16, süre: 34.2 dk (1461 adım/s)
+en iyi ara kayıt: 250000 adım, skor 2.818 -> best_model.zip (ara_degerlendirme.csv)
+son model, komut vx 0.10:
+komut_vx: 0.100
+komut_vy: 0.000
+komut_wz: 0.000
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: 1.154
+yana_kayma_m: -0.111
+ortalama_hiz_m_s: 0.115
+toplam_yol_m: 1.159
+yon_sapmasi_derece: -9.157
+devrildi: False
+adim_basi_odul: 3.065
+ortalama_guc_w: 4.073
+ritim_uyumu: 0.929
+havadaki_ayak_orani: 0.467
+govde_vx_m_s: 0.118
+govde_vy_m_s: -0.001
+donus_hizi_rad_s: -0.016
