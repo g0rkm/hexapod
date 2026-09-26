@@ -66,9 +66,18 @@ girme (§1).
 
 1. **Windows'ta NVIDIA sürücüsü güncel olsun.** WSL içinde CUDA için Linux'a
    ayrıca sürücü KURULMAZ; Windows sürücüsü yeter.
-2. **WSL2 + Ubuntu 26.04.** Eski PC'de dağıtım adı `Ubuntu` (26.04.1 LTS),
-   kullanıcı adı `gorkem`. Yönetici PowerShell'de `wsl --install`, dağıtım
-   adını `wsl --list --online` ile doğrula.
+2. **WSL2 + Ubuntu 26.04.** Yeni PC'de WSL2 kurulu ama Ubuntu yok (kullanıcı
+   2026-09-26'da söyledi). Sürüm önemli: ROS 2 Lyrical paketleri yalnız
+   Ubuntu 26.04 (resolute) için var.
+   - PowerShell'de `wsl --list --online` ile adı bak.
+   - `wsl --install -d Ubuntu-26.04` ile kur. O ad yoksa `Ubuntu`'yu kur ve
+     içinde `lsb_release -ds` ile 26.04 olduğunu doğrula.
+   - İlk açılışta Ubuntu bir kullanıcı adı ve şifre ister; bunu **kullanıcı
+     girer**. Eski PC'de kullanıcı adı `gorkem`, dağıtım adı `Ubuntu`
+     (26.04.1 LTS) idi.
+   - Birden fazla dağıtım varsa (ör. docker-desktop) Ubuntu varsayılan
+     olmalı: `wsl --set-default <ad>`. Betikler ve `wsl -e bash`
+     varsayılan dağıtımı kullanır.
 3. **Depoyu al.** `git clone https://github.com/g0rkm/hexapod.git`.
    Eski PC'de depo OneDrive altındaydı (`C:\Users\gorke\OneDrive\Masaüstü\hexapod`).
    Yeni PC aynı OneDrive hesabıyla açılırsa klasör kendiliğinden de gelir.
