@@ -212,6 +212,16 @@ def test_hedefi_asmak_progress_kazandirmaz():
     assert asan["lin_vel"] < tam["lin_vel"]
 
 
+def test_kucuk_yon_sapmasi_da_kaybettirir():
+    """v6: 2°/s'lik sabit dönüş (10 s'de 20°) dönüş teriminin en az %10'unu kaybettirmeli."""
+    cfg = TaskConfig()
+    cmd = (0.1, 0.0, 0.0)
+    _, duz = reward(state(), [0.0] * 18, [0.0] * 18, cmd, cfg, False, tracked=(0.1, 0.0, 0.0))
+    _, kayan = reward(state(), [0.0] * 18, [0.0] * 18, cmd, cfg, False,
+                      tracked=(0.1, 0.0, math.radians(-2.0)))
+    assert kayan["yaw_rate"] < 0.9 * duz["yaw_rate"]
+
+
 def test_enerji_artik_pahali():
     """v5: 5 W fazladan güç (PPO v4 ile tripod farkı) adım başı en az 0.2 kaybettirmeli."""
     cfg = TaskConfig()

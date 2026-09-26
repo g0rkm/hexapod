@@ -9,6 +9,8 @@ eder (ödül değişince yeniden öğrenmek yerine uyum sağlasın diye). PPO'nu
 ayarları o modelden gelir; yalnızca ortam ve günlük yeni. Taklit ile
 başlatılmış model de böyle verilir (pretrain.py). --randomize: alan
 rastgeleleştirme açık (task.Randomization; servo, gecikme, itme, IMU gürültüsü).
+--std: keşif gürültüsünü (eylem biriminde) kurar; devam eğitiminde
+gürültüyü küçültmek için (gSDE'li modelde desteklenmez).
 --lr, --target-kl: modelden gelen ayarların üstüne yazar. Neden (2026-09-26):
 gSDE'li taklitten 3e-4 ile başlayan PPO'da güncellemeler çok büyüktü (KL
 0.06-0.23, kırpılma 0.5-0.7) ve ödül 200 bin adımda 2200'den 1570'e düştü.
@@ -25,6 +27,7 @@ Sonda kısa bir değerlendirme yapılır (evaluate.py); ara kayıtlar da
 from __future__ import annotations
 
 import argparse
+import math
 import time
 from pathlib import Path
 
@@ -58,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lr", type=float, default=None, help="öğrenme hızı (modeldekini ezer)")
     parser.add_argument("--target-kl", type=float, default=None,
                         help="güncelleme KL'si bunu aşınca dönemleri kes")
+    parser.add_argument("--std", type=float, default=None,
+                        help="keşif gürültüsü std'si (eylem birimi; modeldekini ezer)")
     parser.add_argument("--init-from", type=Path, default=None,
                         help="eğitilmiş model.zip'ten devam et")
     args = parser.parse_args(argv)
@@ -81,9 +86,15 @@ def main(argv: list[str] | None = None) -> int:
         model._setup_lr_schedule()
     if args.target_kl is not None:
         model.target_kl = args.target_kl
+    if args.std is not None:
+        if model.use_sde:
+            parser.error("--std gSDE'li modelde desteklenmiyor (pretrain.py --sde --std kullan)")
+        with torch.no_grad():
+            model.policy.log_std.fill_(math.log(args.std))
     (out / "ayarlar.txt").write_text(
         f"learning_rate: {model.learning_rate}\ntarget_kl: {model.target_kl}\n"
-        f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\n", encoding="utf-8")
+        f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\nstd: {args.std}\n",
+        encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
     t0 = time.time()

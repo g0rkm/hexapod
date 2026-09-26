@@ -65,6 +65,12 @@ gürültüsüz düz zeminde tripod'un 3-4 katı enerji harcıyor ve hedef hızı
   - güç cezası -0.02 -> -0.05 /W: v4'te 7 W adım başı 0.14'e mal oluyordu,
     enerji neredeyse bedavaydı (TÜBİTAK tanımı: en az enerjiyle).
 
+Ödül v6 (gece deneyleri, 2026-09-26): bütün PPO eğitimleri yavaşça sağa
+dönmeye kayıyordu (v5_dr 5M gürültüsüz: 10 s'de -24..-42°). Dönüş izleme
+toleransı 0.2 rad/s (~11°/s) iken 2°/s'lik sapma terimin yalnız %3'ünü
+kaybettiriyordu; PPO'nun gürültüsü içinde bu fark görünmüyordu.
+  - yaw_rate_sigma 0.2 -> 0.1 rad/s (2°/s artık %11, 4°/s %37 kaybettirir)
+
 Alan rastgeleleştirme (G7): Randomization, bölüm başında env.py çeker;
 TaskConfig.randomization None ise kapalı (değerlendirmenin varsayılanı).
 Zemin ve sürtünme S5'in (Samet) dünyalarıyla gelecek; kütle dünyanın
@@ -113,7 +119,7 @@ class TaskConfig:
         "fall": -10.0,         # devrilince bir kez
     })
     lin_vel_sigma: float = 0.05    # m/s; v3'te 0.10 -> 0.05
-    yaw_rate_sigma: float = 0.2    # rad/s; v3'te 0.5 -> 0.2
+    yaw_rate_sigma: float = 0.1    # rad/s; v3'te 0.5 -> 0.2, v6'da -> 0.1
     vel_filter_s: float = 0.5      # s; v4: izleme terimleri bu ortalamaya bakar
     randomization: "Randomization | None" = None   # None: kapalı
 
