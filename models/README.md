@@ -14,6 +14,32 @@ python -m hexapod_rl.evaluate models/ppo_v4_4M/model.zip --vx 0.1 --noise 0.1
 python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Samet'in tripod'u
 ```
 
+## Artık eylem (tripod + düzeltme) — en iyi sonuç (2026-09-26 sabah)
+
+`ppo_res_250k`: politika eklem açısını değil, adım saatinin tripod'una
+(`hexapod_policy.tripod.PhaseTripod`) eklenen düzeltmeyi üretir (`--residual`).
+Ödül v6, düz zemin, 10 s, deterministik. Eylem gürültüsü **eklemde 0.05 rad**
+(mutlak modda `--noise 0.1`, artık eylemde `--noise 0.25`; ölçekler 0.5 ve
+0.2 rad). Hiçbiri devrilmedi.
+
+| Model | Gürültüsüz ödül (0.05 / 0.10 / 0.15) | Gerçek hız | Yön (10 s) | Güç | Rastgeleleştirmede ödül (0.10, 3 tohum) | Eklem gürültüsünde ödül |
+|---|---|---|---|---|---|---|
+| tripod | 2.83 / 3.22 / 3.57 | 0.049 / 0.098 / 0.146 | ~0° | 1.5 / 1.9 / 2.6 W | 3.08–3.22 | 1.46 |
+| artık, düzeltme 0 (bc_res) | 2.80 / 3.20 / 3.58 | 0.047 / 0.096 / 0.145 | <2.1° | 1.6 / 1.9 / 2.5 W | 3.04–3.23 | 1.89 |
+| **ppo_res_250k** | 2.82 / **3.24 / 3.62** | 0.058 / 0.105 / 0.153 | 0 / +5 / +12° | 1.8 / 2.3 / 2.9 W | 3.06–3.18 | 1.78 |
+| v9_res 1M | 2.76 / 3.16 / 3.54 | 0.064 / 0.115 / 0.167 | +1 / +4 / +8° | 2.3 / 3.0 / 3.8 W | 2.98–3.07 | 1.84 |
+| v9_res 3M | 2.73 / 3.15 / 3.54 | 0.066 / 0.116 / 0.167 | 0 / +1 / +6° | 2.4 / 3.0 / 3.9 W | 2.97–3.09 | 1.82 |
+| ppo_v7_8M (mutlak) | 2.55 / 2.94 / 3.31 | 0.053 / 0.098 / 0.146 | +6 / −3 / −11° | 5.6 / 6.4 / 8.0 W | 2.82–3.00 | 2.23 |
+
+- **Enerji sorunu çözüldü:** artık eylem politikası tripod'dan ~%20 fazla
+  harcıyor, mutlak moddaki PPO 3 kat harcıyordu.
+- ppo_res_250k gürültüsüz ödülde tripod'u 0.10 ve 0.15'te geçiyor,
+  rastgeleleştirmede neredeyse eşit, eklem gürültüsünde önde.
+- Eğitim uzadıkça (1M, 3M) yine hedef hızı aşmaya kayıyor (gürültüye uyum,
+  ders 25); en iyi ara kayıt 250k. Keşif std'si (0.15 → 0.11, artık eylem
+  biriminde) düşürülerek ya da eğitim erken kesilerek denenebilir.
+- Hızlıda sola hafif yön kayması (+12°/10 s, 0.15'te) kalan kusur.
+
 ## Gece karşılaştırması (2026-09-26 sabah, ödül v6)
 
 Ödül v6 (`hexapod_rl.task`), düz zemin, 10 s, deterministik. Rastgeleleştirme:
@@ -129,6 +155,20 @@ keşif gürültüsünde dönen yürüyüşü düz yürüyüşten çok ödüllend
   adımlarla devam edince hız izleme düzeldi (0.10 komutta 0.113 → 0.098).
 - **Sonuç:** yukarıdaki tablo. Kalan sorunlar: enerji (tripod'un ~3 katı),
   hızlıda yön kayması (0.15'te −11°).
+
+**Gerçek robotta DENENMEDİ.**
+
+## ppo_res_250k — artık eylem, en iyi (2026-09-26)
+
+- **Eğitim:** taklit (bc_res: düzeltme 0, kritik tripod + gürültünün
+  getirileriyle; 64 bölüm, 63 s) sonra PPO v9_res: ödül v6, artık eylem
+  (`--residual`, ölçek 0.2 rad, düzeltme cezası −0.5), rastgeleleştirme,
+  std 0.15, lr 1e-4, target_kl 0.02. 3M adım koştu (75 dk, 668 adım/s),
+  en iyi ara kayıt 250k. Ayarlar `ayarlar.txt`'de.
+- **Robotta çalıştırmak:** `policy.npz` artık eylem sözleşmesini taşır;
+  `hexapod_policy` düğümü tripod'u aynı kodla (`PhaseTripod`) kendisi
+  hesaplar. Aktarma: `python -m hexapod_rl.export <zip> --residual`.
+- **Sonuç:** yukarıdaki tablo.
 
 **Gerçek robotta DENENMEDİ.**
 

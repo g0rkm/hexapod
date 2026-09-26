@@ -737,6 +737,7 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
 | 09-26 | v5_dr 10M yerine 5M'de durduruldu; gSDE denendi (v6_sde lr 3e-4, v6b lr 1e-4 + target_kl 0.02), ikisi de bozuldu, bırakıldı | gSDE'de eğitim ödülü sistematik düştü (2300 → 1630) ve politika dönmeye kaydı; KL küçükken bile. Sebep çözülmedi (§12.24) |
 | 09-26 | **Ödül v6: dönüş toleransı 0.2 → 0.1 rad/s; devam eğitiminde keşif std 0.05, lr 1e-4, target_kl 0.02** (`--std`, `--lr`, `--target-kl`) | Bütün PPO'lar yavaşça sağa dönüyordu; 2°/s sapma v5'te terimin %3'ü. Düşük gürültü, eğitimde koşan davranışı gürültüsüz davranışa yaklaştırır. Sonuç `models/ppo_v7_8M`: hız izleme doğru, yön 4 kat iyi; enerji hâlâ tripod'un 3 katı |
 | 09-26 | v8: v7'den güç cezası −0.10/W ile 2M (`--power-weight`); depoya alınmadı | Enerji değişmedi (0.10 m/s'de 6.4 W; tripod 1.9 W). Terim terim fark neredeyse tamamen güç; eylem titremiyor, fazla güç yürüyüş biçiminden. Öneri: tripod üstüne artık eylem |
+| 09-26 | **Artık eylem modu (`--residual`): hedef = adım saatinin tripod'u (`hexapod_policy.tripod.PhaseTripod`, eğitim ve robot aynı kod) + 0.2 rad x eylem; düzeltme cezası −0.5 x ortalama eylem karesi.** En iyi model `models/ppo_res_250k` | Mutlak modda PPO 3 kat enerji harcıyordu, güç cezası düzeltmedi. Artık eylemde eylem 0 = tripod: enerji tripod'dan ~%20 fazla; gürültüsüz ödülde tripod'u 0.10/0.15'te geçiyor, rastgeleleştirmede eşit, gürültüde önde. G7 için önerilen yol |
 | 09-26 | **Süreç içi Gazebo her süreçte ayrı gz-transport bölümünde** (`GZ_PARTITION=hexapod_rl_<pid>`) | Eğitim sürerken açılan ROS'lu simin `ros_gz_sim create` isteği eğitimin "rl" dünyasına gitti, ROS'lu simde robot doğmadı (§12.22) |
 
 ---
@@ -918,15 +919,14 @@ eder (talker → /chatter, `gz sim --version`). Günlük: /tmp/ros_kurulum.log.
   ROS'lu simde tork-hız doğrusu yok (gz_ros2_control hız sınırında torku
   kesiyor; RL simi doğrusal azaltıyor). Ölçülen hızlar iki simde aynı düzeyde
   (tripod %98, politika %96), şimdilik yeterli.
-- **RL (G7), 09-26 sabahı:** en iyi PPO `models/ppo_v7_8M` (ödül v6,
-  rastgeleleştirme). Hız izliyor, eylem gürültüsünde en iyisi; ama düz
-  zeminde tripod hâlâ önde, çünkü PPO 3 kat enerji harcıyor ve hızlıda yön
-  kaydırıyor. Seçenekler: güç cezasını artırmak; eylemi tripod'un üstüne
-  "artık" (residual) düzeltme yapmak (G6'da düşünülmüştü; düz zeminde
-  tripod'a eşit başlar, RL yalnız düzeltmeyi öğrenir); std'yi daha da
-  düşürmek. Kütle rastgeleleştirmesi yok. Sürtünme düz zeminde etkisiz
-  (ölçüldü), eğimle S5'te. Zeminli eğitim S5, "bitti" ölçümü S6 bekliyor.
-  Karşılaştırma: `models/README.md`.
+- **RL (G7), 09-26 sabahı:** en iyi model `models/ppo_res_250k` (artık
+  eylem: tripod + düzeltme). Düz zeminde tripod'la başa baş ya da biraz
+  önde, enerji ~%20 fazla. Uzun eğitimde hedef hızı aşmaya kayıyor (en iyi
+  ara kayıt 250k; std düşürme ya da erken kesme denenebilir); hızlıda
+  hafif sola kayma. Mutlak modun en iyisi `ppo_v7_8M` (3 kat enerji).
+  Kütle rastgeleleştirmesi yok. Sürtünme düz zeminde etkisiz (ölçüldü).
+  Asıl sınav zeminler: S5 (üreteç) + gerçek ayak teması (şu an geometrik,
+  G7) + S6 (ölçüm). Karşılaştırma: `models/README.md`.
 
 ### 13.2 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)
 
