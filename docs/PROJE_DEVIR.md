@@ -9,7 +9,7 @@
 > Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum §0.5;
 > zemine göre ayak teması §7.8; her yöne politika `ppo_omni_250k` §3.2;
 > kütle rastgeleleştirmesi; ilk zeminli eğitim `ppo_lift50_2250k` §3.3)
-> · Testler: **Linux 243/243**, Windows 203 geçti + 8 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 245/245**, Windows 204 geçti + 8 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -95,12 +95,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 203 geçti, 8 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 204 geçti, 8 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 243 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 245 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -929,8 +929,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 203 geçti, 8 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 243 geçti, ~40 s (yeni PC).
+- Windows: 204 geçti, 8 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 245 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1416,6 +1416,18 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     0.879). Zemin ölçümü şimdilik elle, paralel betikle yapıldı
     (`egitim_kayitlari/v13_lift50/zemin_olcumu.md`). Ölçüt olarak hedef
     hızı aşmayı ödüllendirmeyen "en fazla beklenen yol" kullanıldı.
+    Sonra eğitim içine alındı: `--terrains` verilince her ara kayıtta
+    `terrain_probe.EVAL_CASES` da ölçülür, skor düz + zemin durumlarının adım
+    başı ödül ortalaması (ödül aşmayı ve enerjiyi zaten cezalandırıyor).
+    v13 ara kayıtlarında 2.25M'yi seçiyor (2.694; 250k 2.656).
+31. **`HexapodEnv.close()` Gazebo'yu bırakmıyordu.** Geri çağrılar (bound
+    method) TestFixture'ın C++ tarafında tutulduğu için Python'un çöp
+    toplayıcısı döngüyü göremiyordu; aynı süreçte her kur/kapat ~31 MB ve 2
+    iş parçacığı bırakıyordu (`gc.collect()` bile temizlemedi) ve gz "Another
+    world of the same name is running" diyordu. `HexapodSim.close()`
+    fixture/sunucu referanslarını keser: bellek ve iş parçacığı sabit, uyarı
+    yok. Eğitim içi zemin ölçümü süreçte onlarca dünya kurduğu için şarttı.
+    Test: `test_kapatinca_gazebo_birakilir`.
 
 ---
 
@@ -1519,10 +1531,8 @@ zeminler.
 
 **Sıradaki (S5 gelmeden, önerilen sıra):**
 
-8. **Eğitim içi ara kayıt seçimine zemin** (ders 30): `--terrains` verilince
-   geri çağrı birkaç zemin durumunu da ölçsün (ayrı Gazebo dünyası;
-   süreç içinde kur-kapat), skor "en fazla beklenen yol" gibi aşmayı
-   ödüllendirmesin.
+8. ✅ **Eğitim içi ara kayıt seçimine zemin** (ders 30, 31):
+   `terrain_probe.EVAL_CASES`, `train.measure_model`.
 9. ✅ **Adil karşılaştırma:** `TripodGait` 50 mm adımla (`terrain_probe
    tripod:50`) zemin skoru 0.548, RL 0.879 (§3.3).
 10. **Düzde aşma ve enerji:** 50 mm'li politika hedef hızı %10 aşıyor ve
@@ -1607,7 +1617,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 203 geçti, 8 atlandı. WSL: 243 geçti.
+   - Windows: 204 geçti, 8 atlandı. WSL: 245 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).
