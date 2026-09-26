@@ -47,3 +47,34 @@ def test_zemin_listesi_duz_zeminle_baslar():
     for name, make in TERRAINS[1:]:
         sdf, height = make()
         assert sdf.startswith("<model") and callable(height), name
+
+
+def test_cukur_her_yonde_basamak():
+    from hexapod_rl.terrain_probe import pit
+
+    sdf, height = pit(0.045, half=0.35)
+    assert height(0.0, 0.0) == 0.0 and height(0.34, -0.34) == 0.0
+    for x, y in ((0.36, 0.0), (-0.36, 0.1), (0.0, 0.36), (0.2, -0.4)):
+        assert height(x, y) == 0.045
+    boxes = [c for c in ET.fromstring(sdf).iter("collision") if c.find("geometry/box") is not None]
+    assert len(boxes) == 4
+    for box in boxes:                                     # hepsinin üstü 45 mm'de, iç kenarı 0.35'te
+        cx, cy, cz = (float(v) for v in box.find("pose").text.split()[:3])
+        sx, sy, sz = (float(v) for v in box.find("geometry/box/size").text.split())
+        assert cz + sz / 2 == pytest.approx(0.045)
+        inner = min(abs(cx) - sx / 2 if abs(cx) > 1e-9 else math.inf,
+                    abs(cy) - sy / 2 if abs(cy) > 1e-9 else math.inf)
+        assert inner == pytest.approx(0.35)
+
+
+def test_yayla_ve_egitim_seti():
+    from hexapod_rl.terrain_probe import TRAIN_SETS, plateau, training_terrains
+
+    _, height = plateau(0.05, half=0.5)
+    assert height(0.0, 0.0) == 0.05 and height(0.49, 0.49) == 0.05 and height(0.51, 0.0) == 0.0
+    items = training_terrains("deneme", 20)                   # 16'lık liste başa sarar
+    assert len(items) == 20 and items[16][0] == TRAIN_SETS["deneme"][0][0]
+    for label, sdf, h in items:
+        assert (sdf == "") == (h is None), label              # düz zemin: ikisi de boş
+    with pytest.raises(ValueError):
+        training_terrains("yok", 4)

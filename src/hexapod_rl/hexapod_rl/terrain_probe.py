@@ -8,8 +8,9 @@ PhaseTripod = artık eylem modunda eylem 0), "<zip>" (mutlak eylem) ya da
 "<zip>:residual" (artık eylem).
 
 Bu S5'in (Samet, zemin üreteci) yerine geçmez: G7'nin zeminli eğitimi ve
-"bitti" ölçümü S5 + S6 ile yapılacak. Buradaki iki zemin yalnız beklenti
-oluşturmak için (PROJE_DEVIR §14, madde 5); her biri terrain_sdf +
+"bitti" ölçümü S5 + S6 ile yapılacak. Buradaki zeminler yalnız beklenti
+oluşturmak için (PROJE_DEVIR §14, madde 5) ve zeminli eğitim altyapısının
+ilk denemesi için (TRAIN_SETS, train.py --terrains); her biri terrain_sdf +
 terrain_height çifti (sim.py), S5'in üreteci de aynı biçimde vermeli.
 """
 
@@ -66,6 +67,85 @@ def step(height_m: float, at_x: float = 0.3):
     return sdf, height
 
 
+def _boxes_sdf(boxes, with_plane: bool = True) -> str:
+    """boxes: (cx, cy, cz, sx, sy, sz) listesi -> tek bağlantılı statik model."""
+    parts = []
+    if with_plane:
+        parts.append('<collision name="plane"><geometry><plane><normal>0 0 1</normal>'
+                     '<size>100 100</size></plane></geometry></collision>')
+    for i, (cx, cy, cz, sx, sy, sz) in enumerate(boxes):
+        geo = f"<pose>{cx} {cy} {cz} 0 0 0</pose><geometry><box><size>{sx} {sy} {sz}</size></box></geometry>"
+        parts.append(f'<collision name="box{i}">{geo}</collision><visual name="box{i}">{geo}</visual>')
+    return ('<model name="ground"><static>true</static><link name="link">'
+            + "".join(parts) + "</link></model>")
+
+
+def pit(height_m: float, half: float = 0.35):
+    """Çukur: robot |x|, |y| < half karesinde doğar; her yönde height_m'lik
+    basamak çıkar (her yöne komutla eğitimde her yön basamağa varır)."""
+    L = 4.0
+    h = height_m
+    sdf = _boxes_sdf([(half + L / 2, 0, h / 2, L, 2 * (half + L), h),
+                      (-half - L / 2, 0, h / 2, L, 2 * (half + L), h),
+                      (0, half + L / 2, h / 2, 2 * half, L, h),
+                      (0, -half - L / 2, h / 2, 2 * half, L, h)])
+
+    def height(x: float, y: float) -> float:
+        return h if max(abs(x), abs(y)) >= half else 0.0
+
+    return sdf, height
+
+
+def plateau(height_m: float, half: float = 0.5):
+    """Yayla: robot height_m yüksekliğinde bir karenin üstünde doğar, her
+    yönde basamak iner."""
+    h = height_m
+    sdf = _boxes_sdf([(0, 0, h / 2, 2 * half, 2 * half, h)])
+
+    def height(x: float, y: float) -> float:
+        return h if max(abs(x), abs(y)) < half else 0.0
+
+    return sdf, height
+
+
+#: Zeminli eğitim denemesi (G7, 2026-09-26): 16 ortama birer zemin. S5 gelince
+#: onun üreteciyle değişecek; bu yalnız "politika tripod'un çıkamadığı 45 mm'yi
+#: öğrenebiliyor mu" sorusu için. Eğimler her yöne komutla hem inilir hem çıkılır.
+TRAIN_SETS = {
+    "deneme": (
+        ("düz", lambda: ("", None)),
+        ("düz", lambda: ("", None)),
+        ("çukur 20 mm", lambda: pit(0.020)),
+        ("çukur 30 mm", lambda: pit(0.030)),
+        ("çukur 40 mm", lambda: pit(0.040)),
+        ("çukur 45 mm", lambda: pit(0.045)),
+        ("çukur 50 mm", lambda: pit(0.050)),
+        ("çukur 55 mm", lambda: pit(0.055)),
+        ("çukur 60 mm", lambda: pit(0.060)),
+        ("yayla 30 mm", lambda: plateau(0.030)),
+        ("yayla 50 mm", lambda: plateau(0.050)),
+        ("eğim 10° x", lambda: slope(10.0)),
+        ("eğim 20° x", lambda: slope(20.0)),
+        ("eğim 15° y", lambda: slope(15.0, "y")),
+        ("eğim 25° x", lambda: slope(25.0)),
+        ("çukur 45 mm", lambda: pit(0.045)),
+    ),
+}
+
+
+def training_terrains(name: str, n: int) -> list[tuple[str, str, object]]:
+    """n ortama (ad, terrain_sdf, terrain_height): listeyi sırayla dağıt."""
+    if name not in TRAIN_SETS:
+        raise ValueError(f"bilinmeyen zemin seti {name!r}; olanlar: {sorted(TRAIN_SETS)}")
+    items = TRAIN_SETS[name]
+    out = []
+    for i in range(n):
+        label, make = items[i % len(items)]
+        sdf, height = make()
+        out.append((label, sdf, height))
+    return out
+
+
 #: (ad, zemin) — yön robotun ileri (+x) yürüyüşüne göre.
 TERRAINS = (
     ("düz", None),
@@ -77,6 +157,7 @@ TERRAINS = (
     ("basamak 15 mm", lambda: step(0.015)),
     ("basamak 30 mm", lambda: step(0.030)),
     ("basamak 45 mm", lambda: step(0.045)),
+    ("basamak 60 mm", lambda: step(0.060)),
 )
 
 

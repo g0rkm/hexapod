@@ -22,6 +22,11 @@ target_kl, bir güncellemedeki dönemleri KL bu değeri aşınca keser.
 --omni: her yöne yürüyüş (task.OMNI_COMMANDS: ileri/geri, yana, dönüş);
 taklit de --omni ile yapılmalı.
 
+--terrains AD: ortam başına zemin (terrain_probe.TRAIN_SETS[AD]; liste
+ortamlara sırayla dağıtılır, kütle çarpanları karıştırılır). Zemin ortamın
+ömrü boyunca sabit (dünya kurulurken yazılıyor). S5 gelince onun üreteci
+aynı biçimde (terrain_sdf, terrain_height) bir liste verecek.
+
 En iyi ara kayıt (2026-09-26): uzun eğitimde politika yine hedef hızı
 aşmaya kayıyordu, en iyisi 250k ara kaydıydı (ders 25). Her ara kayıtta
 (250 bin adımda bir) politika deterministik ölçülür (evaluate.eval_commands:
@@ -129,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="artık eylem modu (tripod + düzeltme); model de öyle olmalı")
     parser.add_argument("--omni", action="store_true",
                         help="her yöne komut (task.OMNI_COMMANDS)")
+    parser.add_argument("--terrains", default=None,
+                        help="ortam başına zemin seti (terrain_probe.TRAIN_SETS; S5 gelince onunki)")
     parser.add_argument("--power-weight", type=float, default=None,
                         help="güç cezası ağırlığı, W başına (varsayılan: TaskConfig)")
     parser.add_argument("--std", type=float, default=None,
@@ -147,8 +154,17 @@ def main(argv: list[str] | None = None) -> int:
     task = task_from_flags(args.residual, args.omni, args.randomize, w=weights)
     eval_task = task_from_flags(args.residual, args.omni)   # ölçüm: rastgeleleştirmesiz
     masses = body_mass_scales(args.envs, task)   # ortam başına gövde kütlesi çarpanı
-    venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task, body_mass_scale=m)
-                                     for i, m in enumerate(masses)],
+    terrains = [("düz", "", None)] * args.envs
+    if args.terrains:
+        from .terrain_probe import training_terrains
+        terrains = training_terrains(args.terrains, args.envs)
+        # kütle sıralı, zemin listesi de sıralı: aynı zemin hep aynı uç kütleye düşmesin
+        step = next(k for k in range(args.envs // 2 + 1, args.envs + 1)
+                    if math.gcd(k, args.envs) == 1)   # n ile aralarında asal: permütasyon
+        masses = [masses[(i * step) % args.envs] for i in range(args.envs)]
+    venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task, body_mass_scale=m,
+                                              terrain_sdf=sdf, terrain_height=h)
+                                     for i, (m, (_, sdf, h)) in enumerate(zip(masses, terrains))],
                                     start_method="fork"))
     if args.init_from:
         model = PPO.load(args.init_from, env=venv, device="cpu", seed=args.seed)
@@ -171,7 +187,8 @@ def main(argv: list[str] | None = None) -> int:
         f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\nstd: {args.std}\n"
         f"power_weight: {task.w['power']}\naction_mode: {task.action_mode}\n"
         f"omni: {args.omni}\nenvs: {args.envs}\n"
-        f"body_mass_scales: {[round(m, 3) for m in masses]}\n",
+        f"body_mass_scales: {[round(m, 3) for m in masses]}\n"
+        f"terrains: {[t[0] for t in terrains]}\n",
         encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt

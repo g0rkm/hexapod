@@ -271,3 +271,19 @@ def test_agir_govde_servolari_daha_cok_yukler(tmp_path_factory):
         finally:
             e.close()
     assert loads[1] > 1.1 * loads[0]
+
+
+def test_cukurda_dogar_ve_ayakta_durur(tmp_path_factory):
+    """Zeminli eğitim denemesinin çukuru: robot çukurun tabanında (z=0) doğar,
+    ayakları basamaklara değmez, altısı da yerde."""
+    from hexapod_rl.terrain_probe import pit
+
+    sdf, height = pit(0.045)
+    e = HexapodEnv(workdir=tmp_path_factory.mktemp("cukur"), terrain_sdf=sdf,
+                   terrain_height=height)
+    try:
+        e.reset(seed=0)
+        assert all(e._state.foot_contact) and e._state.ground_z == 0.0
+        assert e._state.base_pos[2] == pytest.approx(e.task.stand_height_mm / 1000, abs=0.004)
+    finally:
+        e.close()
