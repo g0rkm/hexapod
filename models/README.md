@@ -16,6 +16,69 @@ python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Same
 python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip:residual
 ```
 
+## Zeminli eğitim — `ppo_lift50_2250k` (2026-09-26 öğleden sonra)
+
+İlk zeminde eğitilmiş politika. Her yöne, artık eylem; **taban tripod ayağı
+50 mm kaldırıyor** (öncekiler 25 mm). Eğitim 16 ortamda, deneme zeminleriyle
+(`terrain_probe.TRAIN_SETS["deneme"]`: düz, 20–60 mm çukurlar, yaylalar,
+10–25° eğimler; S5'in yerine geçmez). Görev ayarı `gorev.json`'da; `evaluate`,
+`export`, `terrain_probe` oradan okur.
+
+**Önce tek başına taban** (düzeltmesiz PhaseTripod, 0.1 m/s, 10 s): ayak
+kaldırma 25 mm'de 45 mm basamak ve 50 mm yayladan iniş takılıyor; 40 mm'de
+ikisi de geçiliyor; 60 mm'de 60 mm basamak da. Düz zeminde ödül değişmiyor
+(3.20–3.24), güç 1.9 → 3.2–3.3 W.
+
+**Zemin ölçümü** (rastgeleleştirme açık, 3 tohum, deterministik, 10 s; alınan
+yol ve engeli geçen tohum sayısı; "geçti" = 0.4 m'den fazla ilerledi).
+"Zemin skoru": her durumda en fazla beklenen yol (1 m, yanda 0.6 m) sayılır,
+yani hedef hızı aşmak puan getirmez.
+
+| Model | 45 mm basamak | 60 mm basamak | çukur 45 geri | çukur 45 yana | çukur 60 geri | yayla 50 iniş | yokuş yukarı 20° | düz | Zemin skoru |
+|---|---|---|---|---|---|---|---|---|---|
+| tripod (Samet) | 0.09 (0/3) | 0.09 (0/3) | 0.14 (0/3) | 0.12 (0/3) | 0.13 (0/3) | 0.54 (3/3) | 0.76 | 0.98 | 0.404 |
+| tripod (Samet), adım 50 mm | 0.62 (2/3) | 0.09 (0/3) | 0.41 (2/3) | 0.12 (0/3) | 0.14 (0/3) | 0.86 (3/3) | 0.70 | 1.00 | 0.548 |
+| ppo_omni_250k (25 mm) | 0.08 (0/3) | 0.08 (0/3) | 0.12 (0/3) | 0.11 (0/3) | 0.12 (0/3) | 0.46 (3/3) | 0.85 | 1.02 | 0.407 |
+| taban 50 mm (düzeltme 0) | 0.90 (3/3) | 0.27 (1/3) | 0.91 (3/3) | 0.58 (3/3) | 0.45 (2/3) | 0.86 (3/3) | 0.82 | 1.00 | 0.791 |
+| **ppo_lift50_2250k** | **1.00 (3/3)** | 0.30 (1/3) | **1.03 (3/3)** | 0.59 (3/3) | **0.79 (3/3)** | 0.93 (3/3) | **0.91** | 1.10 | **0.879** |
+
+**Düz zemin** (her yön seti, 10 s, deterministik):
+
+| Model | Her yön ortalama ödül | İleri 0.05/0.10/0.15 hız | Güç (her yön ort.) | Rastgeleleştirmede | Eklem gürültüsü | Gövde ×1.6 |
+|---|---|---|---|---|---|---|
+| tripod | 2.848 | 0.049 / 0.098 / 0.146 | 1.85 W | 3.08–3.21 | 1.46 | 3.22 |
+| taban 50 mm | 2.829 | 0.049 / 0.100 / 0.150 | 3.13 W | 3.09–3.16 | 1.82 | 3.20 |
+| ppo_omni_250k | **2.868** | 0.050 / 0.100 / 0.150 | 1.98 W | 3.08–3.24 | 1.84 | 3.25 |
+| ppo_lift50_2250k | 2.764 | 0.053 / 0.109 / 0.165 | 3.82 W | 3.05–3.08 | **1.88** | 3.13 |
+
+- **Zeminde RL tabanını geçiyor:** aynı 50 mm tabana göre engellerde +%15
+  (0.726 → 0.834), zemin skoru 0.791 → 0.879. 60 mm çukurdan geri çıkışı
+  3/3 yapıyor (taban 2/3). 60 mm basamağı ileri çıkmayı güvenilir
+  öğrenmedi (ara kayıtlar 0/3–2/3 arasında dalgalanıyor).
+- **Samet'in tripod'u ve 25 mm'li politikalar** 45 mm'lik hiçbir engeli
+  geçemiyor. **Aynı adım yüksekliğinde de RL önde:** `TripodGait` 50 mm
+  adımla (`GaitParams.step_height_mm`; `terrain_probe tripod:50`) 45 mm
+  basamağı 2/3, çukurdan yana ve 60 mm'yi 0/3 geçiyor; zemin skoru 0.548
+  (RL 0.879). Düzde 50 mm adımlı tripod 0.10 m/s'de ödül 3.25, 2.57 W.
+- **Bedeli düz zemin:** hedef hızı %10 aşıyor (ders 25), güç 3.8 W
+  (25 mm'li politika 2.0 W). Düz zeminde `ppo_omni_250k` daha iyi.
+- ROS'lu simde gerçek düğümle (`tools/wsl/politika_ros_olcum.sh`): bütün
+  komutlarda yürüyor, ileri/geri/yana %106–111 (aşma burada da), dönüş
+  %98–99, sıfır komutta ayakta.
+- **Ara kayıt seçimi:** eğitim içindeki otomatik seçim düz zemine baktığı
+  için 250k'yı seçti (düzde en az aşan). Zemin skoruna göre en iyisi
+  2.25M; elle seçildi (`egitim_kayitlari/v13_lift50/zemin_olcumu.md`).
+  Zeminli eğitimde seçim ölçütüne zemin de girmeli.
+- Önceki deneme `v12_zemin` (taban 25 mm, aynı zeminler, 2.25M adım):
+  hiçbir engelde iyileşme yok; keşif gürültüsü ayağı yükseğe kaldırmayı
+  bulamadı (`egitim_kayitlari/v12_zemin/zemin_olcumu.md`).
+
+**Eğitim:** taklit `bc_lift50` (zeminlerde, 128 bölüm, std 0.1) → PPO
+`v13_lift50` (lr 1e-4, target_kl 0.02, std 0.1, 3M, 34 dk, 1461 adım/s).
+
+**Gerçek robotta DENENMEDİ.** Gerçek robotta 50 mm ayak kaldırmanın
+erişilebilirliği ve servo yükü eklem limitleri (D6) ile kontrol edilmeli.
+
 ## Her yöne yürüyüş — `ppo_omni_250k` (2026-09-26 öğlen, yeni PC)
 
 Politika artık ileri/geri (vx ±0.15), yana (vy ±0.08) ve dönüş (wz ±0.5)

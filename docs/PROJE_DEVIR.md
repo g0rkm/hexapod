@@ -8,8 +8,8 @@
 >
 > Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum §0.5;
 > zemine göre ayak teması §7.8; her yöne politika `ppo_omni_250k` §3.2;
-> kütle rastgeleleştirmesi; deneme zeminleri)
-> · Testler: **Linux 236/236**, Windows 197 geçti + 8 atlandı (Gazebo/ROS/SB3
+> kütle rastgeleleştirmesi; ilk zeminli eğitim `ppo_lift50_2250k` §3.3)
+> · Testler: **Linux 243/243**, Windows 203 geçti + 8 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -95,12 +95,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 197 geçti, 8 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 203 geçti, 8 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 236 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 243 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -309,7 +309,7 @@ artık geçersiz ya da güncellendi:
 | 5 | Klasik yürüyüş (tripod) | ✅ Samet: `hexapod_gait` (S2), `hexapod_teleop` (S3) |
 | 6 | Gerçek robot sürücü düğümü (`hexapod_hardware`) | ✅ Samet (S4); yalnız dry-run, donanımda denenmedi |
 | 7 | RL ortamı (`hexapod_rl`) | ✅ (G6); tripod aynı ortamda ölçüldü |
-| 8 | PPO eğitimi | 🔄 (G7). En iyisi `models/ppo_omni_250k` (her yöne; düz zeminde tripod'la başa baş, eğim/basamakta önde); zeminli eğitim S5'i bekliyor |
+| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_omni_250k` (her yöne); zeminde `models/ppo_lift50_2250k` (ilk zeminli eğitim, 45 mm engeller). Asıl zeminler S5'i bekliyor |
 | 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu Gazebo'da yürüdü; son G7 politikasıyla tekrar aktarılacak |
 | 10 | Pi 4'e aktarma | ⛔ donanım vardiyası (D11) |
 
@@ -363,7 +363,31 @@ görmüş artık eylem politikası. Tablolar [models/README.md](../models/README
 - **Deneme zeminleri** (`terrain_probe`, zemin görmeden): 20° yokuşta ve
   30 mm basamakta politikalar tripod'dan %6–21 hızlı. **45 mm basamağı
   hiçbiri çıkamıyor**: ayak 25 mm kalkıyor. Zeminli eğitimin çözmesi
-  gereken ilk somut örnek.
+  gereken ilk somut örnek. → §3.3.
+
+### 3.3 İlk zeminli eğitim (2026-09-26 öğleden sonra)
+
+Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim").
+
+- **Altyapı hazır:** ortam başına zemin (`train.py --terrains`), taklit de
+  zeminlerde (`pretrain.py --terrains`), görev ayarı modelin yanında
+  (`gorev.json`), taban ayak kaldırma ayarlı (`--lift-mm`). S5 gelince
+  yalnız zemin listesi değişir.
+- **Taban 25 mm'yken RL engelleri öğrenemedi** (`v12_zemin`, 2.25M adım):
+  keşif gürültüsü ayağı yükseğe kaldırmayı bulamıyor (ders 29).
+- **Taban 50 mm'de** (`ppo_lift50_2250k`): 45 mm basamak, 45 mm çukurdan
+  geri/yana çıkış, 50 mm yayladan iniş, 60 mm çukurdan geri çıkış hepsi
+  3/3 (rastgeleleştirme açık). Samet'in tripod'u ve 25 mm'li politikalar
+  bunların hiçbirini geçemiyor. Aynı 50 mm tabana göre RL engellerde
+  **+%15** (zemin skoru 0.791 → 0.879). 60 mm basamağı ileri çıkmayı
+  güvenilir öğrenmedi.
+- **Bedeli düz zemin:** hedef hızı %10 aşıyor, güç 3.8 W (25 mm'li
+  politika 2.0 W). Düz zeminde `ppo_omni_250k` daha iyi. İkisi de
+  depoda; hangisinin robota gideceği D11'de zemine göre seçilir.
+- **Adil karşılaştırma:** Samet'in `TripodGait`'i de 50 mm adımla
+  ölçüldü: zemin skoru 0.548 (25 mm'de 0.404), RL 0.879. Aynı adım
+  yüksekliğinde de RL açık ara önde; 45 mm çukurdan yana çıkış ve 60 mm
+  çukurdan geri çıkış tripod'da 0/3, RL'de 3/3.
 
 ---
 
@@ -802,9 +826,17 @@ taklit eder.
 - `--sde`: gSDE; bu kurulumda bozuldu (§12.24).
 
 **Eğitim (`train.py`):**
-- `--steps --envs --name --init-from --randomize --residual --omni --lr
-  --target-kl --std --power-weight`. Görev ayarı bayraklardan
-  `task.task_from_flags` ile kurulur (train, pretrain, export aynı yol).
+- `--steps --envs --name --init-from --randomize --residual --omni
+  --terrains --lift-mm --lr --target-kl --std --power-weight`. Görev ayarı
+  bayraklardan `task.task_from_flags` ile kurulur ve çıktı klasörüne
+  **`gorev.json`** olarak yazılır; `evaluate`, `export` ve `terrain_probe`
+  modelin yanındaki (ara kayıtsa bir üstündeki) bu dosyayı okur, bayrak
+  gerekmez. `models/<ad>/gorev.json` de depoda.
+- `--terrains AD`: ortam başına zemin (`terrain_probe.TRAIN_SETS`; liste
+  ortamlara sırayla dağıtılır, kütle çarpanları karıştırılır). Taklit de
+  aynı zeminlerde toplanabilir (`pretrain --terrains`).
+- `--lift-mm`: artık eylemde taban tripod'un ayak kaldırması (varsayılan 25;
+  zeminli eğitimde 50, §3.3).
 - Çıktılar `~/hexapod_runs/<ad>/`: model.zip (son), **best_model.zip**,
   checkpoints/ (250k'da bir), progress.csv, ara_degerlendirme.csv,
   ayarlar.txt, degerlendirme.txt.
@@ -897,8 +929,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 197 geçti, 8 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 236 geçti, ~40 s (yeni PC).
+- Windows: 203 geçti, 8 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 243 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1179,6 +1211,10 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | v10_omni (std 0.15) 2.1M'de durduruldu; `ppo_omni_250k` depoya | Deterministik skor 250k'dan sonra düştü (1M'de tripod'un altı), rastgeleleştirme açıkken de; eğitim ödülü artıyordu (ders 25). Kalan 3M boşa giderdi |
 | 09-26 | Gövde kütlesi rastgeleleştirmesi ×0.9–1.6, **ortam başına** | Faturadaki fazla batarya/buck ve kapak tahmine girmemişti; gz.sim kütleyi sonradan değiştiremediği için bölüm başına olamıyor |
 | 09-26 | Deneme zeminleri (`terrain_probe`) S5'ten ayrı, yalnız beklenti için | Plan §14-5. Zeminli eğitim ve "bitti" ölçümü S5 + S6 ile |
+| 09-26 | **Görev ayarı modelin yanında** (`gorev.json`); evaluate/export/terrain_probe bayraksız okur | Ayak kaldırması farklı bir modeli yanlış tabanla ölçmek ya da robota aktarmak sessiz bir hata olurdu |
+| 09-26 | Zeminli eğitim ortam başına (`--terrains`), ilk deneme kendi deneme zeminlerimle | S5 henüz yok; altyapı hazır olsun, S5 gelince yalnız liste değişsin |
+| 09-26 | v12_zemin (taban 25 mm) 2.25M'de durduruldu; **taban ayak kaldırma 50 mm** ile yeniden (`--lift-mm 50`) | 2M adımda hiçbir engelde iyileşme yoktu; düzeltmesiz tripod 40–60 mm kaldırmayla 45–60 mm engelleri geçiyor ve düzde ödül değişmiyor |
+| 09-26 | `ppo_lift50_2250k` depoya, ara kayıt elle (zemin skoruyla) seçildi | Eğitim içi seçim düz zemine bakıp 250k'yı seçti; zemin skorunda en iyisi 2.25M |
 | 09-26 | **Ayak teması ve gövde yüksekliği zemin yüksekliği fonksiyonuna göre** (`terrain_height(x, y)`, `terrain_sdf` ile zorunlu çift); fizik motorunun temas sensörü değil | Sensör yolu (Contact sistemi + gz.transport) tek süreci 381 → 182 adım/s yavaşlattı ve mesajlar eşzamansız (tekrarlanabilirlik bozulur). Yükseklik yolu bedava, sensörle 0–20° eğimde %97.8–98.8 uyumlu (§12.26). Yüksekliksiz zemin reddedilir: z=0 varsaymak değer uydurmak olur |
 
 ---
@@ -1365,6 +1401,21 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     kayıt seçimi için deterministik düz zemin ölçümü şimdilik yeterli:
     rastgeleleştirmeli ölçüm v10'da aynı sırayı verdi (250k > 2M > 1M),
     v11'de ara kayıtlar ikisinde de gürültü düzeyinde farklı.
+29. **Kör politika büyük bir hareket değişikliğini keşif gürültüsüyle
+    bulamaz; tabanı doğru kur.** Taban tripod ayağı 25 mm kaldırırken 45 mm
+    basamağı geçmek ~25 mm daha yüksek salınım istiyordu; artık eylem
+    ölçeği (0.2 rad) buna yetiyordu ama std 0.1'lik bağımsız gürültü
+    bütün bacaklarda tutarlı bir yükseltmeyi hiç denemedi: 2.25M adımda
+    sıfır ilerleme (v12). Tabanı elle 50 mm yapınca aynı engeller hemen
+    geçildi ve RL üstüne %15 kattı (v13). Önce düzeltmesiz tabanın
+    parametrelerini zeminde tara (`terrain_probe phase:<mm>`), RL'yi
+    tabanın yetmediği farkı öğrenmeye bırak.
+30. **Zeminli eğitimde ara kayıt seçimi zemini görmeli.** Eğitim içi seçim
+    düz zemine bakıyordu; zeminde en iyi ara kayıt (2.25M) düzde hedef hızı
+    %10 aştığı için düşük puan aldı ve 250k seçildi (zemin skoru 0.755'e
+    0.879). Zemin ölçümü şimdilik elle, paralel betikle yapıldı
+    (`egitim_kayitlari/v13_lift50/zemin_olcumu.md`). Ölçüt olarak hedef
+    hızı aşmayı ödüllendirmeyen "en fazla beklenen yol" kullanıldı.
 
 ---
 
@@ -1395,8 +1446,9 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
    düz ister (10° eğimde ayakta duran robot adım başı ~0.06 kaybeder).
    Politika eğimde gövdeyi yataya çekmeyi öğrenirse iyi; zeminli eğitimde
    buna bakılmalı, gerekirse zemin normaline göre ölçülür.
-2. **Zeminli eğitim** (S5'i bekler). Süreç başına ayrı `terrain_sdf` +
-   `terrain_height`, kolaydan zora müfredat. Robot zemine göre doğuyor.
+2. **Zeminli eğitim** (asıl zeminler S5'i bekler). Altyapı hazır: ortam
+   başına `terrain_sdf` + `terrain_height` (`--terrains`), ilk deneme kendi
+   deneme zeminlerimle (§3.3). Kolaydan zora müfredat henüz yok.
 3. ~~**Komut aralığı.**~~ ✅ 2026-09-26: `--omni`, `models/ppo_omni_250k`
    (§3.2). Düğüm aralıkları ve ölü bölgeyi `.npz`'den okur.
 4. **Uzun eğitimde deterministik davranışın kötüleşmesi** (ders 25, 28).
@@ -1461,15 +1513,26 @@ zeminler.
 6. ✅ **G8'i her yön politikasıyla tekrarla:** ROS'lu simde her komutta
    %96–104, sıfır komutta hareket yok (§7.9). Araç:
    `bash tools/wsl/politika_ros_olcum.sh [policy.npz]`.
-7. **Zeminli eğitim altyapısı:** ortam başına farklı zemin (`make_env`'e
-   `terrain_sdf`/`terrain_height`; 16 ortama bir zemin listesi dağıtılır,
-   kütle gibi). S5 gelince yalnız liste değişir. Önce `terrain_probe`
-   zeminleriyle (eğimler + 15–60 mm basamaklar) bir deneme: 45 mm basamağı
-   öğrenebiliyor mu? Artık eylem ölçeği 0.2 rad ayağı ~30 mm daha
-   kaldırmaya yetebilir; yetmezse ölçek ya da `lift_mm` gözden geçirilir.
-   Beklenti oluşturur, S5'in yerine geçmez.
-8. Eğimde `orientation` cezası dünyaya göre (§13.2-1); zeminli eğitimde
-   gövdeyi yataya çekmeye zorluyor mu bak.
+7. ✅ **Zeminli eğitim altyapısı** (`--terrains`, `--lift-mm`, `gorev.json`)
+   ve ilk deneme: taban 25 mm'de öğrenemedi, 50 mm'de `ppo_lift50_2250k`
+   (§3.3).
+
+**Sıradaki (S5 gelmeden, önerilen sıra):**
+
+8. **Eğitim içi ara kayıt seçimine zemin** (ders 30): `--terrains` verilince
+   geri çağrı birkaç zemin durumunu da ölçsün (ayrı Gazebo dünyası;
+   süreç içinde kur-kapat), skor "en fazla beklenen yol" gibi aşmayı
+   ödüllendirmesin.
+9. ✅ **Adil karşılaştırma:** `TripodGait` 50 mm adımla (`terrain_probe
+   tripod:50`) zemin skoru 0.548, RL 0.879 (§3.3).
+10. **Düzde aşma ve enerji:** 50 mm'li politika hedef hızı %10 aşıyor ve
+    3.8 W harcıyor. Seçenekler: std 0.05 ile devam (ders 25), ya da ödülde
+    aşmayı cezalandırmak.
+11. **60 mm:** taban 60 mm kaldırmayla ya da daha uzun eğitimle. Gövde
+    çarpışma kutusunun altı yerden ~63 mm'de; 60 mm sınıra yakın.
+12. Eğimde `orientation` cezası dünyaya göre (§13.2-1): v13 20° yokuşta
+    yürüdü; cezanın gövdeyi yataya çekmeye zorladığına dair işaret yok,
+    ama S5'in eğimlerinde bakılmalı.
 
 **S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
 S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son
@@ -1544,7 +1607,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 197 geçti, 8 atlandı. WSL: 236 geçti.
+   - Windows: 203 geçti, 8 atlandı. WSL: 243 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).

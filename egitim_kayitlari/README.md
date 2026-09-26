@@ -38,6 +38,8 @@ tablolar: `models/README.md`.
 | `hiz_testi_env8/12/16` | yeni PC hız testi: 8/12/16 ortam, 40 güncelleme turu | 1342 / 1588 / 1818 adım/s (PROJE_DEVIR §0.5) |
 | `bc_omni`, `v10_omni` | her yöne komut (`--omni`), std 0.15, 16 ortam; 2.1M'de durduruldu | en iyi ara kayıt 250k → `models/ppo_omni_250k`; sonra deterministik skor düştü (ders 25) |
 | `bc_omni_m`, `v11_omni` | her yön, std 0.05, kütle rastgeleleştirmeli, 3M | düşüş yok, tripod düzeyinde (en iyi 750k, 2.850) |
+| `v12_zemin` | `ppo_omni_250k`'dan devam, deneme zeminleri (`--terrains deneme`), taban 25 mm, std 0.1; 2.25M'de durduruldu | hiçbir engelde iyileşme yok (`zemin_olcumu.md`) |
+| `bc_lift50`, `v13_lift50` | taban ayak kaldırma 50 mm, taklit ve PPO deneme zeminlerinde, 3M | 2.25M ara kaydı → `models/ppo_lift50_2250k`; bütün ara kayıtların zemin ölçümü `zemin_olcumu.md` (rastgeleleştirme açık, 3 tohum) |
 | `omni_olcum_2026-09-26.txt` | v10/v11 ve tabanların ham ölçüm çıktısı (her yön, ileri, rastgeleleştirme, gürültü, kütle, deneme zeminleri) | tablolar `models/README.md`'de |
 
 Yeni PC'den (2026-09-26 öğlen) itibaren her eğitimde ayrıca:
