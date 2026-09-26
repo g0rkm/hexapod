@@ -1,0 +1,50 @@
+veri: 64 bölüm, 64000 adım, 77 s; gürültü 0.1; devrilen 0; rastgeleleştirme açık; gösterimin adım başı ödülü 1.761
+tur 10: aktor_rmse 0.0212, kritik_aciklanan_varyans 0.6287
+tur 20: aktor_rmse 0.0092, kritik_aciklanan_varyans 0.6490
+tur 30: aktor_rmse 0.0051, kritik_aciklanan_varyans 0.6261
+tur 40: aktor_rmse 0.0038, kritik_aciklanan_varyans 0.6183
+tur 50: aktor_rmse 0.0033, kritik_aciklanan_varyans 0.5995
+tur 60: aktor_rmse 0.0028, kritik_aciklanan_varyans 0.5843
+std 0.15 (gerçekleşen 0.150, gSDE); doğrulama: aktor_rmse 0.0028, kritik_aciklanan_varyans 0.5843
+--- değerlendirme, komut vx=0.05
+komut_vx: 0.050
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: 0.497
+yana_kayma_m: -0.002
+ortalama_hiz_m_s: 0.050
+toplam_yol_m: 0.497
+yon_sapmasi_derece: -0.331
+devrildi: False
+adim_basi_odul: 2.835
+ortalama_guc_w: 1.538
+ritim_uyumu: 0.942
+havadaki_ayak_orani: 0.450
+--- değerlendirme, komut vx=0.1
+komut_vx: 0.100
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: 0.969
+yana_kayma_m: 0.001
+ortalama_hiz_m_s: 0.097
+toplam_yol_m: 0.969
+yon_sapmasi_derece: 0.215
+devrildi: False
+adim_basi_odul: 3.209
+ortalama_guc_w: 1.920
+ritim_uyumu: 0.940
+havadaki_ayak_orani: 0.445
+--- değerlendirme, komut vx=0.15
+komut_vx: 0.150
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: 1.450
+yana_kayma_m: 0.056
+ortalama_hiz_m_s: 0.145
+toplam_yol_m: 1.451
+yon_sapmasi_derece: 2.182
+devrildi: False
+adim_basi_odul: 3.584
+ortalama_guc_w: 2.531
+ritim_uyumu: 0.939
+havadaki_ayak_orani: 0.446

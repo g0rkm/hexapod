@@ -1,0 +1,13 @@
+02:02 bekleniyor: v5_dr 5M
+04:21 v5_dr durduruldu (5M)
+04:23 bc_v6 bitti; v6_sde başlıyor
+04:30 v6_sde bitti
+04:30 v6_sde durduruldu (ödül düşüyordu); v6b başlıyor (lr 1e-4, target_kl 0.02)
+04:54 v6b_sde bitti
+04:55 v6b durduruldu (gSDE: ödül 2300->1630, dönmeye kaydı); v7 başlıyor
+06:12 v7_lowstd bitti
+06:19 v8_power başlıyor (v7'den, güç -0.10/W)
+07:07 v8_power bitti
+07:15 bc_res başlıyor (artık eylem)
+07:16 v9_res başlıyor
+08:31 v9_res bitti

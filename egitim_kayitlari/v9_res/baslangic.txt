@@ -1,0 +1,1 @@
+/home/gorkem/hexapod_runs/bc_res/model.zip

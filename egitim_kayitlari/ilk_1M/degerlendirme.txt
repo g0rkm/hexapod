@@ -1,0 +1,6 @@
+adım: 1000000, ortam: 8, süre: 34.2 dk (487 adım/s)
+komut_vx: 0.100
+sure_s: 10.000
+alinan_yol_m: -0.015
+ortalama_hiz_m_s: -0.001
+devrildi: False

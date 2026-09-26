@@ -1,0 +1,9 @@
+adım: 10000000, ortam: 8, süre: 488.6 dk (341 adım/s)
+komut_vx: 0.100
+sure_s: 10.000
+alinan_yol_m: 0.472
+yana_kayma_m: -0.725
+ortalama_hiz_m_s: 0.047
+devrildi: False
+ritim_uyumu: 0.767
+havadaki_ayak_orani: 0.669

@@ -1,0 +1,14 @@
+adım: 2000000, ortam: 8, süre: 48.2 dk (692 adım/s)
+komut_vx: 0.100
+gurultu: 0.000
+sure_s: 10.000
+alinan_yol_m: 1.031
+yana_kayma_m: -0.016
+ortalama_hiz_m_s: 0.103
+toplam_yol_m: 1.031
+yon_sapmasi_derece: -7.200
+devrildi: False
+adim_basi_odul: 3.011
+ortalama_guc_w: 6.361
+ritim_uyumu: 0.948
+havadaki_ayak_orani: 0.472

@@ -1,0 +1,1 @@
+/mnt/c/Users/gorke/OneDrive/Masaüstü/hexapod/models/tork_v2_10M/model.zip
