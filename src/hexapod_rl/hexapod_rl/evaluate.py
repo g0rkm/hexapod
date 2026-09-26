@@ -143,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     from dataclasses import replace
 
-    from .task import Randomization, find_task, task_from_flags
+    from .task import Randomization, find_task, standard_reward, task_from_flags
     task = task_from_flags(args.residual, randomize=args.randomize)
     if args.model == "tripod":
         from .baseline import TripodPolicy
@@ -152,8 +152,8 @@ def main(argv: list[str] | None = None) -> int:
         model = PPO.load(Path(args.model), device="cpu")
         trained = find_task(args.model)   # eğitimin gorev.json'ı: eylem modu, taban yürüyüş
         if trained is not None:
-            task = replace(trained, randomization=Randomization() if args.randomize else None,
-                           w=task.w)
+            task = standard_reward(replace(
+                trained, randomization=Randomization() if args.randomize else None))
             print(f"# görev ayarı modelin gorev.json'ından (eylem modu {task.action_mode}, "
                   f"ayak kaldırma {task.lift_mm:g} mm)", file=sys.stderr)
     print(format_result(evaluate(model, args.seconds, args.vx, seed=args.seed,

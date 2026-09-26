@@ -356,3 +356,39 @@ def test_deneme_zemini_phase_ayak_kaldirma():
     _, task = load("phase:50")
     assert task.action_mode == "residual" and task.lift_mm == 50.0
     assert load("phase")[1].lift_mm == TaskConfig().lift_mm
+
+
+# --- ödül v7: aşma cezası (2026-09-26) -------------------------------------------
+
+
+def test_odul_v7_komutu_asmak_kaybettirir():
+    """v6'da komutu aşmak progress'i değiştirmiyordu (kırpma); v7'de tepe tam
+    komutta. Komutun altında ikisi aynı; katsayı 0 = v6."""
+    from dataclasses import replace
+
+    v6 = TaskConfig()
+    v7 = replace(v6, progress_overshoot=1.0)
+    cmd = (0.1, 0.0, 0.0)
+
+    def progress(cfg, vx):
+        _, t = reward(state(lin=(vx, 0.0, 0.0)), [0.0] * 18, [0.0] * 18, cmd, cfg, False,
+                      tracked=(vx, 0.0, 0.0))
+        return t["progress"] / cfg.w["progress"]
+
+    assert progress(v6, 0.08) == pytest.approx(0.08) == pytest.approx(progress(v7, 0.08))
+    assert progress(v6, 0.10) == pytest.approx(0.10) == pytest.approx(progress(v7, 0.10))
+    assert progress(v6, 0.12) == pytest.approx(0.10)              # v6: aşmak bedava
+    assert progress(v7, 0.12) == pytest.approx(0.08)              # v7: 0.02 aşma = 0.02 eksik
+    assert progress(v7, -0.05) == 0.0                              # ters yöne gitmek eksi değil
+
+
+def test_rapor_odulu_ortak():
+    from dataclasses import replace
+
+    from hexapod_rl.task import standard_reward
+
+    cfg = replace(TaskConfig(action_mode="residual", lift_mm=50.0), progress_overshoot=1.0,
+                  w={**TaskConfig().w, "power": -0.2})
+    s = standard_reward(cfg)
+    assert s.progress_overshoot == 0.0 and s.w == TaskConfig().w
+    assert s.lift_mm == 50.0 and s.action_mode == "residual"      # görev (taban) aynı kalır

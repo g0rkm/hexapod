@@ -156,7 +156,8 @@ def main(argv: list[str] | None = None) -> int:
     from dataclasses import replace
 
     from .env import make_env
-    from .task import TASK_FILE, TaskConfig, body_mass_scales, task_from_flags, task_to_json
+    from .task import (TASK_FILE, TaskConfig, body_mass_scales, standard_reward, task_from_flags,
+                       task_to_json)
 
     parser = argparse.ArgumentParser(description="Hexapod PPO eğitimi")
     parser.add_argument("--steps", type=int, default=1_000_000)
@@ -176,6 +177,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="ortam başına zemin seti (terrain_probe.TRAIN_SETS; S5 gelince onunki)")
     parser.add_argument("--lift-mm", type=float, default=None,
                         help="artık eylemde taban tripod'un ayak kaldırması (varsayılan TaskConfig)")
+    parser.add_argument("--overshoot", type=float, default=None,
+                        help="ödül v7: komutu aşan hızın progress'ten düşülme katsayısı (1: simetrik)")
     parser.add_argument("--power-weight", type=float, default=None,
                         help="güç cezası ağırlığı, W başına (varsayılan: TaskConfig)")
     parser.add_argument("--std", type=float, default=None,
@@ -191,8 +194,11 @@ def main(argv: list[str] | None = None) -> int:
     weights = dict(TaskConfig().w)
     if args.power_weight is not None:
         weights["power"] = args.power_weight
-    task = task_from_flags(args.residual, args.omni, args.randomize, args.lift_mm, w=weights)
-    # ölçüm: rastgeleleştirmesiz ve standart ödülle (eğitimler karşılaştırılabilsin)
+    extra = {} if args.overshoot is None else {"progress_overshoot": args.overshoot}
+    task = task_from_flags(args.residual, args.omni, args.randomize, args.lift_mm, w=weights,
+                           **extra)
+    # Ara kayıt seçimi: rastgeleleştirmesiz; ağırlıklar standart ama progress
+    # biçimi (v7 aşma cezası) eğitimdeki gibi, seçim hedefle tutarlı olsun.
     eval_task = replace(task, randomization=None, w=dict(TaskConfig().w))
     # Görev ayarı modelin yanında: evaluate/export/terrain_probe bayraksız okur.
     (out / TASK_FILE).write_text(task_to_json(task), encoding="utf-8")
@@ -248,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
     model.save(out / "model")
     venv.close()
 
-    result = evaluate(model, task=eval_task)
+    result = evaluate(model, task=standard_reward(eval_task))   # rapor: ortak ödül
     lines = [f"adım: {args.steps}, ortam: {args.envs}, süre: {wall / 60:.1f} dk "
              f"({args.steps / wall:.0f} adım/s)"]
     if best.best_step is not None:

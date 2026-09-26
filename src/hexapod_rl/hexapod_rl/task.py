@@ -80,6 +80,14 @@ Artık eylemde eylem 0 = tripod; politika düz zeminde tripod'un verimiyle
 başlar, yalnız gerektiğinde düzeltir. "residual" terimi düzeltmenin
 büyüklüğünü (eylem karelerinin ortalaması) cezalandırır; yalnız bu modda.
 
+Ödül v7 (progress_overshoot, 2026-09-26; varsayılan 0 = v6): 50 mm tabanlı
+zemin politikaları hedef hızı %10-14 aşıyor ve fazladan enerji harcıyordu;
+düşük keşif gürültüsü (ders 25'in çaresi) bunu düzeltmedi. Sebep progress'in
+kırpılması: süzülmüş hız komutun altına düşünce puan kaybediliyor, üstüne
+çıkınca kaybedilmiyor; hız dalgalandıkça (engel, itme) ortalamayı komutun
+üstünde tutmak kârlı. v7'de komutun üstündeki her m/s, progress_overshoot
+katsayısıyla düşülür (1: tepe tam komutta, iki yan simetrik).
+
 Zemin (2026-09-26): gövde yüksekliği (height terimi, devrilme) ve ayak
 teması, düz zeminin z=0'ına değil altındaki zemine göre (SimState.ground_z,
 sim.py'deki terrain_height). Düz zeminde ödül değişmedi.
@@ -133,6 +141,8 @@ class TaskConfig:
         "fall": -10.0,         # devrilince bir kez
         "residual": -0.5,      # yalnız artık eylem modunda: ortalama eylem karesi
     })
+    # v7 (2026-09-26): komutu aşan hız progress'ten bu katsayıyla düşülür (0: v6)
+    progress_overshoot: float = 0.0
     lin_vel_sigma: float = 0.05    # m/s; v3'te 0.10 -> 0.05
     yaw_rate_sigma: float = 0.1    # rad/s; v3'te 0.5 -> 0.2, v6'da -> 0.1
     vel_filter_s: float = 0.5      # s; v4: izleme terimleri bu ortalamaya bakar
@@ -181,6 +191,15 @@ def task_to_json(cfg: TaskConfig) -> str:
     import json
     from dataclasses import asdict
     return json.dumps(asdict(cfg), ensure_ascii=False, indent=1)
+
+
+def standard_reward(cfg: TaskConfig) -> TaskConfig:
+    """Aynı görev, raporlamanın ortak ödülüyle (TaskConfig'in varsayılan
+    ağırlıkları, progress_overshoot 0 = ödül v6): farklı ödülle eğitilmiş
+    modeller aynı ölçekte karşılaştırılsın. Hız, güç ve yol ayrıca yazılır."""
+    from dataclasses import replace
+    base = TaskConfig()
+    return replace(cfg, w=dict(base.w), progress_overshoot=base.progress_overshoot)
 
 
 def task_from_json(text: str) -> TaskConfig:
@@ -362,7 +381,7 @@ def reward(state: SimState, action, prev_action, command: tuple[float, float, fl
     ex, ey = command[0] - tx, command[1] - ty
     terms = {
         "lin_vel": math.exp(-(ex * ex + ey * ey) / cfg.lin_vel_sigma ** 2),
-        "progress": _progress(tx, ty, command),
+        "progress": _progress(tx, ty, command, cfg.progress_overshoot),
         "gait": gait_score(state.foot_contact, phase, groups),
         "yaw_rate": math.exp(-((command[2] - twz) ** 2) / cfg.yaw_rate_sigma ** 2),
         "orientation": g[0] ** 2 + g[1] ** 2,
@@ -378,10 +397,13 @@ def reward(state: SimState, action, prev_action, command: tuple[float, float, fl
     return sum(weighted.values()), weighted
 
 
-def _progress(vx: float, vy: float, command) -> float:
-    """Komut yönündeki hız, [0, |komut|] aralığına kırpılmış (m/s)."""
+def _progress(vx: float, vy: float, command, overshoot: float = 0.0) -> float:
+    """Komut yönündeki hız (m/s): komutun altında olduğu gibi (en az 0),
+    üstünde |komut| - overshoot x fazlası (overshoot 0: v6'daki gibi kırpılır)."""
     speed = math.hypot(command[0], command[1])
     if speed < 1e-9:
         return 0.0
     along = (vx * command[0] + vy * command[1]) / speed
-    return max(0.0, min(speed, along))
+    if along <= speed:
+        return max(0.0, along)
+    return speed - overshoot * (along - speed)

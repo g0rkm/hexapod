@@ -200,7 +200,7 @@ def load(spec: str):
     görev ondan (eylem modu, taban yürüyüş); yoksa ":residual" eki."""
     from dataclasses import replace
 
-    from .task import TaskConfig, find_task
+    from .task import TaskConfig, find_task, standard_reward
 
     if spec.startswith("tripod"):   # "tripod" ya da "tripod:50" (adım yüksekliği, mm)
         from .baseline import TripodPolicy
@@ -214,8 +214,7 @@ def load(spec: str):
     path, _, mode = spec.partition(":")
     trained = find_task(path)
     if trained is not None:
-        return PPO.load(path, device="cpu"), replace(trained, randomization=None,
-                                                     w=dict(TaskConfig().w))
+        return PPO.load(path, device="cpu"), standard_reward(replace(trained, randomization=None))
     return PPO.load(path, device="cpu"), TaskConfig(
         action_mode="residual" if mode == "residual" else "absolute")
 
