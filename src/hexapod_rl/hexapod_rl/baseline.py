@@ -28,15 +28,21 @@ _COMMAND = slice(OBS_SIZE - 5, OBS_SIZE - 2)   # gözlemde vx, vy, wz (task.obse
 
 
 class TripodPolicy:
-    def __init__(self, task: TaskConfig | None = None, config_path=None) -> None:
+    def __init__(self, task: TaskConfig | None = None, config_path=None,
+                 step_height_mm: float | None = None) -> None:
+        """step_height_mm: salınımda ayak kaldırma (GaitParams.step_height_mm;
+        verilmezse Samet'in varsayılanı). Zeminde RL ile adil karşılaştırma
+        için: politika tabanı 50 mm kaldırıyorsa tripod da öyle ölçülür."""
         self.task = task or TaskConfig()
         kin = HexapodKinematics.from_config(RobotConfig.load(config_path))
         pose = standing_pose(kin, self.task.stand_reach_mm, self.task.stand_height_mm)
         self.default = [math.radians(v) for leg in sorted(pose)
                         for v in pose[leg].as_dict().values()]
+        extra = {} if step_height_mm is None else {"step_height_mm": float(step_height_mm)}
         self.gait = TripodGait(kin, GaitParams(cycle_hz=self.task.gait_hz,
                                                stance_reach_mm=self.task.stand_reach_mm,
-                                               stance_height_mm=self.task.stand_height_mm))
+                                               stance_height_mm=self.task.stand_height_mm,
+                                               **extra))
         self.dt = 1.0 / COMMAND_RATE_HZ
 
     def reset(self) -> None:

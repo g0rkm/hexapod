@@ -32,3 +32,12 @@ def test_tripod_eylemleri_kirpilmadan_sigar():
             action, _ = policy.predict(obs)
             assert len(action) == 18
             assert max(abs(a) for a in action) <= 1.0
+
+
+def test_adim_yuksekligi_verilebilir():
+    """Zeminde RL ile adil karşılaştırma: tripod da politikanın tabanı kadar
+    yüksek adım atabilmeli; verilmezse Samet'in varsayılanı."""
+    from hexapod_gait import GaitParams
+
+    assert TripodPolicy().gait.params.step_height_mm == GaitParams().step_height_mm
+    assert TripodPolicy(step_height_mm=50.0).gait.params.step_height_mm == 50.0

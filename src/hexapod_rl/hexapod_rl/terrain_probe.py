@@ -173,16 +173,18 @@ class _ZeroResidual:
 def load(spec: str):
     """Model tanımı -> (model, görev ayarı; rastgeleleştirmesiz).
 
-    "tripod", "phase" (düzeltmesiz PhaseTripod), "phase:50" (ayak 50 mm
-    kalkan), "<zip>" ya da "<zip>:residual". Modelin yanında gorev.json varsa
+    "tripod" (Samet'in; "tripod:50" adım yüksekliği 50 mm), "phase"
+    (düzeltmesiz PhaseTripod), "phase:50" (ayak 50 mm kalkan), "<zip>" ya da
+    "<zip>:residual". Modelin yanında gorev.json varsa
     görev ondan (eylem modu, taban yürüyüş); yoksa ":residual" eki."""
     from dataclasses import replace
 
     from .task import TaskConfig, find_task
 
-    if spec == "tripod":
+    if spec.startswith("tripod"):   # "tripod" ya da "tripod:50" (adım yüksekliği, mm)
         from .baseline import TripodPolicy
-        return TripodPolicy(), TaskConfig()
+        _, _, h = spec.partition(":")
+        return TripodPolicy(step_height_mm=float(h) if h else None), TaskConfig()
     if spec.startswith("phase"):
         _, _, lift = spec.partition(":")
         task = TaskConfig(action_mode="residual")
