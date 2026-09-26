@@ -9,7 +9,7 @@
 > Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum §0.5;
 > zemine göre ayak teması §7.8; her yöne politika `ppo_omni_250k` §3.2;
 > kütle rastgeleleştirmesi; zeminli eğitim `ppo_lift50_3750k` §3.3)
-> · Testler: **Linux 245/245**, Windows 204 geçti + 8 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 247/247**, Windows 206 geçti + 8 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -95,12 +95,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 204 geçti, 8 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 206 geçti, 8 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 245 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 247 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -387,6 +387,11 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
 - **Devam (v14, std 0.05):** düzde aşmayı azaltmadı (%14, 4.0 W) ama
   zeminde ilerledi: `ppo_lift50_3750k` 60 mm basamağı da 3/3 geçiyor,
   zemin skoru 0.957 (tablolar models/README). Zeminde şu an en iyisi bu.
+- **Aşmayı ödülle düzeltme (ödül v7, v15/v16):** komutu aşan hız
+  `progress`'ten düşülünce (katsayı 1 ve 3) hız 0.114 → 0.110/0.107'ye
+  indi ama güç 3.9–4.0 W'ta kaldı; katsayı 3'te zemin becerisi bozuldu
+  (çukurdan yana çıkış 0/3). **Kör politikada düz verim ile zemin
+  sağlamlığı arasında ödünleşim var** (ders 33).
 - **Adil karşılaştırma:** Samet'in `TripodGait`'i de 50 mm adımla
   ölçüldü: zemin skoru 0.548 (25 mm'de 0.404), RL 0.879. Aynı adım
   yüksekliğinde de RL açık ara önde; 45 mm çukurdan yana çıkış ve 60 mm
@@ -799,6 +804,11 @@ Python bağları, TestFixture).
 - action_rate −0.01, fall −10
 - residual −0.5 × ortalama eylem karesi (yalnız artık eylem modunda)
 
+İsteğe bağlı ödül v7 (`--overshoot k`, `TaskConfig.progress_overshoot`;
+varsayılan 0 = v6): komutu aşan hız `progress`'ten k katsayısıyla düşülür.
+Raporlar bütün modellerde ortak ödülle (`task.standard_reward`, v6)
+verilir; hız ve güç ayrıca yazılır (ders 33).
+
 İzleme terimleri gövde hızının 0.5 s'lik üstel ortalamasına bakar
 (`VelocityFilter`). Ödülün v1'den v6'ya nasıl ve neden değiştiği `task.py`
 modül açıklamasında ve karar günlüğünde (§11).
@@ -932,8 +942,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 204 geçti, 8 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 245 geçti, ~40 s (yeni PC).
+- Windows: 206 geçti, 8 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 247 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1218,6 +1228,7 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | Zeminli eğitim ortam başına (`--terrains`), ilk deneme kendi deneme zeminlerimle | S5 henüz yok; altyapı hazır olsun, S5 gelince yalnız liste değişsin |
 | 09-26 | v12_zemin (taban 25 mm) 2.25M'de durduruldu; **taban ayak kaldırma 50 mm** ile yeniden (`--lift-mm 50`) | 2M adımda hiçbir engelde iyileşme yoktu; düzeltmesiz tripod 40–60 mm kaldırmayla 45–60 mm engelleri geçiyor ve düzde ödül değişmiyor |
 | 09-26 | `ppo_lift50_2250k` depoya, ara kayıt elle (zemin skoruyla) seçildi | Eğitim içi seçim düz zemine bakıp 250k'yı seçti; zemin skorunda en iyisi 2.25M |
+| 09-26 | Ödül v7 (`progress_overshoot`) eklendi ama varsayılan 0 (v6) kaldı; v15/v16 modelleri depoya alınmadı | Aşma biraz azaldı, enerji azalmadı, katsayı 3'te zemin bozuldu (ders 33). Raporlar ortak ödülle (`standard_reward`, v6) |
 | 09-26 | v14 (std 0.05, 2M) → `ppo_lift50_3750k` depoya; ara kayıt rastgeleleştirmeli 3 tohumla elle seçildi | Düzde aşma azalmadı ama 60 mm basamak 3/3, zemin skoru 0.957; eğitim içi deterministik seçim (500k) ikili durumlarda gürültülü (ders 32) |
 | 09-26 | **Ayak teması ve gövde yüksekliği zemin yüksekliği fonksiyonuna göre** (`terrain_height(x, y)`, `terrain_sdf` ile zorunlu çift); fizik motorunun temas sensörü değil | Sensör yolu (Contact sistemi + gz.transport) tek süreci 381 → 182 adım/s yavaşlattı ve mesajlar eşzamansız (tekrarlanabilirlik bozulur). Yükseklik yolu bedava, sensörle 0–20° eğimde %97.8–98.8 uyumlu (§12.26). Yüksekliksiz zemin reddedilir: z=0 varsaymak değer uydurmak olur |
 
@@ -1442,6 +1453,17 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     Ayrıca: std 0.05 (ders 25) 50 mm tabanlı politikada hız aşmasını
     azaltmadı (%10 → %14); aşma burada gürültü uyumundan değil, engel
     geçmenin getirdiği agresif yürüyüşten olabilir.
+33. **Kör politikada düz verim ↔ zemin sağlamlığı ödünleşimi.** 50 mm
+    tabanlı zemin politikası düzde hedef hızı %14 aşıyor ve 4.0 W harcıyor
+    (aşmayan taban 3.1 W). Ödül v7 ile aşma cezalandırıldı (önce ders 20:
+    v7 davranışları doğru sıralıyordu). Katsayı 1'de hız 0.114 → 0.110,
+    katsayı 3'te 0.107; **güç ikisinde de 3.9–4.0 W**, katsayı 3'te zemin
+    becerisi bozuldu. Ara kayıt adım başı terim dökümü (`reward_terms`):
+    fazla güç hızdan değil, engel geçiren düzeltmelerden. Politika önünde
+    engel olup olmadığını bilmiyor (gözlem yalnız IMU + komut + saat); bu
+    yürüyüşü her yerde kullanıyor. Çözüm ödülde değil gözlemde: ileri bakan
+    mesafe sensörleri (3 VL53L0X alındı, S7/D8) ya da iki model arasında
+    düğümde seçim (düzde `ppo_omni_250k`, engelde `ppo_lift50_3750k`).
 
 ---
 
@@ -1549,11 +1571,11 @@ zeminler.
    `terrain_probe.EVAL_CASES`, `train.measure_model`.
 9. ✅ **Adil karşılaştırma:** `TripodGait` 50 mm adımla (`terrain_probe
    tripod:50`) zemin skoru 0.548, RL 0.879 (§3.3).
-10. **Düzde aşma ve enerji:** 50 mm'li politika hedef hızı %10–14 aşıyor
-    ve 3.8–4.0 W harcıyor. std 0.05 ile devam denendi, olmadı (ders 32).
-    Sıradaki seçenek: ödülde aşmayı açıkça cezalandırmak (lin_vel
-    toleransı ya da progress'in üstüne aşma cezası), önce tripod'la aynı
-    ödülde ölçerek (ders 20).
+10. **Düzde aşma ve enerji:** std 0.05 (ders 32) ve ödül v7'nin aşma
+    cezası (katsayı 1 ve 3; ders 33) denendi: aşma biraz azaldı, enerji
+    azalmadı, katsayı 3'te zemin bozuldu. Kör politikanın ödünleşimi; çözüm
+    gözlemde (ileri bakan mesafe sensörleri, S7'den sonra) ya da düğümde
+    iki model arasında seçim. Şimdilik açık bırakıldı.
 11. ✅ **60 mm:** `ppo_lift50_3750k` 60 mm basamağı ve 60 mm çukurdan geri
     çıkışı 3/3 geçiyor (daha uzun eğitimle).
 12. Eğimde `orientation` cezası dünyaya göre (§13.2-1): v13 20° yokuşta
@@ -1633,7 +1655,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 204 geçti, 8 atlandı. WSL: 245 geçti.
+   - Windows: 206 geçti, 8 atlandı. WSL: 247 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).

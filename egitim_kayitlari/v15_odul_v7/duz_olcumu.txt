@@ -1,0 +1,5 @@
+phase:50: her yön ödül 2.829, güç 3.13 W, ileri 0.10 -> 0.100 m/s
+ppo_lift50_3750k: her yön ödül 2.693, güç 4.02 W, ileri 0.10 -> 0.114 m/s
+ppo_250000_steps: her yön ödül 2.711, güç 3.99 W, ileri 0.10 -> 0.112 m/s
+ppo_1500000_steps: her yön ödül 2.692, güç 3.90 W, ileri 0.10 -> 0.112 m/s
+ppo_2000000_steps: her yön ödül 2.676, güç 3.90 W, ileri 0.10 -> 0.110 m/s

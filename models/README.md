@@ -90,6 +90,24 @@ gürültülü, `egitim_kayitlari/v14_lift50_std05/zemin_olcumu.md`). ROS'lu
 simde gerçek düğümle bütün komutlarda yürüyor (ileri/geri/yana %106–115,
 dönüş %89–97), sıfır komutta ayakta.
 
+**Aşmayı ödülle düzeltme denemesi (ödül v7, `--overshoot`, 2026-09-26):**
+`progress` komutu aşan hızı da kaybettirsin diye `ppo_lift50_3750k`'dan 2M
+adım devam (std 0.05), iki katsayıyla. Önce ders 20: v7, tabanları ve
+politikaları doğru sıralıyor (düzde aşan politika cezalanıyor, zeminde
+tırmanan yine önde).
+
+| | 0.10'da hız | Güç (her yön) | Her yön ödülü (v6) | 60 mm basamak | çukur 45 yana | çukur 60 geri |
+|---|---|---|---|---|---|---|
+| ppo_lift50_3750k (başlangıç) | 0.114 | 4.02 W | 2.693 | 3/3 | 3/3 | 3/3 |
+| v15, katsayı 1, 2M | 0.110 | 3.90 W | 2.676 | 3/3 | 3/3 | 3/3 |
+| v16, katsayı 3, 2M | 0.107 | 4.01 W | 2.701 | 3/3 | **0/3** | 2/3 |
+
+Aşma biraz azaldı ama **enerji azalmadı**; katsayı büyüyünce zemin becerisi
+kayboldu. Fazla enerji hızdan değil, engel geçiren düzeltmelerden geliyor;
+kör politika engel önünde olup olmadığını bilmediği için bu yürüyüşü her
+yerde kullanıyor. Depoya model alınmadı; zeminde en iyisi `ppo_lift50_3750k`.
+Kayıtlar `egitim_kayitlari/v15_odul_v7`, `v16_odul_v7_k3`.
+
 **Gerçek robotta DENENMEDİ.** Gerçek robotta 50 mm ayak kaldırmanın
 erişilebilirliği ve servo yükü eklem limitleri (D6) ile kontrol edilmeli.
 
