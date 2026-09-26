@@ -159,6 +159,37 @@ def rough(height_m: float, seed: int = 0, cell: float = 0.12, extent: float = 1.
     return sdf, height
 
 
+def world_sdf(terrain_sdf: str, name: str = "zemin") -> str:
+    """Deneme zeminini ROS'lu simin (sim.launch.py world:=...) dünya dosyasına
+    göm: hexapod_gazebo/worlds/flat.sdf'teki fizik ve sistem eklentileri
+    (IMU, Contact...) aynı, yalnız zemin modeli değişir. ROS'lu sim robotu
+    düz zemine göre doğurur: orijini z=0'da olan zeminler (step, pit)."""
+    return f"""<?xml version="1.0"?>
+<!-- ÜRETİLDİ: hexapod_rl.terrain_probe.world_sdf (deneme zemini; S5'in yerine geçmez) -->
+<sdf version="1.9">
+  <world name="{name}">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+    {terrain_sdf}
+  </world>
+</sdf>
+"""
+
+
 #: Zeminli eğitim denemesi (G7, 2026-09-26): 16 ortama birer zemin. S5 gelince
 #: onun üreteciyle değişecek; bu yalnız "politika tripod'un çıkamadığı 45 mm'yi
 #: öğrenebiliyor mu" sorusu için. Eğimler her yöne komutla hem inilir hem çıkılır.

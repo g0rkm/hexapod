@@ -116,3 +116,18 @@ def test_surtunme_ve_engebe():
         assert 0.0 <= ha(cx, cy) <= 0.04
     assert ha(2.0, 0.0) == 0.0                                  # engebe alanının dışı düz
     assert len(TRAIN_SETS["deneme2"]) == 16
+
+
+def test_ros_simi_icin_dunya_dosyasi():
+    """Deneme zemini ROS'lu simin dünya dosyasına gömülür: aynı sistem
+    eklentileri (IMU ve Contact robotun sensörleri için şart), tek zemin modeli."""
+    from hexapod_rl.terrain_probe import pit, world_sdf
+
+    root = ET.fromstring(world_sdf(pit(0.045)[0], name="zemin"))
+    world = root.find("world")
+    assert world.get("name") == "zemin"
+    plugins = {p.get("name") for p in world.findall("plugin")}
+    assert {"gz::sim::systems::Physics", "gz::sim::systems::Imu",
+            "gz::sim::systems::Contact"} <= plugins
+    assert [m.get("name") for m in world.findall("model")] == ["ground"]
+    assert float(world.find("physics/max_step_size").text) == 0.001   # ROS'lu simin adımı

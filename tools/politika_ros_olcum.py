@@ -53,7 +53,12 @@ def main(argv=None) -> int:
     parser.add_argument("--model", default="hexapod")
     parser.add_argument("--seconds", type=float, default=8.0, help="komut başına sim saniyesi")
     parser.add_argument("--settle", type=float, default=3.0, help="başta komutsuz bekleme")
+    parser.add_argument("--commands", default=None,
+                        help='komut listesi "vx,vy,wz;vx,vy,wz" (varsayılan: ileri, geri, '
+                             'iki yana, iki dönüş, karışık, sıfır)')
     args = parser.parse_args(argv)
+    commands = COMMANDS if not args.commands else [
+        tuple(float(v) for v in c.split(",")) for c in args.commands.split(";")]
 
     lock = threading.Lock()
     samples: list[tuple[float, float, float, float, float]] = []
@@ -89,9 +94,9 @@ def main(argv=None) -> int:
     while now() - start < args.settle:
         time.sleep(0.05)
 
-    print("| Komut (vx, vy, wz) | gövde vx | gövde vy | dönüş rad/s | izleme | yükseklik |")
-    print("|---|---|---|---|---|---|")
-    for cmd in COMMANDS:
+    print("| Komut (vx, vy, wz) | gövde vx | gövde vy | dönüş rad/s | izleme | yol (tüm süre) | yükseklik |")
+    print("|---|---|---|---|---|---|---|")
+    for cmd in commands:
         msg = Twist()
         msg.linear.x, msg.linear.y, msg.angular.z = cmd
         s0 = now()
@@ -107,8 +112,9 @@ def main(argv=None) -> int:
         track = (" / ".join(f"%{100 * r:.0f}" for r in ratios) if ratios
                  else f"hareket {1000 * moved:.1f} mm")
         height = sum(s[3] for s in seg) / len(seg)
-        print(f"| {cmd} | {vx:+.3f} | {vy:+.3f} | {wz:+.3f} | {track} | "
-              f"{1000 * height:.0f} mm |", flush=True)
+        path = math.hypot(seg[-1][1] - seg[0][1], seg[-1][2] - seg[0][2])
+        print(f"| {cmd} | {vx:+.3f} | {vy:+.3f} | {wz:+.3f} | {track} | {path:.2f} m | "
+              f"{1000 * height:.0f} mm (z {1000 * seg[-1][3]:.0f}) |", flush=True)
     pub.publish(Twist())
     sys.stdout.flush()
     # gz.transport + rclpy birlikte kapanırken çöküyor (segfault); ölçüm bitti,
