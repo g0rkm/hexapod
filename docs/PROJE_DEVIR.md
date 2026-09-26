@@ -6,8 +6,9 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum tamam, §0.5)
-> · Testler: **Linux 208/208**, Windows 178 geçti + 8 atlandı (Gazebo/ROS/SB3
+> Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum tamam
+> §0.5; zemine göre ayak teması §7.8)
+> · Testler: **Linux 211/211**, Windows 179 geçti + 8 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -93,11 +94,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 178 geçti, 8 atlandı.
+     depo kökünde `python -m pytest -q`. Beklenen: 179 geçti, 8 atlandı
+     (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 208 geçti, ~1 dk.
+     Beklenen: 211 geçti, ~30 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -339,7 +341,8 @@ zemin, ödül v6, 10 s, deterministik. Hiçbir model devrilmedi.
   - Politika yalnız **ileri 0.05–0.15 m/s** komutunu gördü. Yana, geri ve
     dönüş eğitilmedi; politika düğümü bu komutlarda ayakta bekler.
 - RL'nin tripod'u açıkça geçmesi beklenen yer zorlu zemin. Bunun için
-  gerekenler: S5 (Samet), gerçek ayak teması (G7) ve S6.
+  gerekenler: S5 (Samet) ve S6. Zemine göre ayak teması (G7) hazır
+  (2026-09-26, §7.8).
 
 ---
 
@@ -711,11 +714,20 @@ Python bağları, TestFixture).
   `durma torku·(1−|hız|/yüksüz hız)`, frenlerken durma torkuyla sınırlı.
 - Rastgeleleştirme düğmeleri: `set_servo(strength, stiffness)`,
   `latency_steps`, `push(force, seconds)`.
-- `terrain_sdf`: düz zemin yerine statik bir `<model>` SDF parçası (S5 için).
+- **Zemin (S5 için):** `terrain_sdf` (düz zemin yerine statik bir `<model>`
+  SDF parçası) + `terrain_height(x, y)` (aynı zeminin üst yüzeyinin z'si, m).
+  İkisi birlikte verilmek zorunda; yalnız biri verilirse `ValueError`.
+  - Robot orijinde, sıfır duruşundaki ayakların altındaki zemine göre doğar
+    (`spawn_height`); orijinin z=0'da olması gerekmez.
+  - **Ayak teması zemine göre:** ayak küresinin alt ucu altındaki zeminin
+    2 mm yakınında mı (dikey). Fizik motorunun temas sensörüyle 0–20° eğimde
+    %97.8–98.8 uyuşuyor (§12.26). ~40°'ye kadar geçerli; basamak kenarında
+    birkaç mm yanılabilir.
+  - `SimState.ground_z`: gövde merkezinin altındaki zemin. Ödülün `height`
+    terimi ve devrilme (`< 45 mm`) buna göre.
+  - Düz zeminde her şey eskisiyle birebir aynı.
 - Her süreç kendi gz-transport bölümünde (`GZ_PARTITION=hexapod_rl_<pid>`,
   §12.22).
-- Ayak teması şu an **geometrik**: ayak ucu dünya z=0'ın 2 mm yakınında mı.
-  Engebeli zeminde yanlış olur (§13).
 
 **Görev (`task.py`):**
 
@@ -751,7 +763,7 @@ aralıklar.
 - Kütle ve sürtünme yok (§13).
 
 **Ortam (`env.py`, `HexapodEnv`):** Gymnasium. `make_env(rank, task,
-terrain_sdf)`, `SubprocVecEnv` ile.
+terrain_sdf=..., terrain_height=...)`, `SubprocVecEnv` ile.
 
 **Taklit (`demo.py`, `pretrain.py`):** politika PPO'dan önce bir gösterimi
 taklit eder.
@@ -819,8 +831,8 @@ En iyi sonucu 250k ara kaydı verdi; uzun eğitimde hedef hızı aşmaya kayıyo
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 178 geçti, 8 atlandı, ~5 s.
-- WSL (ROS + venv kaynaklı): 208 geçti, ~1 dk.
+- Windows: 179 geçti, 8 atlandı, ~4 s.
+- WSL (ROS + venv kaynaklı): 211 geçti, ~30 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1085,6 +1097,8 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | v8: v7'den güç cezası −0.10/W ile 2M (`--power-weight`); depoya alınmadı | Enerji değişmedi (0.10 m/s'de 6.4 W; tripod 1.9 W). Terim terim fark neredeyse tamamen güç; eylem titremiyor, fazla güç yürüyüş biçiminden. Öneri: tripod üstüne artık eylem |
 | 09-26 | **Artık eylem modu (`--residual`): hedef = adım saatinin tripod'u (`hexapod_policy.tripod.PhaseTripod`, eğitim ve robot aynı kod) + 0.2 rad x eylem; düzeltme cezası −0.5 x ortalama eylem karesi.** En iyi model `models/ppo_res_250k` | Mutlak modda PPO 3 kat enerji harcıyordu, güç cezası düzeltmedi. Artık eylemde eylem 0 = tripod: enerji tripod'dan ~%20 fazla; gürültüsüz ödülde tripod'u 0.10/0.15'te geçiyor, rastgeleleştirmede eşit, gürültüde önde. G7 için önerilen yol |
 | 09-26 | **Süreç içi Gazebo her süreçte ayrı gz-transport bölümünde** (`GZ_PARTITION=hexapod_rl_<pid>`) | Eğitim sürerken açılan ROS'lu simin `ros_gz_sim create` isteği eğitimin "rl" dünyasına gitti, ROS'lu simde robot doğmadı (§12.22) |
+| 09-26 | Yeni PC: Ubuntu-26.04 mevcut Ubuntu-24.04'ün yanına kuruldu, varsayılan yapıldı; eğitim `--envs 16` | 24.04'te başka veriler var ve Lyrical yok. 16 ortam 1818 adım/s, eski PC'nin 2.7 katı (§0.5) |
+| 09-26 | **Ayak teması ve gövde yüksekliği zemin yüksekliği fonksiyonuna göre** (`terrain_height(x, y)`, `terrain_sdf` ile zorunlu çift); fizik motorunun temas sensörü değil | Sensör yolu (Contact sistemi + gz.transport) tek süreci 381 → 182 adım/s yavaşlattı ve mesajlar eşzamansız (tekrarlanabilirlik bozulur). Yükseklik yolu bedava, sensörle 0–20° eğimde %97.8–98.8 uyumlu (§12.26). Yüksekliksiz zemin reddedilir: z=0 varsaymak değer uydurmak olur |
 
 ---
 
@@ -1232,6 +1246,27 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     başlayan bir politikayı iyileştirirken gürültüyü küçük tut (0.05) ya da
     std'yi zamanla düşür; değerlendirmeyi hem deterministik hem stokastik
     yap.
+26. **gz.sim Python'da fizik temas verisi pahalı ve eşzamansız.** Python
+    bağlarında ECM'den temas bileşeni (`ContactSensorData`) okunamıyor;
+    `gz.sim` yalnız Link/Joint/Model/World sarmalayıcılarını veriyor. Tek yol:
+    dünyaya `gz-sim-contact-system`, tibia'ya `<sensor type="contact">`,
+    süreç içinden `gz.transport.Node().subscribe(Contacts, konu, cb)`.
+    Ölçülenler (tek süreç, 2026-09-26):
+    - Sensörsüz 381, sensör + Contact sistemi (abone yok) 316, Python
+      aboneliğiyle 182 adım/s. Maliyetin çoğu Python geri çağrısı.
+    - Contact sistemi `update_rate`'i dinlemiyor, her fizik adımında
+      (2 ms) ve yalnız temas varsa yayınlıyor. Mesaj damgası sim zamanı.
+    - Geri çağrı ana iş parçacığında değil. Denemede bütün mesajlar
+      `server.run()` dönmeden gelmişti ama bunun garantisi yok; yük
+      altında adım sonundaki temas eksik görülebilir.
+    - Aynı `GZ_PARTITION` içinde olduğu için abone, `Node` süreç içi dünya
+      kurulduktan (ortam değişkeni ayarlandıktan) sonra yaratılmalı.
+    Karar: zemin yüksekliği fonksiyonu. Sensör yolu yalnız doğrulama
+    aracı olarak işe yaradı: yükseklik temasıyla 0°, 10° (aşağı, yukarı,
+    yana), 20° (aşağı, yukarı) eğimde %97.8–98.8 uyum. Farkların hepsi
+    "ayak 2 mm içinde ama değmiyor" (iniş/kalkış); fiziğin gördüğü temas hiç
+    kaçmadı; temasta dikey boşluk en çok 0.73 mm. Deneme betiği depoda
+    değil; yöntemi bu madde anlatıyor.
 
 ---
 
@@ -1256,13 +1291,14 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 
 ### 13.2 Yazılım (Görkem, G7)
 
-1. **Gerçek ayak teması.** RL simindeki temas geometrik (ayak ucu z=0'a
-   2 mm yakın mı). Engebeli ya da eğimli zeminde yanlış olur; ödülün ritim
-   terimi ve değerlendirme buna bakıyor. S5'le birlikte gz Contact sistemine
-   ya da zemin yüksekliğine geçilmeli.
-2. **Zeminli eğitim** (S5'i bekler). Süreç başına ayrı `terrain_sdf`,
-   kolaydan zora müfredat. Robot orijinde düz zemine göre doğuyor; orijin
-   çevresi z=0'da olmalı.
+1. ~~**Gerçek ayak teması.**~~ ✅ 2026-09-26: temas, gövde yüksekliği ve
+   devrilme zemin yüksekliği fonksiyonuna göre (`terrain_height`, §7.8,
+   §12.26). Açık kalan: eğimde `orientation` cezası gövdeyi **dünyaya** göre
+   düz ister (10° eğimde ayakta duran robot adım başı ~0.06 kaybeder).
+   Politika eğimde gövdeyi yataya çekmeyi öğrenirse iyi; zeminli eğitimde
+   buna bakılmalı, gerekirse zemin normaline göre ölçülür.
+2. **Zeminli eğitim** (S5'i bekler). Süreç başına ayrı `terrain_sdf` +
+   `terrain_height`, kolaydan zora müfredat. Robot zemine göre doğuyor.
 3. **Komut aralığı.** Politika yalnız ileri 0.05–0.15 m/s gördü.
    - `PhaseTripod` vy ve wz'yi zaten destekliyor; artık eylem modunda taban
      hazır.
@@ -1287,8 +1323,9 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 
 ### 13.3 Yazılım (Samet)
 
-- **S5:** zemin üreteci. Entegrasyon notu GOREVLER.md'de: `terrain_sdf`
-  statik `<model>` parçası, orijin çevresi z=0.
+- **S5:** zemin üreteci. Entegrasyon notu GOREVLER.md'de: her zemin için
+  `terrain_sdf` (statik `<model>` parçası) **ve** `terrain_height(x, y)`.
+  Orijinin z=0'da olması artık gerekmiyor.
 - **S6:** ölçüm aracı. Çekirdeği `hexapod_rl.evaluate` + `baseline.TripodPolicy`
   hazır; eksik olanlar zemin seçimi, N tekrar ve tablo.
 - **S7:** sensör sürücüleri (saf Python, dry-run testli).
@@ -1317,12 +1354,8 @@ S6'nın ölçümünde tripod'u geçiyor; eğim, engebe ve kaygan zeminde ayrı a
 
 **S5 gelmeden yapılabilecekler (sırayla önerilen):**
 
-1. **Gerçek ayak teması** (§13.2-1).
-   - Önce gz.sim Python bağlarında temas verisinin okunabildiğini dene.
-     `Joint.transmitted_wrench` bozuk (§12.18); Contact sistemi ya da
-     `ContactSensorData` bileşeni denenebilir.
-   - Olmazsa zemin yüksekliği fonksiyonu kullan: S5 üreteci her zemin için
-     z(x, y) verebilir.
+1. ✅ **Gerçek ayak teması** (§13.2-1). Fizik sensörü denendi, pahalı ve
+   eşzamansız çıktı; zemin yüksekliği fonksiyonuna geçildi (§12.26).
 2. **Komut aralığını genişletme** (§13.2-3).
    - Artık eylem modunda: vy, wz, geri.
    - Taklit (etiket 0) + PPO + değerlendirmeye yön ve yana komut.
@@ -1404,7 +1437,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 178 geçti, 8 atlandı. WSL: 208 geçti.
+   - Windows: 179 geçti, 8 atlandı. WSL: 211 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).
