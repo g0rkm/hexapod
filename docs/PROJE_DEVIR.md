@@ -6,7 +6,7 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-26** (3. oturum sonu, yeni bilgisayara geçiş öncesi)
+> Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum tamam, §0.5)
 > · Testler: **Linux 208/208**, Windows 178 geçti + 8 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
@@ -116,13 +116,12 @@ Yeni PC'de eğitimi hızlandıran şey **çekirdek sayısı**. Ryzen 7 7700X:
 8 çekirdek / 16 iş parçacığı. Eski i5-10300H 4 / 8'di, çekirdek başına da
 ~1.7–2 kat yavaştı.
 - **Öneri:** `--envs 16`. `n_steps 256 × 16 = 4096`, batch 512'ye bölünür.
-- **Beklenti (tahmin):** ~3 kat hız; 3M adım ~75 dk yerine ~25 dk. İlk
-  eğitimde gerçek adım/s'yi ölç ve buraya yaz.
+- **Ölçüldü (2026-09-26, §0.5):** 16 ortamda **1818 adım/s**, eski PC'nin
+  (8 ortam, 668) 2.7 katı; 3M adım ~28 dk. Tahmin ~3 kat idi.
 - Ortam sayısı değişince PPO'nun güncelleme başına verisi de değişir
   (2048 → 4096 adım). Eski eğitimlerle karşılaştırırken bunu belirt.
-- Her ortam ayrı bir Gazebo süreci. Eski PC'de 8 ortam birkaç GB kullanıyordu;
-  16 ortamdan önce WSL'e ayrılan belleğe bak (`free -g`; gerekirse
-  `.wslconfig` ile `memory=`).
+- Her ortam ayrı bir Gazebo süreci. Bellek sorun değil: 16 ortam toplam
+  ~2.0 GB kullandı, WSL'e 7.3 GB düşüyor (§0.5).
 
 GPU ancak GPU'da paralel çalışan bir simülatöre (Isaac Lab, MuJoCo MJX gibi)
 geçilirse işe yarar. Bu, TÜBİTAK başvurusundaki Gazebo'dan sapma olur;
@@ -143,6 +142,55 @@ Kodda sabit bir kullanıcı yolu yok. Betikler depoyu kendi konumundan bulur,
 `robot.yaml` yukarı doğru aranır. Ama bu belgede ve eski betik örneklerinde
 geçen `C:\Users\gorke\...`, `/mnt/c/Users/gorke/...`, `~/hexapod_runs` gibi
 yollar eski PC'ye ait; yeni PC'de kullanıcı adı farklı olabilir.
+
+Yeni PC'deki yollar (2026-09-26):
+- Depo: `C:\Users\user\Desktop\hexapod` (OneDrive dışında), WSL'den
+  `/mnt/c/Users/user/Desktop/hexapod`.
+- WSL dağıtımı `Ubuntu-26.04` (varsayılan), Linux kullanıcısı `user`:
+  `~/hexapod_ws` = `/home/user/hexapod_ws`, `~/hexapod_venv`, `~/hexapod_runs`.
+
+### 0.5 Yeni PC kurulum sonucu (2026-09-26)
+
+Kurulum §0.2'ye göre yapıldı; her şey ilk denemede çalıştı.
+
+- **WSL:** WSL 2.7.3. Makinede zaten `Ubuntu-24.04` (içinde başka veriler,
+  ~20 GB) ve `docker-desktop` vardı. 24.04'e dokunulmadı; ROS 2 Lyrical onda
+  yok. `wsl --install -d Ubuntu-26.04 --no-launch` ile yanına **Ubuntu 26.04.1
+  LTS (resolute)** kuruldu ve `wsl --set-default Ubuntu-26.04` ile varsayılan
+  yapıldı. Kullanıcı hesabını kullanıcı açtı.
+- **Kurulum betikleri:** `ros_kurulum.sh` (kullanıcı çalıştırdı, sudo) →
+  ROS 2 Lyrical, Gazebo 10.5.0, Python 3.14.4. `derle.sh` → 9 paket, 9 s.
+  `rl_kurulum.sh` → torch 2.14.0+cpu, SB3 2.9.0, Gymnasium 1.3.0.
+- **Testler:** Windows (Python 3.11.8) 178 geçti + 8 atlandı, 4 s. WSL 208
+  geçti, 31 s (eski PC ~1 dk).
+- **Model ölçümü** (`ppo_res_250k`, artık eylem, düz zemin, 10 s): eski PC'yle
+  **birebir aynı** (simülasyon makineden bağımsız, belirlenimci).
+
+  | Komut vx | Gerçek hız | Yön | Adım başı ödül | Güç |
+  |---|---|---|---|---|
+  | 0.05 | 0.058 | +0.1° | 2.821 | 1.82 W |
+  | 0.10 | 0.105 | +5.4° | 3.238 | 2.26 W |
+  | 0.15 | 0.153 | +12.2° | 3.615 | 2.94 W |
+  | tripod 0.10 | 0.098 | −0.3° | 3.216 | 1.91 W |
+
+- **Bellek:** Windows'ta 16 GB (15.2 GB görünür). WSL varsayılanı: 7.3 GB
+  bellek + 2 GB takas, 16 iş parçacığı (`free -g`: toplam 7). `.wslconfig`
+  gerekmedi.
+- **Eğitim hızı:** aynı tarifle (artık eylem + rastgeleleştirme,
+  `ppo_res_250k`'dan devam, lr 1e-4, target_kl 0.02), her biri 40 güncelleme
+  turu. Süreye Gazebo'ların açılışı da dahil, uzun eğitimde biraz daha hızlı
+  olur.
+
+  | Ortam | Adım/s | Duvar süresi | Bellek (tepe, toplam kullanılan) |
+  |---|---|---|---|
+  | 8 | 1342 | 82k adım, 72 s | 1.4 GB |
+  | 12 | 1588 | 123k adım, 88 s | 1.7 GB |
+  | 16 | **1818** | 164k adım, 100 s | 2.0 GB |
+
+  Eski PC 8 ortamda 500–690 adım/s idi. Bundan sonra **`--envs 16`**; 3M adım
+  ~28 dk, 10M ~1.5 sa. Kayıtlar WSL'de `~/hexapod_runs/hiz_testi_env{8,12,16}`
+  (depoda değil, küçük deneme).
+- GPU (RTX 5070, sürücü 616.64) kullanılmıyor; gerekçe §0.3.
 
 ---
 
@@ -656,7 +704,8 @@ hexapod/
 **Simülasyon (`sim.py`, `HexapodSim`):** ROS'suz, süreç içi Gazebo (gz.sim
 Python bağları, TestFixture).
 - Fizik adımı 2 ms, eylem 50 Hz (kontrol adımı başına 10 fizik adımı).
-- 8 paralel süreçte eski PC'de saniyede ~500–690 adım.
+- 8 paralel süreçte eski PC'de saniyede ~500–690 adım; yeni PC'de 16 süreçte
+  ~1800 (§0.5).
 - **Servo modeli, her fizik adımında Python'da:**
   `tork = Kp·(hedef−konum) − Kd·hız`. Hareket yönünde
   `durma torku·(1−|hız|/yüksüz hız)`, frenlerken durma torkuyla sınırlı.
@@ -881,9 +930,9 @@ bağları için): torch 2.14.0 CPU, stable-baselines3 2.9.0, gymnasium 1.3.0.
 **Bilgisayarlar:**
 - **Eski PC** (1–3. oturum): Windows 11 Pro, i5-10300H (8 iş parçacığı),
   16 GB RAM (WSL'e 7 GB), GTX 1650.
-- **Yeni PC** (2026-09-26'dan sonra): **AMD Ryzen 7 7700X** (8 çekirdek /
-  16 iş parçacığı, masaüstü, Zen 4) + RTX 5070. RAM bu belge yazılırken
-  bilinmiyordu; ilk oturumda `free -g` ile bak ve buraya yaz. Kurulum §0.2'de.
+- **Yeni PC** (2026-09-26'dan sonra): Windows 11 Pro, **AMD Ryzen 7 7700X**
+  (8 çekirdek / 16 iş parçacığı, masaüstü, Zen 4), 16 GB RAM (WSL'e 7.3 GB),
+  RTX 5070 12 GB. Kurulum §0.2'de, sonucu ve hız ölçümü §0.5'te.
 
 **Yazılım:**
 - **ROS 2: Lyrical Luth** (LTS, Mayıs 2031'e kadar), Ubuntu 26.04'ün birincil
