@@ -57,6 +57,7 @@ def contract_for(task: TaskConfig, config_path=None) -> PolicyContract:
         base_gait=base,
         # eğitimde çekilen en küçük komutun yarısı: altında düğüm ayakta bekler
         command_deadband=0.5 * task.min_command_frac,
+        lift_range=tuple(task.lift_action) if task.lift_action is not None else None,
     )
 
 
@@ -86,6 +87,8 @@ def export(zip_path: Path, out: Path | None = None, check: int = 256,
     obs = rng.normal(0.0, 1.0, (check, OBS_SIZE)).astype(np.float32)
     ref, _ = model.predict(obs, deterministic=True)            # SB3 [-1, 1]'e kırpar
     ours = np.clip(np.stack([loaded(o) for o in obs]), -1.0, 1.0)
+    if ours.shape != ref.shape:
+        raise RuntimeError(f"aktarılan çıkış {ours.shape}, SB3 {ref.shape}: sözleşme uymuyor")
     err = float(np.max(np.abs(ours - ref)))
     if err > 1e-5:
         raise RuntimeError(f"aktarılan politika SB3'ten farklı: en büyük fark {err:g}")

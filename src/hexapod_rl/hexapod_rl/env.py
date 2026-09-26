@@ -40,8 +40,10 @@ from .task import (
     OBS_SIZE,
     TaskConfig,
     VelocityFilter,
+    action_dim,
     action_to_targets,
     fallen,
+    lift_from_action,
     observation,
     reward,
     sample_command,
@@ -87,14 +89,17 @@ class HexapodEnv(gym.Env):
                        for n in self.sim.names]
 
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (OBS_SIZE,), np.float32)
-        self.action_space = gym.spaces.Box(-1.0, 1.0, (ACTION_SIZE,), np.float32)
+        if self.task.lift_action is not None and self.base is None:
+            raise ValueError("öğrenilmiş ayak kaldırma yalnız artık eylem modunda")
+        self.n_actions = action_dim(self.task)
+        self.action_space = gym.spaces.Box(-1.0, 1.0, (self.n_actions,), np.float32)
         self.max_steps = int(round(self.task.episode_s / self.dt))
 
         self._state = None
         self._command = (0.0, 0.0, 0.0)
         self._phase = 0.0
         self._steps = 0
-        self._prev_action = [0.0] * ACTION_SIZE
+        self._prev_action = [0.0] * self.n_actions
         self._vel = VelocityFilter(self.dt, self.task.vel_filter_s)
         self._next_push = math.inf
         self.dynamics: dict[str, float] = {}
@@ -110,7 +115,7 @@ class HexapodEnv(gym.Env):
             self._command = tuple(float(v) for v in options["command"])
         self._phase = 0.0
         self._steps = 0
-        self._prev_action = [0.0] * ACTION_SIZE
+        self._prev_action = [0.0] * self.n_actions
         self._vel.reset()
         self._next_push = self._push_gap()
         self._state = state
@@ -118,10 +123,16 @@ class HexapodEnv(gym.Env):
 
     def step(self, action):
         action = [float(a) for a in np.asarray(action, dtype=np.float64).reshape(-1)]
+        joints, lift = action[:ACTION_SIZE], None
+        if self.task.lift_action is not None:   # son eylem: ayak kaldırma
+            if len(action) != self.n_actions:
+                raise ValueError(f"{self.n_actions} eylem bekleniyordu, {len(action)} geldi")
+            lift = lift_from_action(action[ACTION_SIZE], self.task.lift_action)
         if self.base is None:
             targets = action_to_targets(action, self.default, self.task.action_scale, self.limits)
-        else:   # artık eylem: tripod(saat, komut) + düzeltme
-            targets = action_to_targets(action, self.base.targets(self._phase, self._command),
+        else:   # artık eylem: tripod(saat, komut[, kaldırma]) + düzeltme
+            targets = action_to_targets(joints,
+                                        self.base.targets(self._phase, self._command, lift),
                                         self.task.residual_scale, self.limits)
         if self._steps >= self._next_push:
             self._push()
@@ -135,7 +146,9 @@ class HexapodEnv(gym.Env):
         self._prev_action = action
         self._state = state
         info = {"reward_terms": terms, "command": self._command,
-                "base_pos": state.base_pos, "foot_contact": state.foot_contact}
+                "base_pos": state.base_pos, "foot_contact": state.foot_contact,
+                "lift_mm": lift if lift is not None else
+                (self.task.lift_mm if self.base is not None else None)}
         return self._obs(), float(r), fell, self._steps >= self.max_steps, info
 
     def close(self) -> None:

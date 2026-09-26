@@ -306,3 +306,29 @@ def test_engebede_dogar_ve_ayakta_durur(tmp_path_factory):
         assert sum(e._state.foot_contact) >= 3
     finally:
         e.close()
+
+
+def test_ogrenilmis_ayak_kaldirma_salinimi_degistirir(tmp_path_factory):
+    """Eylem 19 boyutlu; son eylem -1 (20 mm) ile +1 (60 mm) arasında salınımdaki
+    ayağın yerden en çok yüksekliği ~40 mm değişmeli."""
+    from hexapod_rl.task import TaskConfig
+
+    e = HexapodEnv(task=TaskConfig(action_mode="residual", lift_action=(20.0, 60.0)),
+                   workdir=tmp_path_factory.mktemp("kaldirma"))
+    try:
+        assert e.action_space.shape == (19,)
+        peaks = []
+        for lift_a in (-1.0, 1.0):
+            e.reset(seed=0, options={"command": (0.05, 0.0, 0.0)})
+            a = np.zeros(19, dtype=np.float32)
+            a[-1] = lift_a
+            peak = 0.0
+            for _ in range(int(round(1.5 / e.dt))):          # iki adım döngüsü
+                _, _, terminated, _, info = e.step(a)
+                assert not terminated
+                peak = max(peak, max(f[2] for f in e._state.foot_pos))
+            peaks.append(peak)
+            assert info["lift_mm"] == pytest.approx(20.0 if lift_a < 0 else 60.0)
+        assert peaks[1] - peaks[0] > 0.02, peaks
+    finally:
+        e.close()

@@ -151,6 +151,10 @@ class TaskConfig:
     lift_mm: float = 25.0          # artık eylem modunda tripod'un ayak kaldırması
     randomization: "Randomization | None" = None   # None: kapalı
     # komut örnekleme (sample_command); varsayılanlar eski davranış: aralıktan düz çekim
+    # Öğrenilmiş ayak kaldırma (2026-09-27): (en az, en çok) mm verilirse eylem
+    # 19 boyutlu, son eylem [-1, 1] -> bu aralıkta taban tripod'un ayak kaldırması
+    # (yalnız artık eylem modunda). None: sabit lift_mm.
+    lift_action: "tuple[float, float] | None" = None
     command_zero_prob: float = 0.0  # her bileşen bu olasılıkla 0 (saf ileri/yana/dönüş sık gelsin)
     min_command_frac: float = 0.0   # command_fraction bunun altındaysa yeniden çek ("dur" değil)
 
@@ -183,6 +187,24 @@ def task_from_flags(residual: bool = False, omni: bool = False,
 
 #: Eğitimin görev ayarı modelin yanında bu adla (train.py yazar).
 TASK_FILE = "gorev.json"
+
+
+def action_dim(cfg: TaskConfig) -> int:
+    """Politikanın eylem boyutu: 18 eklem (+1 öğrenilmiş ayak kaldırma)."""
+    return ACTION_SIZE + (1 if cfg.lift_action is not None else 0)
+
+
+def lift_from_action(a: float, lift_range: tuple[float, float]) -> float:
+    """[-1, 1] -> [en az, en çok] mm (kırpılır)."""
+    lo, hi = lift_range
+    a = max(-1.0, min(1.0, float(a)))
+    return lo + (a + 1.0) * 0.5 * (hi - lo)
+
+
+def action_for_lift(lift_mm: float, lift_range: tuple[float, float]) -> float:
+    """lift_from_action'ın tersi (sıcak başlangıç için)."""
+    lo, hi = lift_range
+    return 2.0 * (lift_mm - lo) / (hi - lo) - 1.0
 
 
 def task_to_json(cfg: TaskConfig) -> str:
@@ -391,8 +413,9 @@ def reward(state: SimState, action, prev_action, command: tuple[float, float, fl
         "action_rate": sum((a - b) ** 2 for a, b in zip(action, prev_action)),
         "fall": 1.0 if fell else 0.0,
     }
-    if cfg.action_mode == "residual":
-        terms["residual"] = sum(a * a for a in action) / len(action)
+    if cfg.action_mode == "residual":   # yalnız eklem düzeltmeleri (kaldırma seçimi değil)
+        joints = list(action)[:ACTION_SIZE]
+        terms["residual"] = sum(a * a for a in joints) / len(joints)
     weighted = {k: cfg.w[k] * v for k, v in terms.items()}
     return sum(weighted.values()), weighted
 

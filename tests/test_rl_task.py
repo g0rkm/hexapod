@@ -392,3 +392,23 @@ def test_rapor_odulu_ortak():
     s = standard_reward(cfg)
     assert s.progress_overshoot == 0.0 and s.w == TaskConfig().w
     assert s.lift_mm == 50.0 and s.action_mode == "residual"      # görev (taban) aynı kalır
+
+
+# --- öğrenilmiş ayak kaldırma (2026-09-27) ---------------------------------------
+
+
+def test_ayak_kaldirma_eylemi():
+    from dataclasses import replace
+
+    from hexapod_rl.task import action_dim, action_for_lift, lift_from_action
+
+    cfg = TaskConfig(action_mode="residual")
+    assert action_dim(cfg) == 18
+    lifted = replace(cfg, lift_action=(20.0, 60.0))
+    assert action_dim(lifted) == 19
+    assert lift_from_action(-1.0, (20, 60)) == 20.0 and lift_from_action(1.0, (20, 60)) == 60.0
+    assert lift_from_action(5.0, (20, 60)) == 60.0                        # kırpılır
+    assert lift_from_action(action_for_lift(50.0, (20, 60)), (20, 60)) == pytest.approx(50.0)
+    # düzeltme cezası yalnız eklem eylemlerine: kaldırma seçimi cezalanmaz
+    _, a = reward(state(), [0.0] * 18 + [1.0], [0.0] * 19, (0.1, 0, 0), lifted, False)
+    assert a["residual"] == 0.0

@@ -129,3 +129,22 @@ def test_olu_bolge_kaydet_yukle_ve_eski_dosyada_sifir(tmp_path):
     assert random_policy().contract.command_deadband == 0.0     # eski dosyalar: ölü bölge yok
     with pytest.raises(ValueError):
         replace(c, command_deadband=1.0)
+
+
+def test_ayak_kaldirma_sozlesmesi(tmp_path):
+    from dataclasses import replace
+
+    base = {"groups": [[0], [1]], "reach_mm": 130.0, "height_mm": 100.0, "lift_mm": 50.0}
+    c = replace(contract(), action_mode="residual", residual_scale=0.2, base_gait=base,
+                lift_range=(20.0, 60.0))
+    assert c.output_size == 3                                  # 2 eklem + kaldırma
+    rng = np.random.default_rng(0)
+    p = MlpPolicy([(rng.normal(size=(3, 4)), rng.normal(size=3))], "tanh", c)
+    q = MlpPolicy.load(p.save(tmp_path / "k.npz"))
+    assert q.contract.lift_range == (20.0, 60.0) and q(np.ones(4)).shape == (3,)
+    with pytest.raises(ValueError):                            # çıkış sayısı uymuyor
+        MlpPolicy([(rng.normal(size=(2, 4)), rng.normal(size=2))], "tanh", c)
+    with pytest.raises(ValueError):                            # mutlak modda olmaz
+        replace(contract(), lift_range=(20.0, 60.0))
+    with pytest.raises(ValueError):
+        replace(c, lift_range=(60.0, 20.0))

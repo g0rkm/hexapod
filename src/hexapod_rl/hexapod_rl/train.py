@@ -177,6 +177,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="ortam başına zemin seti (terrain_probe.TRAIN_SETS; S5 gelince onunki)")
     parser.add_argument("--lift-mm", type=float, default=None,
                         help="artık eylemde taban tripod'un ayak kaldırması (varsayılan TaskConfig)")
+    parser.add_argument("--lift-range", type=float, nargs=2, default=None, metavar=("EN_AZ", "EN_COK"),
+                        help="öğrenilmiş ayak kaldırma aralığı, mm (eylem 19 boyutlu; "
+                             "başlangıç modeli hexapod_rl.widen ile genişletilmeli)")
+    parser.add_argument("--lift-std", type=float, default=None,
+                        help="ayak kaldırma eyleminin keşif std'si (--std'den sonra uygulanır)")
     parser.add_argument("--overshoot", type=float, default=None,
                         help="ödül v7: komutu aşan hızın progress'ten düşülme katsayısı (1: simetrik)")
     parser.add_argument("--power-weight", type=float, default=None,
@@ -195,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.power_weight is not None:
         weights["power"] = args.power_weight
     extra = {} if args.overshoot is None else {"progress_overshoot": args.overshoot}
+    if args.lift_range is not None:
+        extra["lift_action"] = tuple(args.lift_range)
     task = task_from_flags(args.residual, args.omni, args.randomize, args.lift_mm, w=weights,
                            **extra)
     # Ara kayıt seçimi: rastgeleleştirmesiz; ağırlıklar standart ama progress
@@ -231,6 +238,11 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--std gSDE'li modelde desteklenmiyor (pretrain.py --sde --std kullan)")
         with torch.no_grad():
             model.policy.log_std.fill_(math.log(args.std))
+    if args.lift_std is not None:
+        if task.lift_action is None:
+            parser.error("--lift-std için --lift-range gerekir")
+        with torch.no_grad():
+            model.policy.log_std[-1] = math.log(args.lift_std)
     (out / "ayarlar.txt").write_text(
         f"learning_rate: {model.learning_rate}\ntarget_kl: {model.target_kl}\n"
         f"use_sde: {model.use_sde}\nrandomize: {args.randomize}\nstd: {args.std}\n"

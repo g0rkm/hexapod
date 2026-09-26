@@ -80,6 +80,7 @@ def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123,
     steps = int(round(seconds / env.dt))
     fell, gait, airborne, total, power, n = False, 0.0, 0.0, 0.0, 0.0, 0
     body_v = [0.0, 0.0]   # gövde çerçevesinde ortalama hız
+    lifts = []            # taban tripod'un ayak kaldırması (öğrenilmiş kaldırmada değişken)
     turned_rad = 0.0      # açılmış (sarılmamış) toplam dönüş
     info = {"base_pos": env._state.base_pos}
     for _ in range(steps):
@@ -92,6 +93,8 @@ def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123,
         power += info["reward_terms"]["power"] / env.task.w["power"]
         gait += info["reward_terms"]["gait"] / env.task.w["gait"]
         airborne += sum(not c for c in info["foot_contact"]) / 6
+        if info.get("lift_mm") is not None:
+            lifts.append(info["lift_mm"])
         v = env._state.lin_vel_in_base()
         body_v[0] += v[0]
         body_v[1] += v[1]
@@ -116,7 +119,8 @@ def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123,
             "ritim_uyumu": gait / max(n, 1), "havadaki_ayak_orani": airborne / max(n, 1),
             # gövde çerçevesinde (komutla doğrudan karşılaştırılır; dönerken de anlamlı)
             "govde_vx_m_s": body_v[0] / max(n, 1), "govde_vy_m_s": body_v[1] / max(n, 1),
-            "donus_hizi_rad_s": turned_rad / t}
+            "donus_hizi_rad_s": turned_rad / t,
+            "ayak_kaldirma_mm": sum(lifts) / len(lifts) if lifts else float("nan")}
 
 
 def format_result(result: dict) -> str:

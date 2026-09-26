@@ -37,8 +37,11 @@ class PhaseTripod:
     height_mm: float          # gövde yüksekliği
     lift_mm: float = 25.0     # salınımda ayak kaldırma
 
-    def feet(self, phase: float, command) -> dict[int, Vec3]:
-        """Adım saatinin phase ([0, 1)) anında ayak hedefleri, gövde çerçevesi, mm."""
+    def feet(self, phase: float, command, lift_mm: float | None = None) -> dict[int, Vec3]:
+        """Adım saatinin phase ([0, 1)) anında ayak hedefleri, gövde çerçevesi, mm.
+        lift_mm: bu an için ayak kaldırma (öğrenilmiş kaldırma; verilmezse
+        self.lift_mm)."""
+        lift = self.lift_mm if lift_mm is None else lift_mm
         vx, vy, wz = command
         stance_s = 0.5 / self.gait_hz
         out = {}
@@ -53,13 +56,13 @@ class PhaseTripod:
                 s, dz = 0.5 - 2.0 * p, 0.0
             else:                              # salınım: -d/2'den +d/2'ye, kalkarak
                 q = (p - 0.5) * 2.0
-                s, dz = -0.5 + q, self.lift_mm * math.sin(math.pi * q)
+                s, dz = -0.5 + q, lift * math.sin(math.pi * q)
             out[leg] = (hx + s * dx, hy + s * dy, -self.height_mm + dz)
         return out
 
-    def targets(self, phase: float, command) -> list[float]:
+    def targets(self, phase: float, command, lift_mm: float | None = None) -> list[float]:
         """Eklem hedefleri, rad, interface.joint_names() sırasıyla."""
-        angles = self.kin.inverse(self.feet(phase, command))
+        angles = self.kin.inverse(self.feet(phase, command, lift_mm))
         return [math.radians(v) for leg in sorted(angles)
                 for v in angles[leg].as_dict().values()]
 

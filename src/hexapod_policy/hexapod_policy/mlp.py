@@ -45,6 +45,15 @@ class PolicyContract:
     # küçük komut hiç görülmedi. 0: yok (eski, yalnız ileri eğitilmiş dosyalar;
     # onlarda "dur" ileri hızın alt sınırından çıkar).
     command_deadband: float = 0.0
+    # Öğrenilmiş ayak kaldırma (2026-09-27): (en az, en çok) mm verilirse ağın
+    # action_size'dan sonraki bir çıkışı daha var: [-1, 1] -> taban tripod'un
+    # o anki ayak kaldırması. None: base_gait["lift_mm"] sabit.
+    lift_range: tuple[float, float] | None = None
+
+    @property
+    def output_size(self) -> int:
+        """Ağın çıkış sayısı: eklemler (+1 ayak kaldırma)."""
+        return self.action_size + (1 if self.lift_range is not None else 0)
 
     def __post_init__(self) -> None:
         if self.action_mode not in ("absolute", "residual"):
@@ -64,6 +73,12 @@ class PolicyContract:
                 raise ValueError(f"{axis} aralığı ters: {lo} > {hi}")
         if not 0.0 <= self.command_deadband < 1.0:
             raise ValueError(f"ölü bölge [0, 1) olmalı: {self.command_deadband}")
+        if self.lift_range is not None:
+            lo, hi = self.lift_range
+            if not 0 < lo < hi:
+                raise ValueError(f"ayak kaldırma aralığı 0 < en az < en çok olmalı: {self.lift_range}")
+            if self.action_mode != "residual":
+                raise ValueError("öğrenilmiş ayak kaldırma yalnız artık eylem modunda")
 
 
 class MlpPolicy:
@@ -83,8 +98,8 @@ class MlpPolicy:
                 raise ValueError(f"katman {i}: ağırlık {w.shape}, sapma {b.shape}, "
                                  f"giriş {width} bekleniyordu")
             width = w.shape[0]
-        if width != contract.action_size:
-            raise ValueError(f"çıkış {width}, eylem boyutu {contract.action_size}")
+        if width != contract.output_size:
+            raise ValueError(f"çıkış {width}, beklenen {contract.output_size}")
         self.activation = activation
         self.contract = contract
         self.source = source
@@ -131,6 +146,7 @@ class MlpPolicy:
             residual_scale=float(c.get("residual_scale", 0.0)),
             base_gait=c.get("base_gait"),
             command_deadband=float(c.get("command_deadband", 0.0)),
+            lift_range=tuple(float(v) for v in c["lift_range"]) if c.get("lift_range") else None,
         )
         return cls(layers, meta["activation"], contract, meta.get("source", ""))
 

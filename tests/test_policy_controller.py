@@ -236,3 +236,35 @@ def test_her_yon_politikasi_olu_bolgede_durur(command):
     c.on_command(*command, 0.0)
     assert c.tick(0.0) == pytest.approx(list(DEFAULT))
     assert c.status.startswith("dur (komut ölü bölgede")
+
+
+def test_ogrenilmis_ayak_kaldirma_tabana_gecer():
+    """Ağın son çıkışı eğitimdeki eşlemeyle ayak kaldırmaya çevrilir ve tripod
+    tabanı o yükseklikle hesaplanır (eğitimdeki env ile aynı)."""
+    from pathlib import Path
+
+    from hexapod_driver import RobotConfig
+    from hexapod_kinematics import HexapodKinematics
+    from hexapod_policy.tripod import PhaseTripod
+
+    kin = HexapodKinematics.from_config(
+        RobotConfig.load(Path(__file__).resolve().parent.parent / "config" / "robot.yaml"))
+    base_gait = {"groups": [[0, 2, 4], [1, 3, 5]], "reach_mm": 130.0, "height_mm": 100.0,
+                 "lift_mm": 50.0}
+    c = PolicyContract(obs_size=OBS_SIZE, action_size=ACTION_SIZE, action_scale=0.5, gait_hz=1.5,
+                       control_hz=50.0, default_rad=DEFAULT, command_ranges=RANGES,
+                       action_mode="residual", residual_scale=0.2, base_gait=base_gait,
+                       lift_range=(20.0, 60.0))
+    bias = np.zeros(ACTION_SIZE + 1)
+    bias[-1] = 0.5                                             # -> 20 + 0.75 x 40 = 50 mm
+    policy = MlpPolicy([(np.zeros((ACTION_SIZE + 1, OBS_SIZE)), bias)], "tanh", c)
+    ctl = PolicyController(policy, [(-3.0, 3.0)] * ACTION_SIZE, kin=kin)
+    ctl.on_imu(LEVEL, (0, 0, 0), 0.0)
+    ctl.on_command(0.1, 0.0, 0.0, 0.0)
+    tripod = PhaseTripod(kin, ((0, 2, 4), (1, 3, 5)), 1.5, 130.0, 100.0, 25.0)
+    for k in range(5):
+        phase = ctl._phase
+        targets = ctl.tick(0.0)
+        lift = 50.0                                        # son katman doğrusal: çıkış = sapma
+        assert ctl.lift_mm == pytest.approx(lift)
+        assert targets == pytest.approx(tripod.targets(phase, (0.1, 0.0, 0.0), lift), abs=1e-9)

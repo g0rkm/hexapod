@@ -86,6 +86,7 @@ class PolicyController:
         self._targets = list(self.stand)
         self.status = "başlıyor"
         self.clipped_command = False
+        self.lift_mm: float | None = None   # öğrenilmiş ayak kaldırmada son seçilen, mm
 
     # -- girdiler -----------------------------------------------------------------
 
@@ -113,11 +114,17 @@ class PolicyController:
             return list(self._targets)
         c = self.policy.contract
         command = self._effective_command()
-        action = np.clip(self.policy(self.observation(command)), -1.0, 1.0)
+        out = np.clip(self.policy(self.observation(command)), -1.0, 1.0)
+        action = out[:c.action_size]
+        self.lift_mm = None
+        if c.lift_range is not None:   # son çıkış: ayak kaldırma (eğitimdeki eşlemeyle)
+            lo, hi = c.lift_range
+            self.lift_mm = lo + (float(out[c.action_size]) + 1.0) * 0.5 * (hi - lo)
         if self.base is None:
             base, scale = c.default_rad, c.action_scale
         else:
-            base, scale = self.base.targets(self._phase, command), c.residual_scale
+            base = self.base.targets(self._phase, command, self.lift_mm)
+            scale = c.residual_scale
         self._targets = [_clip(b + scale * float(a), lim)
                          for b, a, lim in zip(base, action, self.limits)]
         self._phase = (self._phase + c.gait_hz / c.control_hz) % 1.0

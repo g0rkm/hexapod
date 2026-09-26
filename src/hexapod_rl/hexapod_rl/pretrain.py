@@ -100,14 +100,15 @@ def _collect(job) -> list[dict]:
     return episodes
 
 
-def _spaces_only_env():
+def _spaces_only_env(n_actions: int = ACTION_SIZE):
     """PPO'yu Gazebo kurmadan oluşturmak için yalnız uzayları olan ortam
-    (uzaylar env.HexapodEnv ile aynı; train.py yüklerken denetler)."""
+    (uzaylar env.HexapodEnv ile aynı; train.py yüklerken denetler).
+    n_actions: öğrenilmiş ayak kaldırmada 19 (task.action_dim)."""
     import gymnasium as gym
 
     class SpacesOnly(gym.Env):
         observation_space = gym.spaces.Box(-np.inf, np.inf, (OBS_SIZE,), np.float32)
-        action_space = gym.spaces.Box(-1.0, 1.0, (ACTION_SIZE,), np.float32)
+        action_space = gym.spaces.Box(-1.0, 1.0, (n_actions,), np.float32)
 
         def reset(self, *, seed=None, options=None):
             return np.zeros(OBS_SIZE, np.float32), {}
