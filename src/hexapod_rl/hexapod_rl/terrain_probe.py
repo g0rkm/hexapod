@@ -24,9 +24,22 @@ import math
 _THICK, _SIZE = 0.2, 8.0
 
 
-def slope(deg: float, axis: str = "x"):
+def _surface(mu: float | None) -> str:
+    """Zeminin sürtünme katsayısı (<surface><friction>); None: Gazebo varsayılanı
+    (1). Ölçüldü (2026-09-26): düz zeminde 1.0-0.15 arası yürüyüşü etkilemiyor,
+    kaygan zemin ancak eğimle anlamlı."""
+    if mu is None:
+        return ""
+    if not mu > 0:
+        raise ValueError(f"sürtünme katsayısı pozitif olmalı: {mu}")
+    return (f"<surface><friction><ode><mu>{mu}</mu><mu2>{mu}</mu2></ode></friction>"
+            "</surface>")
+
+
+def slope(deg: float, axis: str = "x", mu: float | None = None):
     """Orijinden geçen düz eğim. axis "x": +x (ileri) yönünde ALÇALIR (deg > 0
-    yokuş aşağı, deg < 0 yokuş yukarı); "y": +y (sol) yönünde alçalır."""
+    yokuş aşağı, deg < 0 yokuş yukarı); "y": +y (sol) yönünde alçalır.
+    mu: sürtünme (kaygan eğim)."""
     t = math.radians(deg)
     if axis == "x":
         n, rpy = (math.sin(t), 0.0, math.cos(t)), (0.0, t, 0.0)
@@ -37,7 +50,7 @@ def slope(deg: float, axis: str = "x"):
     c = tuple(-0.5 * _THICK * v for v in n)   # üst yüz orijinden geçsin
     sdf = f"""<model name="ground"><static>true</static><link name="link">
       <collision name="collision"><pose>{c[0]} {c[1]} {c[2]} {rpy[0]} {rpy[1]} {rpy[2]}</pose>
-        <geometry><box><size>{_SIZE} {_SIZE} {_THICK}</size></box></geometry></collision>
+        <geometry><box><size>{_SIZE} {_SIZE} {_THICK}</size></box></geometry>{_surface(mu)}</collision>
       <visual name="visual"><pose>{c[0]} {c[1]} {c[2]} {rpy[0]} {rpy[1]} {rpy[2]}</pose>
         <geometry><box><size>{_SIZE} {_SIZE} {_THICK}</size></box></geometry></visual>
     </link></model>"""
@@ -68,15 +81,17 @@ def step(height_m: float, at_x: float = 0.3):
     return sdf, height
 
 
-def _boxes_sdf(boxes, with_plane: bool = True) -> str:
+def _boxes_sdf(boxes, with_plane: bool = True, mu: float | None = None) -> str:
     """boxes: (cx, cy, cz, sx, sy, sz) listesi -> tek bağlantılı statik model."""
     parts = []
+    surface = _surface(mu)
     if with_plane:
         parts.append('<collision name="plane"><geometry><plane><normal>0 0 1</normal>'
-                     '<size>100 100</size></plane></geometry></collision>')
+                     f'<size>100 100</size></plane></geometry>{surface}</collision>')
     for i, (cx, cy, cz, sx, sy, sz) in enumerate(boxes):
         geo = f"<pose>{cx} {cy} {cz} 0 0 0</pose><geometry><box><size>{sx} {sy} {sz}</size></box></geometry>"
-        parts.append(f'<collision name="box{i}">{geo}</collision><visual name="box{i}">{geo}</visual>')
+        parts.append(f'<collision name="box{i}">{geo}{surface}</collision>'
+                     f'<visual name="box{i}">{geo}</visual>')
     return ('<model name="ground"><static>true</static><link name="link">'
             + "".join(parts) + "</link></model>")
 
@@ -109,6 +124,41 @@ def plateau(height_m: float, half: float = 0.5):
     return sdf, height
 
 
+def flat(mu: float | None = None):
+    """Düz zemin (isteğe bağlı sürtünmeyle: kaygan düz)."""
+    return _boxes_sdf([], mu=mu), lambda x, y: 0.0
+
+
+def rough(height_m: float, seed: int = 0, cell: float = 0.12, extent: float = 1.5,
+          mu: float | None = None):
+    """Engebe: [-extent, extent]² karesi cell x cell bloklara bölünür, her bloğun
+    üstü [0, height_m] aralığından rastgele (aynı tohum aynı zemin); dışı düz.
+    Blokların yanları dik: yükseklik fonksiyonu SDF ile birebir aynı."""
+    import numpy as np
+
+    n = int(round(2 * extent / cell))
+    tops = np.random.default_rng(seed).uniform(0.0, height_m, (n, n))
+    base = 0.05                                     # blok z=-base'den üst yüzüne
+    boxes = []
+    for i in range(n):
+        for j in range(n):
+            x = -extent + (i + 0.5) * cell
+            y = -extent + (j + 0.5) * cell
+            h = float(tops[i, j])
+            boxes.append((round(x, 6), round(y, 6), round((h - base) / 2, 6), cell, cell,
+                          round(h + base, 6)))
+    sdf = _boxes_sdf(boxes, mu=mu)
+
+    def height(x: float, y: float) -> float:
+        i = math.floor((x + extent) / cell)
+        j = math.floor((y + extent) / cell)
+        if 0 <= i < n and 0 <= j < n:
+            return float(tops[i, j])
+        return 0.0
+
+    return sdf, height
+
+
 #: Zeminli eğitim denemesi (G7, 2026-09-26): 16 ortama birer zemin. S5 gelince
 #: onun üreteciyle değişecek; bu yalnız "politika tripod'un çıkamadığı 45 mm'yi
 #: öğrenebiliyor mu" sorusu için. Eğimler her yöne komutla hem inilir hem çıkılır.
@@ -131,6 +181,27 @@ TRAIN_SETS = {
         ("eğim 25° x", lambda: slope(25.0)),
         ("çukur 45 mm", lambda: pit(0.045)),
     ),
+    # G7 "bitti" şartının üç türü (eğim, engebe, kaygan) + basamaklar
+    # (2026-09-26). Ölçüm: 15° kaygan yokuşu (μ 0.3) tripod çıkamıyor, geriye
+    # kayıp devriliyor; deneme zemini politikası tutunuyor ama ilerlemiyor.
+    "deneme2": (
+        ("düz", lambda: ("", None)),
+        ("kaygan düz μ0.2", lambda: flat(0.2)),
+        ("çukur 45 mm", lambda: pit(0.045)),
+        ("çukur 55 mm", lambda: pit(0.055)),
+        ("çukur 60 mm", lambda: pit(0.060)),
+        ("yayla 50 mm", lambda: plateau(0.050)),
+        ("eğim 10° x", lambda: slope(10.0)),
+        ("eğim 20° x", lambda: slope(20.0)),
+        ("kaygan eğim 10° x μ0.25", lambda: slope(10.0, mu=0.25)),
+        ("kaygan eğim 15° x μ0.3", lambda: slope(15.0, mu=0.3)),
+        ("kaygan eğim 15° y μ0.3", lambda: slope(15.0, "y", mu=0.3)),
+        ("kaygan eğim 20° x μ0.4", lambda: slope(20.0, mu=0.4)),
+        ("engebe 20 mm", lambda: rough(0.020, seed=11)),
+        ("engebe 40 mm", lambda: rough(0.040, seed=12)),
+        ("engebe 50 mm", lambda: rough(0.050, seed=13)),
+        ("engebe 60 mm", lambda: rough(0.060, seed=14)),
+    ),
 }
 
 
@@ -144,6 +215,14 @@ EVAL_CASES = {
         ("çukur 60 geri", lambda: pit(0.060), (-0.10, 0.0, 0.0)),
         ("yayla 50 ileri", lambda: plateau(0.050), (0.10, 0.0, 0.0)),
         ("yokuş yukarı 20", lambda: slope(-20.0), (0.10, 0.0, 0.0)),
+    ),
+    "deneme2": (
+        ("çukur 60 geri", lambda: pit(0.060), (-0.10, 0.0, 0.0)),
+        ("çukur 45 yana", lambda: pit(0.045), (0.0, 0.06, 0.0)),
+        ("kaygan yokuş 15 μ0.3", lambda: slope(-15.0, mu=0.3), (0.10, 0.0, 0.0)),
+        ("kaygan yokuş 20 μ0.4", lambda: slope(-20.0, mu=0.4), (0.10, 0.0, 0.0)),
+        ("engebe 40 ileri", lambda: rough(0.040, seed=101), (0.10, 0.0, 0.0)),
+        ("engebe 60 yana", lambda: rough(0.060, seed=102), (0.0, 0.06, 0.0)),
     ),
 }
 
@@ -180,6 +259,10 @@ TERRAINS = (
     ("basamak 30 mm", lambda: step(0.030)),
     ("basamak 45 mm", lambda: step(0.045)),
     ("basamak 60 mm", lambda: step(0.060)),
+    ("kaygan yokuş 15° μ0.3", lambda: slope(-15.0, mu=0.3)),
+    ("kaygan yokuş 20° μ0.4", lambda: slope(-20.0, mu=0.4)),
+    ("engebe 40 mm", lambda: rough(0.040, seed=1)),
+    ("engebe 60 mm", lambda: rough(0.060, seed=1)),
 )
 
 

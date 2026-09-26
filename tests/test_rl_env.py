@@ -287,3 +287,22 @@ def test_cukurda_dogar_ve_ayakta_durur(tmp_path_factory):
         assert e._state.base_pos[2] == pytest.approx(e.task.stand_height_mm / 1000, abs=0.004)
     finally:
         e.close()
+
+
+def test_engebede_dogar_ve_ayakta_durur(tmp_path_factory):
+    """Engebe (rastgele bloklar): robot ayaklarının altındaki en yüksek bloğa
+    göre doğar, devrilmeden oturur, gövde zemine göre ~100 mm'de."""
+    from hexapod_rl.terrain_probe import rough
+
+    sdf, height = rough(0.04, seed=5)
+    e = HexapodEnv(workdir=tmp_path_factory.mktemp("engebe"), terrain_sdf=sdf,
+                   terrain_height=height)
+    try:
+        e.reset(seed=0)
+        for _ in range(25):
+            _, _, terminated, _, _ = e.step(np.zeros(18, dtype=np.float32))
+            assert not terminated
+        assert e._state.height_above_ground() == pytest.approx(0.1, abs=0.03)
+        assert sum(e._state.foot_contact) >= 3
+    finally:
+        e.close()

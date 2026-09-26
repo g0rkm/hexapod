@@ -90,3 +90,29 @@ def test_ara_kayit_zemin_durumlari():
         assert sdf.startswith("<model") and callable(height) and len(cmd) == 3, label
     with pytest.raises(ValueError):
         eval_cases("yok")
+
+
+def test_surtunme_ve_engebe():
+    from hexapod_rl.terrain_probe import TRAIN_SETS, flat, rough, slope
+
+    sdf, h = slope(15.0, mu=0.3)
+    mus = [float(m.text) for m in ET.fromstring(sdf).iter("mu")]
+    assert mus == [0.3] and h(0.0, 0.0) == 0.0
+    assert "<mu>" not in slope(15.0)[0]                        # varsayılan: Gazebo'nunki
+    with pytest.raises(ValueError):
+        flat(0.0)
+    assert [float(m.text) for m in ET.fromstring(flat(0.2)[0]).iter("mu")] == [0.2]
+    # engebe: aynı tohum aynı zemin; yükseklik fonksiyonu bloklarla birebir
+    a, ha = rough(0.04, seed=3)
+    b, hb = rough(0.04, seed=3)
+    assert a == b and ha(0.31, -0.2) == hb(0.31, -0.2)
+    assert rough(0.04, seed=4)[0] != a
+    boxes = [c for c in ET.fromstring(a).iter("collision") if c.find("geometry/box") is not None]
+    assert len(boxes) == 25 * 25
+    for box in boxes[::37]:
+        cx, cy, cz = (float(v) for v in box.find("pose").text.split()[:3])
+        sz = float(box.find("geometry/box/size").text.split()[2])
+        assert cz + sz / 2 == pytest.approx(ha(cx, cy), abs=1e-5)
+        assert 0.0 <= ha(cx, cy) <= 0.04
+    assert ha(2.0, 0.0) == 0.0                                  # engebe alanının dışı düz
+    assert len(TRAIN_SETS["deneme2"]) == 16
