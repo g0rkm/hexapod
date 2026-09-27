@@ -319,7 +319,7 @@ ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.1}}"
 
 Her yöne model geri (`x: -0.1`), yana (`linear: {y: 0.06}`) ve dönüş (`angular: {z: 0.4}`) komutlarında da yürür; sıfıra yakın komutta ayakta bekler.
 
-Politika yalnızca eğitildiği komutları yürür (şimdilik ileri 0.05–0.15 m/s). Komut kesilirse,
+Politika yalnızca eğitildiği komutları yürür (eski `ppo_res_250k` yalnız ileri 0.05–0.15 m/s). Komut kesilirse,
 IMU gelmezse ya da robot devrilirse ayakta duruşa geçer.
 
 ## RL eğitimi (WSL)
@@ -338,6 +338,16 @@ source ~/hexapod_venv/bin/activate
 
 ```bash
 python -m hexapod_rl.train --steps 1000000 --envs 8 --name deneme
+```
+
+Zeminli eğitim ve ölçüm araçları (ayrıntı: `docs/PROJE_DEVIR.md` §7.8, tablolar `models/README.md`):
+
+```bash
+python -m hexapod_rl.train --steps 3000000 --envs 16 --name z1 --residual --omni --randomize --terrains deneme --init-from models/ppo_omni_250k/model.zip      # sabit zemin seti
+python -m hexapod_rl.train --steps 3000000 --envs 16 --name m1 --residual --omni --randomize --curriculum deneme --init-from models/ppo_omni_250k/model.zip    # kolaydan zora müfredat
+python -m hexapod_rl.terrain_probe tripod models/ppo_lift50_3750k/model.zip   # deneme zeminlerinde karşılaştırma
+python -m hexapod_rl.robustness tripod models/ppo_omni_250k/model.zip         # kalibrasyon ofseti, eğik IMU, gecikme, zayıf servo
+python -m hexapod_rl.reflex_probe --pitch 20 25                               # mesafe sensörlü kaldırma refleksi (DENEYSEL yerleşim)
 ```
 
 ## ROS 2 kurulumu (WSL)
