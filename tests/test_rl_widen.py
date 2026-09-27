@@ -34,3 +34,9 @@ def test_genisletilen_model_eskisiyle_ayni_davranir(tmp_path):
     np.testing.assert_allclose(std[:18], old.policy.log_std.exp().detach().numpy(), rtol=1e-6)
     with pytest.raises(ValueError):                                       # aralık dışı taban
         widen(SRC, tmp_path / "x" / "model.zip", (20.0, 40.0))
+    out = widen(SRC, tmp_path / "s" / "model.zip", (20.0, 60.0), lift_start=35.0)
+    a_start, _ = PPO.load(out, device="cpu").predict(obs, deterministic=True)
+    np.testing.assert_allclose(a_start[:, :18], a_old, atol=1e-6)     # eklemler yine aynı
+    np.testing.assert_allclose(a_start[:, 18], action_for_lift(35.0, (20.0, 60.0)), atol=1e-6)
+    with pytest.raises(ValueError):                                       # aralık dışı başlangıç
+        widen(SRC, tmp_path / "y" / "model.zip", (20.0, 60.0), lift_start=65.0)

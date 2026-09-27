@@ -16,6 +16,10 @@ sapması modelin eğitildiği sabit kaldırmaya (gorev.json lift_mm) karşılık
 gelen eylem. Eklem çıkışları, kritik ve std'ler kopyalanır: başlangıç
 davranışı eski modelle birebir aynı (test). Yeni boyutun std'si --lift-std.
 Yanına kaldırma aralığı eklenmiş gorev.json yazılır.
+
+--lift-start MM: kaldırma modelinkinden farklı bir değerden başlar (eklem
+çıkışları yine kopya). 25 mm'lik modelden 25 mm'de başlayan v20 ~28 mm'de
+durdu: engeller ~35 mm'de geçilmeye başlıyor, arada ödül eğimi yok.
 """
 
 from __future__ import annotations
@@ -26,7 +30,8 @@ from dataclasses import replace
 from pathlib import Path
 
 
-def widen(src: Path, out: Path, lift_range: tuple[float, float], lift_std: float = 0.3):
+def widen(src: Path, out: Path, lift_range: tuple[float, float], lift_std: float = 0.3,
+          lift_start: float | None = None):
     import torch
     from stable_baselines3 import PPO
 
@@ -44,8 +49,9 @@ def widen(src: Path, out: Path, lift_range: tuple[float, float], lift_std: float
     if task.lift_action is not None:
         raise ValueError(f"{src} zaten ayak kaldırma çıkışlı")
     lo, hi = lift_range
-    if not lo <= task.lift_mm <= hi:
-        raise ValueError(f"modelin kaldırması {task.lift_mm} mm aralığın ({lo}, {hi}) dışında")
+    start = task.lift_mm if lift_start is None else float(lift_start)
+    if not lo <= start <= hi:
+        raise ValueError(f"başlangıç kaldırması {start} mm aralığın ({lo}, {hi}) dışında")
 
     old = PPO.load(src, device="cpu")
     new_task = replace(task, lift_action=(float(lo), float(hi)))
@@ -61,7 +67,7 @@ def widen(src: Path, out: Path, lift_range: tuple[float, float], lift_std: float
         new_sd["action_net.weight"].zero_()
         new_sd["action_net.weight"][:ACTION_SIZE].copy_(old_sd["action_net.weight"])
         new_sd["action_net.bias"][:ACTION_SIZE].copy_(old_sd["action_net.bias"])
-        new_sd["action_net.bias"][ACTION_SIZE] = action_for_lift(task.lift_mm, (lo, hi))
+        new_sd["action_net.bias"][ACTION_SIZE] = action_for_lift(start, (lo, hi))
         new_sd["log_std"][:ACTION_SIZE].copy_(old_sd["log_std"])
         new_sd["log_std"][ACTION_SIZE] = math.log(lift_std)
     new.policy.load_state_dict(new_sd)
@@ -78,9 +84,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lift-range", type=float, nargs=2, required=True,
                         metavar=("EN_AZ", "EN_COK"))
     parser.add_argument("--lift-std", type=float, default=0.3)
+    parser.add_argument("--lift-start", type=float, default=None, metavar="MM",
+                        help="başlangıç kaldırması (verilmezse modelin gorev.json lift_mm'i)")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
-    out = widen(args.model, args.out, tuple(args.lift_range), args.lift_std)
+    out = widen(args.model, args.out, tuple(args.lift_range), args.lift_std, args.lift_start)
     print(f"yazıldı -> {out} (+ gorev.json)")
     return 0
 
