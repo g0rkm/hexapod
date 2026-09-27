@@ -13,7 +13,8 @@ Sensör yerleşimi DENEYSEL (robot.yaml'da null, D8): gövde önünde üç sens�
 x 0.10/0.095 m, y 0/±0.03 m, z 0.02 m, bakış 0/±25°, --pitch derece aşağı,
 menzil 1 m. Sensör gürültüsü ve düşmesi bilinmiyor; --noise (bağıl std, %),
 --drop (okumanın gelmeme olasılığı, %), --every (kaç kontrol adımında bir
-okuma) taranan büyüklükler. Rastgeleleştirme açık, 3 tohum, 0.1 m/s ileri,
+okuma) taranan büyüklükler; --offset σ: eklem başına kalibrasyon ofseti
+(robustness.perturbation("ofset", σ, tohum)). Rastgeleleştirme açık, 3 tohum, 0.1 m/s ileri,
 10 s. Hücre: ortalama yol (m), 0.4 m'den fazla ilerleyen tohum, ortalama güç,
 ortalama kaldırma; D = devrilme.
 """
@@ -43,7 +44,8 @@ def front_sensors(pitch_deg: float):
 
 
 def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
-             drop: float = 0.0, every: int = 1, seconds: float = 10.0) -> dict:
+             drop: float = 0.0, every: int = 1, seconds: float = 10.0,
+             offset_deg: float = 0.0) -> dict:
     """mode: sabit kaldırma (mm, float) ya da ("refleks", pitch_deg)."""
     import numpy as np
 
@@ -51,6 +53,7 @@ def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
 
     from . import terrain_probe as tp
     from .env import HexapodEnv
+    from .robustness import perturbation
     from .task import Randomization, action_for_lift
 
     model, task = tp.load(model_spec)
@@ -61,7 +64,8 @@ def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
     sdf, height = ("", None) if gen is None else getattr(tp, gen)(**kw)
     reflex = isinstance(mode, tuple)
     sensors = front_sensors(mode[1] if reflex else 30.0)
-    env = HexapodEnv(task=task, terrain_sdf=sdf, terrain_height=height, range_sensors=sensors)
+    env = HexapodEnv(task=task, terrain_sdf=sdf, terrain_height=height, range_sensors=sensors,
+                     perturbation=perturbation("ofset", offset_deg, seed) if offset_deg else None)
     rng = np.random.default_rng(seed + 1000)
     lift_reflex = LiftReflex()
     try:
@@ -101,8 +105,8 @@ def _job(args):
 
 
 def table(model_spec: str, modes, noise: float, drop: float, every: int,
-          workers: int = 16) -> str:
-    jobs = [(model_spec, m, ti, s, noise, drop, every) for m in modes
+          workers: int = 16, offset_deg: float = 0.0) -> str:
+    jobs = [(model_spec, m, ti, s, noise, drop, every, 10.0, offset_deg) for m in modes
             for ti in range(len(TERRAINS)) for s in SEEDS]
     with mp.get_context("fork").Pool(workers, maxtasksperchild=1) as pool:
         out = pool.map(_job, jobs, chunksize=1)
@@ -137,11 +141,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--noise", type=float, default=0.0, help="bağıl ölçüm gürültüsü, %%")
     parser.add_argument("--drop", type=float, default=0.0, help="okuma gelmeme olasılığı, %%")
     parser.add_argument("--every", type=int, default=1, help="kaç kontrol adımında bir okuma")
+    parser.add_argument("--offset", type=float, default=0.0,
+                        help="eklem başına kalibrasyon ofseti σ, derece (tohumlu)")
     parser.add_argument("--workers", type=int, default=16)
     args = parser.parse_args(argv)
     modes = list(args.fixed) + [("refleks", p) for p in args.pitch]
-    print(table(args.model, modes, args.noise / 100, args.drop / 100, args.every, args.workers),
-          flush=True)
+    print(table(args.model, modes, args.noise / 100, args.drop / 100, args.every, args.workers,
+                args.offset), flush=True)
     return 0
 
 

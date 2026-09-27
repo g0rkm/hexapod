@@ -1679,7 +1679,9 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     önce kuralı denemek hem ucuz (1.5 dk) hem de sensörün nereye bakması
     gerektiğini gösterdi: 45° aşağı bakan ışın engeli çok geç görüyor,
     20–25° doğru. Gürültüde ilk eşik (12 mm, tek okuma) yanlış alarm
-    verdi; eşik 20 mm + art arda 2 okuma yeterli. Değerler robot.yaml'a
+    verdi; eşik 20 mm + art arda 2 okuma yeterli. Kalibrasyon ofsetinde
+    (σ2–4°, ders 37) de engelde sabit 50 mm'den iyi: engelde payı açtığı
+    için 35 mm'lik modelin kırılganlığı kalkıyor. Değerler robot.yaml'a
     yazılmadı: yerleşim D8'in kararı, sim yalnız öneri.
 
 ---

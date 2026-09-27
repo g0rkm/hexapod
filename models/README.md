@@ -71,6 +71,15 @@ adımında bir okuma; `--noise 5 --drop 10 --every 2`):
   alarmla kaldırmayı 25 → 32 mm'ye, gücü 3.95 → 4.35 W'a çıkarıyordu.
   Eşik 20 mm + art arda 2 okuma bunu bitirdi (düzde 25 mm), engel
   becerisi aynı kaldı.
+- **Kalibrasyon hatasına karşı da dayanıklı** (`--offset σ`, eklem başına
+  rastgele ofset; gürültülü sensör, 20°): σ2°'de sabit 35 mm'nin 45 mm
+  basamağı 0.44 m'ye (2/3) düşüyor, refleks 0.96 m (3/3); 60 mm basamak
+  refleks 0.71 (3/3), sabit 50 mm 0.55 (2/3); düz güç refleks 4.31 W, sabit
+  50 mm 4.85 W. σ4°'te basamak 45 / 60 / çukur 45: refleks 0.94 / 0.51 /
+  0.94, sabit 50 mm 0.78 / 0.36 / 0.68; düzde refleksin hızı 0.87'ye iniyor
+  (25 mm'de ayak ofsetle sürtüyor; sabit 50 mm 1.00). Dayanıklılık
+  taramasında (yukarıda) 35 mm'lik modeli kırılgan yapan şey engelde payın
+  dar olmasıydı; refleks engelde payı açıyor.
 - **Sınırlar:** sensörler yalnız ileri bakıyor; yana/geri yürürken refleks
   engeli görmez (25 mm). Işın ideal (VL53L0X'in görüş konisi, yansıtıcılık
   ve ölçüm süresi modellenmedi). Kaldırma çıkışlı modelle çalışıyor
