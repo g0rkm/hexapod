@@ -152,3 +152,17 @@ def test_mufredat_kolaydan_zora_ve_dagilim():
     assert counts == {"çukur": 8, "yayla": 2, "eğim x": 2, "eğim y": 2, "düz": 2}
     with pytest.raises(ValueError):
         curriculum_levels("yok", 4)
+
+
+def test_basamak_dondurulebilir():
+    """angle_deg ile basamak yürüyüş yönüne döner; SDF'teki kutu da aynı yerde."""
+    _, h0 = step(0.045)
+    assert h0(0.31, 0.0) == 0.045 and h0(0.29, 0.0) == 0.0 and h0(0.0, 0.31) == 0.0
+    sdf, h90 = step(0.045, angle_deg=90.0)                  # sola
+    assert h90(0.0, 0.31) == pytest.approx(0.045) and h90(0.0, 0.29) == 0.0
+    assert h90(0.31, 0.0) == 0.0
+    _, h180 = step(0.045, angle_deg=180.0)                  # arkada
+    assert h180(-0.31, 0.0) == pytest.approx(0.045) and h180(0.31, 0.0) == 0.0
+    pose = [float(v) for v in ET.fromstring(sdf).find(".//collision[@name='step']/pose").text.split()]
+    assert pose[0] == pytest.approx(0.0, abs=1e-9) and pose[1] == pytest.approx(0.3 + 4.0)
+    assert pose[5] == pytest.approx(math.pi / 2)

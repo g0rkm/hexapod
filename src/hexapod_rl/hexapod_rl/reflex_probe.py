@@ -22,6 +22,7 @@ ortalama kaldırma; D = devrilme.
 from __future__ import annotations
 
 import argparse
+import math
 import multiprocessing as mp
 from dataclasses import replace
 
@@ -43,13 +44,26 @@ def front_sensors(pitch_deg: float):
             RangeSensor(0.095, -0.03, 0.02, -25.0, pitch_deg, 1.0))
 
 
+def ring_sensors(yaws_deg, pitch_deg: float, radius: float = 0.10):
+    """DENEYSEL yerleşim: gövde kenarında (yarıçap radius) verilen yönlere bakan
+    sensörler (her yöne yürüyüşte yerleşim karşılaştırması için)."""
+    import math
+
+    from hexapod_policy.lift_reflex import RangeSensor
+    return tuple(RangeSensor(radius * math.cos(math.radians(y)), radius * math.sin(math.radians(y)),
+                             0.02, float(y), pitch_deg, 1.0) for y in yaws_deg)
+
+
 def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
              drop: float = 0.0, every: int = 1, seconds: float = 10.0,
-             offset_deg: float = 0.0) -> dict:
-    """mode: sabit kaldırma (mm, float) ya da ("refleks", pitch_deg)."""
+             offset_deg: float = 0.0, command=(0.1, 0.0, 0.0), sensors=None,
+             terrain_spec=None) -> dict:
+    """mode: sabit kaldırma (mm, float) ya da ("refleks", pitch_deg). sensors:
+    yerleşim (verilmezse front_sensors(pitch)); terrain_spec: (üreteç, argümanlar)
+    TERRAINS[terrain] yerine. Dönen yol komut yönünde (m)."""
     import numpy as np
 
-    from hexapod_policy.lift_reflex import LiftReflex, obstacle_height
+    from hexapod_policy.lift_reflex import LiftReflex, covers, obstacle_height
 
     from . import terrain_probe as tp
     from .env import HexapodEnv
@@ -60,17 +74,20 @@ def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
     if task.lift_action is None:
         raise ValueError(f"{model_spec}: öğrenilmiş kaldırma çıkışı yok (19 çıkışlı model gerekir)")
     task = replace(task, randomization=Randomization())
-    _, gen, kw = TERRAINS[terrain]
+    gen, kw = terrain_spec if terrain_spec is not None else TERRAINS[terrain][1:]
     sdf, height = ("", None) if gen is None else getattr(tp, gen)(**kw)
     reflex = isinstance(mode, tuple)
-    sensors = front_sensors(mode[1] if reflex else 30.0)
+    if sensors is None:
+        sensors = front_sensors(mode[1] if reflex else 30.0)
     env = HexapodEnv(task=task, terrain_sdf=sdf, terrain_height=height, range_sensors=sensors,
                      perturbation=perturbation("ofset", offset_deg, seed) if offset_deg else None)
     rng = np.random.default_rng(seed + 1000)
     lift_reflex = LiftReflex()
     try:
-        obs, info = env.reset(seed=seed, options={"command": (0.1, 0.0, 0.0)})
-        x0 = env._state.base_pos[0]
+        obs, info = env.reset(seed=seed, options={"command": tuple(command)})
+        p0 = env._state.base_pos
+        speed = math.hypot(command[0], command[1])
+        ux, uy = (command[0] / speed, command[1] / speed) if speed > 0 else (1.0, 0.0)
         lift = lift_reflex.low_mm if reflex else float(mode)
         lifts, power, n, fell = [], 0.0, 0, False
         for k in range(int(round(seconds / env.dt))):
@@ -86,7 +103,9 @@ def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
                 lift = lift_reflex.update(k * env.dt, heights)
             action, _ = model.predict(obs, deterministic=True)
             action = np.array(action)
-            action[-1] = action_for_lift(lift, task.lift_action)
+            if not reflex or covers(sensors, command[0], command[1]):
+                action[-1] = action_for_lift(lift, task.lift_action)
+            # görmediği yönde (denetleyicideki gibi) politikanın kendi kaldırması
             obs, _, terminated, _, info = env.step(action)
             lifts.append(info["lift_mm"])
             power += info["reward_terms"]["power"] / env.task.w["power"]
@@ -94,7 +113,8 @@ def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
             if terminated:
                 fell = True
                 break
-        return {"yol_m": env._state.base_pos[0] - x0, "guc_w": power / n,
+        p1 = env._state.base_pos
+        return {"yol_m": (p1[0] - p0[0]) * ux + (p1[1] - p0[1]) * uy, "guc_w": power / n,
                 "kaldirma_mm": sum(lifts) / n, "devrildi": fell}
     finally:
         env.close()

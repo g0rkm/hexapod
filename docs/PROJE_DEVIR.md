@@ -13,7 +13,7 @@
 > önceki: yeni bilgisayarda kurulum §0.5; zemine göre ayak teması §7.8;
 > her yöne politika `ppo_omni_250k` §3.2; kütle rastgeleleştirmesi;
 > zeminli eğitim `ppo_lift50_3750k` §3.3)
-> · Testler: **Linux 282/282**, Windows 232 geçti + 9 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 285/285**, Windows 235 geçti + 9 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -99,12 +99,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 232 geçti, 9 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 235 geçti, 9 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 282 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 285 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -415,7 +415,11 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
   mm basamak 0.98 (sabit 50: 0.88), 60 mm basamak 0.86 3/3 (sabit 50: 0.41
   2/3), %5 gürültü + %10 okuma düşmesi + yarı hızda da aynı. Sensör 20–25°
   aşağı bakmalı; 45° hiç çalışmıyor. Kör politikanın ödünleşimi (ders 33)
-  sensörle çözülüyor. Robot düğümüne bağlanması S7 ve D8'i bekliyor.
+  sensörle çözülüyor. Her yöne yürüyüşte yerleşim: bir sensör bakışının
+  ~±30–45°'sini görüyor; biri ileri, ikisi ±90° ile ileri/yana/çapraz
+  görülüyor, geride refleks devre dışı kalıp politikanın kör kaldırmasına
+  dönüyor (`covers`); dört yönde de 45 mm basamak geçiliyor. Robot
+  düğümüne bağlanması S7 ve D8'i bekliyor.
   Tablolar: models/README ("Mesafe sensörlü kaldırma refleksi").
 - **Müfredat (2026-09-27, v22–v23; `--curriculum`, §7.8):** sabit 25 mm
   tabanda müfredat küçük bir kazanç getirdi (engel skoru 0.338 → 0.371, v12
@@ -1041,7 +1045,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
   güncellenir; sensör yavaşsa aynı ölçüm art arda sayılmaz). Mesafe yok ya
   da `range_timeout_s` (0.2 s) bayatsa kör davranışa döner: kaldırma çıkışı
   varsa onun, yoksa tabanın kaldırması (`reflex_status`). Yalnız artık eylem
-  modunda. Kapalı döngü (numpy politika + denetleyici + süreç içi Gazebo,
+  modunda. Yürüyüş yönüne hiçbir sensör bakmıyorsa (±45°, `covers`) de
+  refleks devre dışı ("yön görülmüyor"). Kapalı döngü (numpy politika + denetleyici + süreç içi Gazebo,
   ROS'suz, `ppo_kaldirma35_250k`, 10 s): düzde refleks 25 mm (politika 35),
   ikisi ~1.0 m; 45 mm basamak politika 0.70 m, refleks 0.94 m; 60 mm
   basamak politika 0.07 m takılı, refleks 0.48 m (ön kısmı üstte).
@@ -1070,8 +1075,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 232 geçti, 9 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 282 geçti, ~40 s (yeni PC).
+- Windows: 235 geçti, 9 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 285 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1832,10 +1837,12 @@ zeminler.
     bölüm) denenmedi.
 17. ✅ **Mesafe sensörlü kaldırma refleksi** (ders 41, `lift_reflex`,
     `reflex_probe`): düz verim ↔ zemin ödünleşimi (madde 10) sensörle
-    çözülüyor. Denetleyici çekirdeği hazır (§7.9). Açık: (a) düğüme
-    bağlama (S7'nin mesafe konuları + D8'in yerleşimi robot.yaml'a girince); (b) yana/geri yürüyüş için
-    sensör ya da yedek kaldırma; (c) VL53L0X'in görüş konisi ve gerçek
-    gürültüsü (S7/D8'de ölçülünce); (d) sensör gözlemli RL.
+    çözülüyor. Denetleyici çekirdeği hazır (§7.9); yerleşim önerisi D8'de
+    (ileri + ±90°, görmediği yönde kör kaldırma). Açık: (a) düğüme
+    bağlama (S7'nin mesafe konuları + D8'in yerleşimi robot.yaml'a
+    girince); (b) geri yürüyüşte sensör yok (kör kaldırma, ~35 mm);
+    (c) VL53L0X'in görüş konisi ve gerçek gürültüsü (S7/D8'de ölçülünce);
+    (d) sensör gözlemli RL; (e) refleks açıkken politikayı eğitmek.
 
 **S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
 S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son
@@ -1910,7 +1917,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 232 geçti, 9 atlandı. WSL: 282 geçti.
+   - Windows: 235 geçti, 9 atlandı. WSL: 285 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).

@@ -80,15 +80,37 @@ adımında bir okuma; `--noise 5 --drop 10 --every 2`):
   (25 mm'de ayak ofsetle sürtüyor; sabit 50 mm 1.00). Dayanıklılık
   taramasında (yukarıda) 35 mm'lik modeli kırılgan yapan şey engelde payın
   dar olmasıydı; refleks engelde payı açıyor.
-- **Sınırlar:** sensörler yalnız ileri bakıyor; yana/geri yürürken refleks
-  engeli görmez (25 mm). Işın ideal (VL53L0X'in görüş konisi, yansıtıcılık
-  ve ölçüm süresi modellenmedi). Kaldırma çıkışlı modelle çalışıyor
-  (öğrenilmiş kaldırmalı eğitimde eklemler 25–60 mm'ye alıştı). Robot
-  düğümüne bağlanması S7 (sürücü) ve D8'i (yerleşim) bekliyor.
-- **D8'e öneri:** mesafe sensörlerinden en az biri gövdenin önünde, yerin
-  ~12 cm üstünde, 20–25° aşağı bakacak şekilde. Yan sensörler ±25°.
-  Kesin yerleşim robotta ölçülüp robot.yaml'a girince bu tablo yeniden
-  koşulur (`--pitch`).
+- **Sınırlar:** Işın ideal (VL53L0X'in görüş konisi, yansıtıcılık ve ölçüm
+  süresi modellenmedi). Kaldırma çıkışlı modelle çalışıyor (öğrenilmiş
+  kaldırmalı eğitimde eklemler 25–60 mm'ye alıştı). Robot düğümüne
+  bağlanması S7 (sürücü) ve D8'i (yerleşim) bekliyor.
+
+**Her yöne yürüyüşte yerleşim** (üç sensör gövde kenarında, yarıçap 0.1 m,
+20° aşağı; basamak 45 mm yürüyüş yönünde, `terrain_probe.step(angle_deg=)`;
+gürültülü sensör, rastgeleleştirme açık, 3 tohum). Işın dar: bir sensör
+yalnız bakışının ~±30–45° içindeki engeli zamanında görüyor (30° sapmada
+tetikleniyor, 60°'de tetiklenmiyor). Yürüyüş yönüne hiçbir sensör
+bakmıyorsa refleks 25 mm'de kalıp takılıyordu; artık o yönde devre dışı
+kalıp politikanın kendi (kör, ~35 mm) kaldırmasına dönüyor
+(`lift_reflex.covers`, ±45°; aşağıdaki tablo bu kuralla).
+
+| Kaldırma / yerleşim | basamak 45 ileri | sola | geri | çapraz (30°) | düz güç ileri / sola / geri / çapraz |
+|---|---|---|---|---|---|
+| sabit 25 mm | 0.08 (0/3) | 0.06 (0/3) | 0.07 (0/3) | 0.06 (0/3) | 3.95 / 3.67 / 4.01 / 3.76 W |
+| sabit 35 mm | 0.81 (3/3) | 0.09 (0/3) | 0.73 (3/3) | 0.07 (0/3) | 4.38 / 4.07 / 4.47 / 4.16 W |
+| sabit 50 mm | 0.88 (3/3) | 0.59 (3/3) | 0.94 (3/3) | 0.72 (3/3) | 4.45 / 4.17 / 4.55 / 4.27 W |
+| refleks, ön yelpaze (0°, ±25°) | 0.98 (3/3) | 0.09 (0/3) kör | 0.73 (3/3) kör | 0.78 (3/3) | 3.95 / 4.07 / 4.47 / 3.76 W |
+| **refleks, ön + yanlar (0°, ±90°)** | **0.97 (3/3)** | **0.60 (3/3)** | **0.73 (3/3) kör** | **0.76 (3/3)** | **3.95 / 3.67 / 4.47 / 3.76 W** |
+| refleks, üçgen (0°, ±120°) | 0.97 (3/3) | 0.60 (3/3) | 0.73 (3/3) kör | 0.76 (3/3) | 3.95 / 3.67 / 4.47 / 3.76 W |
+| refleks, ters üçgen (±60°, 180°) | 0.80 (3/3) kör | 0.60 (3/3) | 0.98 (3/3) | 0.78 (3/3) | 4.37 / 3.67 / 4.01 / 3.76 W |
+
+- **D8'e öneri:** üç sensör: biri tam ileri, ikisi yanlara (±90°; ±120° de
+  aynı sonuç), gövde kenarında, yerin ~12 cm üstünde, **20–25° aşağı**.
+  Dört yönde de 45 mm basamak geçiliyor, düzde üç yönde 25 mm'nin
+  enerjisi (geri kör, 35 mm). Önde üç sensör (±25°) yana yürüyüşü
+  kapsamıyor. Kesin yerleşim robotta ölçülüp robot.yaml'a girince bu
+  tablolar yeniden koşulur (`reflex_probe --pitch`, yerleşim
+  karşılaştırması `ring_sensors`).
 
 **Gerçek robotta DENENMEDİ.**
 

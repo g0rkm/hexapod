@@ -37,3 +37,14 @@ def test_engel_yuksekligi_sensorun_yerine_ve_imu_ya_gore():
     assert obstacle_height(s, 0.24, (0.0, 0.0, -1.0), 0.1) == pytest.approx(0.0, abs=1e-9)
     assert obstacle_height(s, 0.15, (0.0, 0.0, -1.0), 0.1) == pytest.approx(0.045)
     assert obstacle_height(s, 1.0, (0.0, 0.0, -1.0), 0.1) is None
+
+
+def test_sensorun_gordugu_yurume_yonleri():
+    from hexapod_policy.lift_reflex import covers
+
+    front = [RangeSensor(0.1, 0.0, 0.02, y, 20.0, 1.0) for y in (0.0, 25.0, -25.0)]
+    assert covers(front, 0.1, 0.0) and covers(front, 0.07, 0.04)      # ileri, çapraz ~30°
+    assert not covers(front, 0.0, 0.06) and not covers(front, -0.1, 0.0)   # sola, geri
+    assert covers(front, 0.0, 0.0)                                     # yerinde dönüş
+    back = [RangeSensor(-0.1, 0.0, 0.02, 180.0, 20.0, 1.0)]
+    assert covers(back, -0.1, 0.0) and covers(back, -0.1, -0.05)       # -180/+180 sarması

@@ -332,7 +332,7 @@ def test_salinim_grubu_ayak_yorungesiyle_uyumlu():
         assert all(feet[leg][2] == pytest.approx(-100.0) for leg in groups[1 - g]), phase
 
 
-def _reflex_controller(lift_range=None, **kw):
+def _reflex_controller(lift_range=None, command_ranges=RANGES, **kw):
     """Artık eylem, düzeltme 0; lift_range verilirse kaldırma çıkışı 20+0.5*... = 50 mm."""
     from pathlib import Path
 
@@ -345,7 +345,7 @@ def _reflex_controller(lift_range=None, **kw):
     base_gait = {"groups": [[0, 2, 4], [1, 3, 5]], "reach_mm": 130.0, "height_mm": 100.0,
                  "lift_mm": 25.0}
     c = PolicyContract(obs_size=OBS_SIZE, action_size=ACTION_SIZE, action_scale=0.5, gait_hz=1.5,
-                       control_hz=50.0, default_rad=DEFAULT, command_ranges=RANGES,
+                       control_hz=50.0, default_rad=DEFAULT, command_ranges=command_ranges,
                        action_mode="residual", residual_scale=0.2, base_gait=base_gait,
                        lift_range=lift_range)
     n = ACTION_SIZE + (1 if lift_range else 0)
@@ -417,3 +417,18 @@ def test_refleks_yanlis_kurulum_reddedilir():
                          reflex=LiftReflex())
     with pytest.raises(ValueError):                           # yerleşimsiz refleks
         PolicyController(policy, [(-3.0, 3.0)] * ACTION_SIZE, reflex=LiftReflex())
+
+
+def test_refleks_gormedigi_yonde_kor_davranisa_doner():
+    """Ön sensörlerle geri yürürken engel görülmez: refleks devre dışı, kaldırma
+    çıkışlı politikada politikanın seçtiği (50 mm)."""
+    omni = {"vx": (-0.15, 0.15), "vy": (-0.08, 0.08), "wz": (-0.5, 0.5)}
+    ctl, flat, _ = _reflex_controller(lift_range=(20.0, 60.0), command_ranges=omni)
+    t = 0.0
+    for _ in range(40):
+        ctl.on_imu(LEVEL, (0, 0, 0), t)
+        ctl.on_command(-0.1, 0.0, 0.0, t)
+        ctl.on_ranges([flat], t)
+        ctl.tick(t)
+        t += 0.02
+    assert ctl.reflex_status == "yön görülmüyor" and ctl.lift_mm == pytest.approx(50.0)

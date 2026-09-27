@@ -64,6 +64,22 @@ def obstacle_height(sensor: RangeSensor, distance: float, gravity_in_base: Vec3,
     return stand_height - (hit[0] * g[0] + hit[1] * g[1] + hit[2] * g[2])
 
 
+#: Bir sensör, bakış yönünden en çok bu kadar sapan yürüyüş yönünü "görür".
+#: Simde (20° aşağı bakan ışın, 45 mm basamak): 30° sapmada refleks zamanında
+#: tetikleniyor, 60°'de tetiklenmiyor (models/README, yerleşim karşılaştırması).
+COVERAGE_DEG = 45.0
+
+
+def covers(sensors: Sequence[RangeSensor], vx: float, vy: float,
+           max_angle_deg: float = COVERAGE_DEG) -> bool:
+    """Yürüyüş yönü (vx, vy; gövde çerçevesi) bir sensörün bakışına yeterince yakın
+    mı? Öteleme yoksa (yerinde dönüş) True: refleks karar verebilir."""
+    if math.hypot(vx, vy) < 1e-9:
+        return True
+    walk = math.degrees(math.atan2(vy, vx))
+    return any(abs((walk - s.yaw_deg + 180.0) % 360.0 - 180.0) <= max_angle_deg for s in sensors)
+
+
 @dataclass
 class LiftReflex:
     """update(t, yükseklikler) -> ayak kaldırma, mm. Ayarlar simde seçildi (deney A)."""
@@ -98,4 +114,4 @@ class LiftReflex:
         return min(self.high_mm, max(self.low_mm, 1000.0 * (top + self.margin_m)))
 
 
-__all__ = ["LiftReflex", "RangeSensor", "obstacle_height"]
+__all__ = ["COVERAGE_DEG", "LiftReflex", "RangeSensor", "covers", "obstacle_height"]

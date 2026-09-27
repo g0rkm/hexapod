@@ -32,8 +32,9 @@ düzeltmesidir; bunun için robotun kinematiği (kin) verilmelidir.
 Mesafe sensörlü kaldırma refleksi (isteğe bağlı; lift_reflex, 2026-09-27):
 range_sensors (yerleşim) + reflex verilirse her salınımın başında taban
 tripod'un ayak kaldırmasını refleks seçer (on_ranges ile gelen mesafeler +
-IMU). Mesafe gelmiyor ya da bayatsa (range_timeout_s) refleks devre dışı,
-politika kör davranışına döner: kaldırma çıkışı varsa onun seçtiği, yoksa
+IMU). Mesafe gelmiyor ya da bayatsa (range_timeout_s) ya da yürüyüş yönüne
+hiçbir sensör bakmıyorsa (lift_reflex.covers) refleks devre dışı, politika
+kör davranışına döner: kaldırma çıkışı varsa onun seçtiği, yoksa
 tabanın sabit kaldırması (reflex_status). Yerleşim robot.yaml'dan (D8)
 gelmeli; bu katman varsayılan koymaz.
 """
@@ -45,7 +46,7 @@ from typing import Sequence
 
 import numpy as np
 
-from .lift_reflex import LiftReflex, RangeSensor, obstacle_height
+from .lift_reflex import LiftReflex, RangeSensor, covers, obstacle_height
 from .mlp import MlpPolicy
 from .tripod import PhaseTripod
 
@@ -156,7 +157,7 @@ class PolicyController:
         command = self._effective_command()
         out = np.clip(self.policy(self.observation(command)), -1.0, 1.0)
         action = out[:c.action_size]
-        reflex_lift = self._update_reflex(now)
+        reflex_lift = self._update_reflex(now, command)
         if self.base is not None and (c.lift_range is not None or self.reflex is not None):
             # ayak kaldırma yalnız salınımın ilk adımında seçilir, salınım boyunca
             # sabit (hexapod_rl.env ile aynı): refleks görüyorsa onun seçtiği, yoksa
@@ -193,11 +194,16 @@ class PolicyController:
 
     # -- iç -----------------------------------------------------------------------
 
-    def _update_reflex(self, now: float) -> float | None:
-        """Refleksin kaldırması, mm; refleks yoksa ya da mesafe gelmiyorsa None.
+    def _update_reflex(self, now: float, command) -> float | None:
+        """Refleksin kaldırması, mm; refleks yoksa, mesafe gelmiyorsa ya da yürüyüş
+        yönüne hiçbir sensör bakmıyorsa (lift_reflex.covers) None: görmediği yönde
+        refleks 25 mm'de kalıp takılırdı, kör davranış daha iyi (models/README).
         Refleks yalnız YENİ bir ölçümle güncellenir (sensör kontrol hızından
         yavaşsa aynı ölçüm art arda sayılmasın)."""
         if self.reflex is None:
+            return None
+        if not covers(self.range_sensors, command[0], command[1]):
+            self.reflex_status = "yön görülmüyor"
             return None
         if self._ranges is None or now - self._ranges_at > self.range_timeout_s:
             self.reflex_status = "mesafe yok" if self._ranges is None else "mesafe bayat"

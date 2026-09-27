@@ -63,21 +63,27 @@ def slope(deg: float, axis: str = "x", mu: float | None = None):
     return sdf, height
 
 
-def step(height_m: float, at_x: float = 0.3):
+def step(height_m: float, at_x: float = 0.3, angle_deg: float = 0.0):
     """Düz zemin; x >= at_x'te height_m yüksekliğinde bir basamak (robot ileri
-    yürürken önce ön ayaklar çıkar)."""
-    cx = at_x + _SIZE / 2
+    yürürken önce ön ayaklar çıkar). angle_deg: basamak o yöne döndürülür
+    (90: +y'de, sola yürüyünce; 180: arkada); at_x o yönde uzaklık."""
+    a = math.radians(angle_deg)
+    ca, sa = math.cos(a), math.sin(a)
+    r = at_x + _SIZE / 2
+    cx, cy = r * ca, r * sa
     sdf = f"""<model name="ground"><static>true</static><link name="link">
       <collision name="plane"><geometry><plane><normal>0 0 1</normal>
         <size>100 100</size></plane></geometry></collision>
-      <collision name="step"><pose>{cx} 0 {height_m / 2} 0 0 0</pose>
+      <collision name="step"><pose>{cx} {cy} {height_m / 2} 0 0 {a}</pose>
         <geometry><box><size>{_SIZE} {_SIZE} {height_m}</size></box></geometry></collision>
-      <visual name="step"><pose>{cx} 0 {height_m / 2} 0 0 0</pose>
+      <visual name="step"><pose>{cx} {cy} {height_m / 2} 0 0 {a}</pose>
         <geometry><box><size>{_SIZE} {_SIZE} {height_m}</size></box></geometry></visual>
     </link></model>"""
 
     def height(x: float, y: float) -> float:
-        return height_m if x >= at_x else 0.0
+        u = x * ca + y * sa
+        v = -x * sa + y * ca
+        return height_m if at_x <= u <= at_x + _SIZE and abs(v) <= _SIZE / 2 else 0.0
 
     return sdf, height
 
