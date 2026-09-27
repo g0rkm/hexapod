@@ -411,3 +411,50 @@ def test_bozulmasiz_ortam_eskisiyle_ayni(tmp_path_factory):
     finally:
         a.close()
         b.close()
+
+
+def test_mufredat_seviye_degisir_ve_zemin_yeniden_kurulur(tmp_path_factory):
+    """Bölüm sonunda doğduğu yerden yeterince uzaklaştıysa zorlaşır, devrildiyse
+    kolaylaşır; zemin gerçekten değişir (yaylada gövde yüksekliği) ve kalibrasyon
+    ofseti yeni dünyada korunur; en zoru geçince aralıkta bir seviyeye döner."""
+    from functools import partial
+
+    from hexapod_rl.env import CURRICULUM_PROMOTE_M, Perturbation
+    from hexapod_rl.terrain_probe import plateau
+
+    levels = [partial(plateau, 0.01), partial(plateau, 0.05)]
+    offsets = tuple(0.5 * i for i in range(18))
+    e = HexapodEnv(workdir=tmp_path_factory.mktemp("mufredat"), terrain_levels=levels,
+                   perturbation=Perturbation(joint_offset_deg=offsets))
+    try:
+        _, info = e.reset(seed=0, options={"command": (0.1, 0.0, 0.0)})
+        assert info["terrain_level"] == 0
+        z0 = e._state.base_pos[2]
+        e.step(np.zeros(18, dtype=np.float32))
+        e._max_disp = CURRICULUM_PROMOTE_M + 0.01           # geçti sayılsın
+        _, info = e.reset(seed=0, options={"command": (0.1, 0.0, 0.0)})
+        assert info["terrain_level"] == 1
+        assert e._state.base_pos[2] - z0 == pytest.approx(0.04, abs=0.005)   # 10 -> 50 mm yayla
+        np.testing.assert_allclose(e.sim.joint_offset, [math.radians(v) for v in offsets])
+        e.step(np.zeros(18, dtype=np.float32))
+        e._max_disp = CURRICULUM_PROMOTE_M + 0.01           # en zoru geçti: aralıkta kalır
+        _, info = e.reset(seed=0, options={"command": (0.1, 0.0, 0.0)})
+        assert info["terrain_level"] in (0, 1)
+        e.set_level(1)
+        e.reset(seed=0, options={"command": (0.1, 0.0, 0.0)})
+        e.step(np.zeros(18, dtype=np.float32))
+        e._fell = True                                      # devrildi: kolaylaşır
+        _, info = e.reset(seed=0, options={"command": (0.1, 0.0, 0.0)})
+        assert info["terrain_level"] == 0
+        for _ in range(50):                                 # 1 s, ~0 ilerleme, 0.1 m/s istendi
+            e.step(np.zeros(18, dtype=np.float32))
+        _, info = e.reset(seed=0, options={"command": (0.0, 0.0, 0.4)})
+        assert info["terrain_level"] == 0                   # en kolayda kalır
+        for _ in range(50):                                 # yerinde dönüş: karar yok
+            e.step(np.zeros(18, dtype=np.float32))
+        e.set_level(1)
+        e._steps, e._max_disp, e._fell = 50, 0.0, False
+        _, info = e.reset(seed=0)
+        assert info["terrain_level"] == 1
+    finally:
+        e.close()

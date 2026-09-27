@@ -12,7 +12,7 @@
 > önceki: yeni bilgisayarda kurulum §0.5; zemine göre ayak teması §7.8;
 > her yöne politika `ppo_omni_250k` §3.2; kütle rastgeleleştirmesi;
 > zeminli eğitim `ppo_lift50_3750k` §3.3)
-> · Testler: **Linux 264/264**, Windows 218 geçti + 9 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 266/266**, Windows 219 geçti + 9 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -98,12 +98,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 218 geçti, 9 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 219 geçti, 9 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 264 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 266 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -879,6 +879,16 @@ taklit eder.
 - `--terrains AD`: ortam başına zemin (`terrain_probe.TRAIN_SETS`; liste
   ortamlara sırayla dağıtılır, kütle çarpanları karıştırılır). Taklit de
   aynı zeminlerde toplanabilir (`pretrain --terrains`).
+- `--curriculum AD` (2026-09-27): kolaydan zora müfredat
+  (`terrain_probe.CURRICULA`; `HexapodEnv(terrain_levels=[üreteç, ...])`).
+  Ortam başına bir zemin türü ve seviyeleri (ör. çukur 10 → 60 mm); her
+  ortam en kolayından başlar. Bölüm sonunda robot doğduğu yerden 0.5 m
+  (`CURRICULUM_PROMOTE_M`) uzaklaştıysa bir zorlaşır; devrildiyse ya da
+  komutun istediği yolun yarısını gidemediyse bir kolaylaşır (yerinde
+  dönüşte karar yok); en zoru geçince rastgele bir seviyeye döner. Zemin
+  değişince Gazebo dünyası yeniden kurulur: reset 0.14 s, kurma + reset
+  0.22 s, bellek artmıyor (ölçüldü). Ortalama seviye `progress.csv`'de
+  `mufredat/<tür>`. `--terrains` ile birlikte verilmez.
 - `--lift-mm`: artık eylemde taban tripod'un ayak kaldırması (varsayılan 25;
   zeminli eğitimde 50, §3.3).
 - `--lift-range EN_AZ EN_COK` (+ `--lift-std`): **öğrenilmiş ayak kaldırma**
@@ -1015,8 +1025,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 218 geçti, 9 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 264 geçti, ~40 s (yeni PC).
+- Windows: 219 geçti, 9 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 266 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1791,7 +1801,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 218 geçti, 9 atlandı. WSL: 264 geçti.
+   - Windows: 219 geçti, 9 atlandı. WSL: 266 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).

@@ -27,6 +27,13 @@ ortamlara sırayla dağıtılır, kütle çarpanları karıştırılır). Zemin 
 ömrü boyunca sabit (dünya kurulurken yazılıyor). S5 gelince onun üreteci
 aynı biçimde (terrain_sdf, terrain_height) bir liste verecek.
 
+--curriculum AD: kolaydan zora müfredat (terrain_probe.CURRICULA[AD]; ortam
+başına bir zemin türü ve seviyeleri, env.HexapodEnv terrain_levels). Her
+ortam en kolay seviyeden başlar, başardıkça zorlaşır. Ortalama seviye her
+güncellemede progress.csv'ye yazılır (mufredat/<tür>, 0 en kolay).
+--terrains ile birlikte verilmez; ara kayıt seçimi aynı adın EVAL_CASES'ini
+ölçer.
+
 En iyi ara kayıt (2026-09-26): uzun eğitimde politika yine hedef hızı
 aşmaya kayıyordu, en iyisi 250k ara kaydıydı (ders 25). Her ara kayıtta
 (250 bin adımda bir) politika deterministik ölçülür (evaluate.eval_commands:
@@ -146,6 +153,25 @@ def best_checkpoint_callback(every: int, out: Path, task, seconds: float = 10.0,
     return BestCheckpoint()
 
 
+def curriculum_log_callback(labels: list[str]):
+    """Her güncelleme turunda müfredat türü başına ortalama zemin seviyesini
+    günlüğe yazar (mufredat/<tür>; 0 en kolay). labels: ortam başına tür adı,
+    None seviyeli (müfredatsız) ortamlar için None."""
+    from stable_baselines3.common.callbacks import BaseCallback
+
+    class CurriculumLog(BaseCallback):
+        def _on_step(self) -> bool:
+            return True
+
+        def _on_rollout_end(self) -> None:
+            levels = self.training_env.get_attr("level")
+            for label in sorted({lb for lb in labels if lb is not None}):
+                vals = [lv for lv, lb in zip(levels, labels) if lb == label]
+                self.logger.record(f"mufredat/{label}", sum(vals) / len(vals))
+
+    return CurriculumLog()
+
+
 def main(argv: list[str] | None = None) -> int:
     import torch
     from stable_baselines3 import PPO
@@ -175,6 +201,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="her yöne komut (task.OMNI_COMMANDS)")
     parser.add_argument("--terrains", default=None,
                         help="ortam başına zemin seti (terrain_probe.TRAIN_SETS; S5 gelince onunki)")
+    parser.add_argument("--curriculum", default=None,
+                        help="kolaydan zora zemin müfredatı (terrain_probe.CURRICULA)")
     parser.add_argument("--lift-mm", type=float, default=None,
                         help="artık eylemde taban tripod'un ayak kaldırması (varsayılan TaskConfig)")
     parser.add_argument("--lift-range", type=float, nargs=2, default=None, metavar=("EN_AZ", "EN_COK"),
@@ -191,6 +219,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--init-from", type=Path, default=None,
                         help="eğitilmiş model.zip'ten devam et")
     args = parser.parse_args(argv)
+    if args.terrains and args.curriculum:
+        parser.error("--terrains ile --curriculum birlikte verilmez")
 
     out = args.out / args.name
     out.mkdir(parents=True, exist_ok=True)
@@ -211,16 +241,24 @@ def main(argv: list[str] | None = None) -> int:
     (out / TASK_FILE).write_text(task_to_json(task), encoding="utf-8")
     masses = body_mass_scales(args.envs, task)   # ortam başına gövde kütlesi çarpanı
     terrains = [("düz", "", None)] * args.envs
+    levels = [None] * args.envs            # müfredat: ortam başına seviye üreteçleri
     if args.terrains:
         from .terrain_probe import training_terrains
         terrains = training_terrains(args.terrains, args.envs)
+    if args.curriculum:
+        from .terrain_probe import curriculum_levels
+        pairs = curriculum_levels(args.curriculum, args.envs)
+        terrains = [(label, "", None) for label, _ in pairs]
+        levels = [lv for _, lv in pairs]
+    if args.terrains or args.curriculum:
         # kütle sıralı, zemin listesi de sıralı: aynı zemin hep aynı uç kütleye düşmesin
         step = next(k for k in range(args.envs // 2 + 1, args.envs + 1)
                     if math.gcd(k, args.envs) == 1)   # n ile aralarında asal: permütasyon
         masses = [masses[(i * step) % args.envs] for i in range(args.envs)]
     venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task, body_mass_scale=m,
-                                              terrain_sdf=sdf, terrain_height=h)
-                                     for i, (m, (_, sdf, h)) in enumerate(zip(masses, terrains))],
+                                              terrain_sdf=sdf, terrain_height=h, terrain_levels=lv)
+                                     for i, (m, (_, sdf, h), lv)
+                                     in enumerate(zip(masses, terrains, levels))],
                                     start_method="fork"))
     if args.init_from:
         model = PPO.load(args.init_from, env=venv, device="cpu", seed=args.seed)
@@ -249,19 +287,24 @@ def main(argv: list[str] | None = None) -> int:
         f"power_weight: {task.w['power']}\naction_mode: {task.action_mode}\n"
         f"omni: {args.omni}\nenvs: {args.envs}\n"
         f"body_mass_scales: {[round(m, 3) for m in masses]}\n"
-        f"terrains: {[t[0] for t in terrains]}\n",
+        f"terrains: {[t[0] for t in terrains]}\n"
+        f"curriculum: {args.curriculum}\n",
         encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
     cases = []
-    if args.terrains:   # ara kayıt seçimi zemini de görsün (ders 30)
+    set_name = args.terrains or args.curriculum
+    if set_name:   # ara kayıt seçimi zemini de görsün (ders 30)
         from .terrain_probe import EVAL_CASES, eval_cases
-        cases = eval_cases(args.terrains) if args.terrains in EVAL_CASES else []
+        cases = eval_cases(set_name) if set_name in EVAL_CASES else []
     best = best_checkpoint_callback(every, out, eval_task, terrain_cases=cases)
+    callbacks = [CheckpointCallback(every, str(out / "checkpoints"), "ppo"), best]
+    if args.curriculum:
+        callbacks.append(curriculum_log_callback(
+            [t[0] if lv is not None else None for t, lv in zip(terrains, levels)]))
     t0 = time.time()
     model.learn(total_timesteps=args.steps, reset_num_timesteps=True,
-                callback=CallbackList([CheckpointCallback(every, str(out / "checkpoints"), "ppo"),
-                                       best]))
+                callback=CallbackList(callbacks))
     wall = time.time() - t0
     model.save(out / "model")
     venv.close()

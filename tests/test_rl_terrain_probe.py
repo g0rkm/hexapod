@@ -131,3 +131,24 @@ def test_ros_simi_icin_dunya_dosyasi():
             "gz::sim::systems::Contact"} <= plugins
     assert [m.get("name") for m in world.findall("model")] == ["ground"]
     assert float(world.find("physics/max_step_size").text) == 0.001   # ROS'lu simin adımı
+
+
+def test_mufredat_kolaydan_zora_ve_dagilim():
+    """Her türün seviyeleri kolaydan zora (engel yüksekliği / eğim artıyor);
+    16 ortamda "deneme" müfredatı TRAIN_SETS["deneme"]'nin oranlarında."""
+    from collections import Counter
+
+    from hexapod_rl.terrain_probe import CURRICULA, curriculum_levels
+
+    probes = {"çukur": (0.5, 0.0), "yayla": (0.0, 0.0), "eğim x": (-1.0, 0.0),
+              "eğim y": (0.0, -1.0)}      # engelin/eğimin yüksekliğinin okunduğu nokta
+    for label, levels in CURRICULA["deneme"]:
+        if levels is None:
+            continue
+        x, y = probes[label]
+        heights = [abs(make()[1](x, y)) for make in levels]
+        assert heights == sorted(heights) and len(set(heights)) == len(heights), label
+    counts = Counter(label for label, _ in curriculum_levels("deneme", 16))
+    assert counts == {"çukur": 8, "yayla": 2, "eğim x": 2, "eğim y": 2, "düz": 2}
+    with pytest.raises(ValueError):
+        curriculum_levels("yok", 4)

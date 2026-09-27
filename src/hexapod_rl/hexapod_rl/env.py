@@ -19,6 +19,13 @@ eklenir. Çekilen değerler reset()'in info'sunda ("dynamics"). Gövde kütlesi
 ortam başına sabit (body_mass_scale; train.py ortamlara task.body_mass_scales
 ile dağıtır).
 
+Müfredat (terrain_levels, varsayılan yok): kolaydan zora zemin üreteçleri
+listesi. Ortam en kolayından başlar; her bölüm sonunda robot doğduğu yerden
+CURRICULUM_PROMOTE_M kadar uzaklaştıysa bir zorlaşır, devrildiyse ya da
+komutun istediği yolun yarısını gidemediyse bir kolaylaşır; en zoru geçince
+rastgele bir seviyeye döner (unutmasın diye). Zemin değişince Gazebo dünyası
+yeniden kurulur (~0.1 s, bir reset'ten biraz fazla; ölçüldü 2026-09-27).
+
 Sabit bozulmalar (Perturbation, varsayılan yok): eğitimde rastgeleleştirilmeyen
 ama robota geçişte beklenen hatalar (kalibrasyon ofseti, eğik takılmış IMU,
 kontrol adımından uzun gecikme, zayıf servo). Dayanıklılık taraması
@@ -31,6 +38,7 @@ import math
 from collections import deque
 from dataclasses import replace
 from pathlib import Path
+from typing import Callable, Sequence
 
 import gymnasium as gym
 import numpy as np
@@ -59,6 +67,17 @@ from .task import (
 )
 
 
+#: Müfredat: bölümde doğduğu yerden bu kadar (m, yatay) uzaklaşan zorlaşır.
+#: Deneme zeminlerinde çukurdan çıkış 0.35 m, yayladan iniş 0.5 m.
+CURRICULUM_PROMOTE_M = 0.5
+#: ... komutun istediği yolun (en çok CURRICULUM_PROMOTE_M) bu kesrine
+#: varamayan kolaylaşır. Yerinde dönüş gibi yavaş komutlarda karar verilmez.
+CURRICULUM_DEMOTE_FRAC = 0.5
+CURRICULUM_MIN_SPEED = 0.03   # m/s
+
+TerrainMaker = Callable[[], tuple]   # () -> (terrain_sdf, terrain_height)
+
+
 def _tilt_matrix(roll_deg: float, pitch_deg: float) -> np.ndarray:
     """IMU çerçevesinden gövdeye dönme (önce roll x ekseni, sonra pitch y ekseni)."""
     r, p = math.radians(roll_deg), math.radians(pitch_deg)
@@ -73,18 +92,28 @@ class HexapodEnv(gym.Env):
     def __init__(self, task: TaskConfig | None = None, physics_step: float = 0.002,
                  config_path: str | Path | None = None, workdir: Path | None = None,
                  terrain_sdf: str = "", terrain_height: TerrainHeight | None = None,
-                 body_mass_scale: float = 1.0, perturbation: Perturbation | None = None) -> None:
+                 body_mass_scale: float = 1.0, perturbation: Perturbation | None = None,
+                 terrain_levels: Sequence[TerrainMaker] | None = None) -> None:
         """terrain_sdf: düz zeminin yerine geçen statik <model> SDF parçası (S5'in
         zemin üreteci; boşsa düz zemin); terrain_height(x, y): aynı zeminin üst
         yüzeyinin z'si, m (ikisi birlikte). Kısıtlar HexapodSim açıklamasında.
         body_mass_scale: gövde kütlesi (ve ataleti) bu çarpanla; bu ortamın
         ömrü boyunca sabit (task.body_mass_scales). perturbation: sabit
-        bozulmalar (Perturbation; dayanıklılık taraması)."""
+        bozulmalar (Perturbation; dayanıklılık taraması). terrain_levels:
+        müfredat, kolaydan zora zemin üreteçleri (terrain_probe.CURRICULA);
+        verilirse terrain_sdf/terrain_height verilmez, seviye 0'dan başlar."""
         super().__init__()
         self.task = task or TaskConfig()
         config = RobotConfig.load(config_path)
         model = RobotModel.from_config(config).with_body_mass_scale(body_mass_scale)
         self.body_mass_scale = body_mass_scale
+        self._model, self._physics_step = model, physics_step
+        self.terrain_levels = list(terrain_levels) if terrain_levels else None
+        self.level = 0
+        if self.terrain_levels is not None:
+            if terrain_sdf or terrain_height is not None:
+                raise ValueError("müfredatta zemin seviyelerden gelir; terrain_sdf verilmez")
+            terrain_sdf, terrain_height = self.terrain_levels[0]()
         self.sim = HexapodSim(model, physics_step=physics_step, workdir=workdir,
                               terrain_sdf=terrain_sdf, terrain_height=terrain_height)
         self.dt = self.sim.dt
@@ -138,6 +167,8 @@ class HexapodEnv(gym.Env):
 
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
+        if self.terrain_levels is not None and self._steps > 0:
+            self._update_level()   # biten bölümün sonucuna göre
         self._randomize_dynamics()
         state = self.sim.reset()
         for _ in range(int(round(self.task.settle_s / self.dt))):  # duruşa yerleş
@@ -154,7 +185,12 @@ class HexapodEnv(gym.Env):
         self._vel.reset()
         self._next_push = self._push_gap()
         self._state = state
-        return self._obs(), {"command": self._command, "dynamics": dict(self.dynamics)}
+        self._spawn_xy = (state.base_pos[0], state.base_pos[1])
+        self._max_disp, self._fell = 0.0, False
+        info = {"command": self._command, "dynamics": dict(self.dynamics)}
+        if self.terrain_levels is not None:
+            info["terrain_level"] = self.level
+        return self._obs(), info
 
     def step(self, action):
         action = [float(a) for a in np.asarray(action, dtype=np.float64).reshape(-1)]
@@ -186,6 +222,9 @@ class HexapodEnv(gym.Env):
         self._steps += 1
         self._phase = (self._phase + self.task.gait_hz * self.dt) % 1.0
         fell = fallen(state, self.task)
+        self._fell = self._fell or fell
+        self._max_disp = max(self._max_disp, math.hypot(state.base_pos[0] - self._spawn_xy[0],
+                                                        state.base_pos[1] - self._spawn_xy[1]))
         r, terms = reward(state, action, self._prev_action, self._command, self.task, fell,
                           phase=self._phase, groups=self.groups,
                           tracked=self._vel.update(state))
@@ -201,6 +240,35 @@ class HexapodEnv(gym.Env):
         """Gazebo dünyasını bırak (HexapodSim.close)."""
         self.sim.close()
         super().close()
+
+    # -- müfredat ----------------------------------------------------------------
+
+    def _update_level(self) -> None:
+        """Biten bölüme göre zemin seviyesi: geçtiyse zorlaş, takıldıysa kolaylaş."""
+        n = len(self.terrain_levels)
+        speed = math.hypot(self._command[0], self._command[1])
+        wanted = min(speed * self._steps * self.dt, CURRICULUM_PROMOTE_M)
+        level = self.level
+        if not self._fell and self._max_disp >= CURRICULUM_PROMOTE_M:
+            level = level + 1 if level + 1 < n else int(self.np_random.integers(0, n))
+        elif self._fell or (speed >= CURRICULUM_MIN_SPEED
+                            and self._max_disp < CURRICULUM_DEMOTE_FRAC * wanted):
+            level = max(0, level - 1)
+        if level != self.level:
+            self.set_level(level)
+
+    def set_level(self, level: int) -> None:
+        """Zemini müfredatın bu seviyesine çevir: Gazebo dünyası yeniden kurulur
+        (aynı model, kütle ve kalibrasyon ofseti; dinamik reset'te yeniden çekilir)."""
+        if self.terrain_levels is None or not 0 <= level < len(self.terrain_levels):
+            raise ValueError(f"geçersiz müfredat seviyesi: {level}")
+        sdf, height = self.terrain_levels[level]()
+        workdir, offset = self.sim.workdir, list(self.sim.joint_offset)
+        self.sim.close()
+        self.sim = HexapodSim(self._model, physics_step=self._physics_step, workdir=workdir,
+                              terrain_sdf=sdf, terrain_height=height)
+        self.sim.joint_offset = offset
+        self.level = level
 
     def _obs(self) -> np.ndarray:
         state = self._state
@@ -255,11 +323,12 @@ class HexapodEnv(gym.Env):
 
 def make_env(rank: int, task: TaskConfig | None = None, physics_step: float = 0.002,
              terrain_sdf: str = "", terrain_height: TerrainHeight | None = None,
-             body_mass_scale: float = 1.0):
+             body_mass_scale: float = 1.0, terrain_levels: Sequence[TerrainMaker] | None = None):
     """SubprocVecEnv için fabrika; her süreç kendi Gazebo dünyasını kurar."""
     def _init():
         env = HexapodEnv(task=task, physics_step=physics_step, terrain_sdf=terrain_sdf,
-                         terrain_height=terrain_height, body_mass_scale=body_mass_scale)
+                         terrain_height=terrain_height, body_mass_scale=body_mass_scale,
+                         terrain_levels=terrain_levels)
         env.reset(seed=rank)
         return env
     return _init

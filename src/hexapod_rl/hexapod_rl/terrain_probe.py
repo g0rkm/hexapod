@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import math
+from functools import partial
 
 #: Zemin kutularının kalınlığı ve yatay boyu (m); robot 10 s'de ~1-1.5 m gider.
 _THICK, _SIZE = 0.2, 8.0
@@ -263,6 +264,36 @@ def eval_cases(name: str) -> list[tuple[str, str, object, tuple[float, float, fl
     if name not in EVAL_CASES:
         raise ValueError(f"{name!r} için ölçüm durumu yok; olanlar: {sorted(EVAL_CASES)}")
     return [(label, *make(), cmd) for label, make, cmd in EVAL_CASES[name]]
+
+
+#: Müfredat (train.py --curriculum; env.HexapodEnv terrain_levels): ortam başına
+#: bir zemin türü ve o türün kolaydan zora seviyeleri. Tür listesi ortamlara
+#: sırayla dağıtılır; seviyesi None olan tür (düz) müfredatsız ortamdır.
+#: "deneme": TRAIN_SETS["deneme"]'nin türleri ve oranları (16 ortamda 8 çukur,
+#: 2 yayla, 4 eğim, 2 düz), ama sabit yükseklikler yerine 10 mm'den 60 mm'ye.
+_OBSTACLE_MM = (10, 20, 30, 35, 40, 45, 50, 55, 60)
+_PITS = tuple(partial(pit, h / 1000) for h in _OBSTACLE_MM)
+_PLATEAUS = tuple(partial(plateau, h / 1000) for h in _OBSTACLE_MM)
+CURRICULA = {
+    "deneme": (
+        ("düz", None),
+        ("çukur", _PITS),
+        ("çukur", _PITS),
+        ("yayla", _PLATEAUS),
+        ("çukur", _PITS),
+        ("eğim x", tuple(partial(slope, d) for d in (5.0, 10.0, 15.0, 20.0, 25.0))),
+        ("çukur", _PITS),
+        ("eğim y", tuple(partial(slope, d, "y") for d in (5.0, 10.0, 15.0, 20.0))),
+    ),
+}
+
+
+def curriculum_levels(name: str, n: int) -> list[tuple[str, tuple | None]]:
+    """n ortama (tür adı, seviye üreteçleri ya da None): listeyi sırayla dağıt."""
+    if name not in CURRICULA:
+        raise ValueError(f"bilinmeyen müfredat {name!r}; olanlar: {sorted(CURRICULA)}")
+    items = CURRICULA[name]
+    return [items[i % len(items)] for i in range(n)]
 
 
 def training_terrains(name: str, n: int) -> list[tuple[str, str, object]]:
