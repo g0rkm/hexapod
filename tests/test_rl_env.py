@@ -458,3 +458,47 @@ def test_mufredat_seviye_degisir_ve_zemin_yeniden_kurulur(tmp_path_factory):
         assert info["terrain_level"] == 1
     finally:
         e.close()
+
+
+def _sockets() -> int:
+    import os
+    n = 0
+    for fd in os.listdir("/proc/self/fd"):
+        try:
+            n += os.readlink(f"/proc/self/fd/{fd}").startswith("socket")
+        except OSError:
+            pass
+    return n
+
+
+def test_dunya_yeniden_kurulurken_soket_sizmaz(tmp_path_factory):
+    """Aynı makinede başka bir süreç içi Gazebo varken dünyayı yeniden kurmak
+    soket sızdırmaz. Keşif portları ortak olunca her kurmada öteki süreçlere
+    ~32 soket açılıyordu (v23, 2.5M adımda "Too many open files")."""
+    import subprocess
+    import sys
+    from functools import partial
+
+    from hexapod_rl.sim import discovery_ports
+    from hexapod_rl.terrain_probe import pit
+
+    assert discovery_ports(123) != discovery_ports(124)
+    other = subprocess.Popen(
+        [sys.executable, "-c",
+         "import time; from hexapod_rl.env import HexapodEnv; e = HexapodEnv(); "
+         "e.reset(seed=0); print('hazır', flush=True); time.sleep(60)"],
+        stdout=subprocess.PIPE, text=True)
+    e = HexapodEnv(workdir=tmp_path_factory.mktemp("soket"),
+                   terrain_levels=[partial(pit, 0.02), partial(pit, 0.04)])
+    try:
+        assert other.stdout.readline().strip() == "hazır"
+        e.reset(seed=0)
+        before = _sockets()
+        for i in range(6):
+            e.set_level((i + 1) % 2)
+            e.reset(seed=0)
+        assert _sockets() == before
+    finally:
+        e.close()
+        other.kill()
+        other.wait()

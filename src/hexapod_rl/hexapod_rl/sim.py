@@ -106,6 +106,15 @@ SPAWN_CLEARANCE_M = 0.01
 CONTACT_TOLERANCE_M = 0.002
 #: Her süreç kendi gz-transport bölümünde (GZ_PARTITION + süreç kimliği).
 PARTITION_PREFIX = "hexapod_rl_"
+#: ... ve kendi keşif portlarında (GZ_DISCOVERY_MSG_PORT / _SRV_PORT; gz
+#: varsayılanı 10317/10318). Bu tabandan, süreç kimliğine göre.
+DISCOVERY_PORT_BASE = 20000
+
+
+def discovery_ports(pid: int) -> tuple[int, int]:
+    """Sürecin gz-transport keşif portları (mesaj, servis): 20000-59999 arası."""
+    k = pid % 20000
+    return DISCOVERY_PORT_BASE + 2 * k, DISCOVERY_PORT_BASE + 2 * k + 1
 
 #: Zeminin üst yüzeyi: dünya (x, y) -> z, metre.
 TerrainHeight = Callable[[float, float], float]
@@ -175,6 +184,14 @@ class HexapodSim:
         # dünyasını buldu ve isteği oraya gönderdi; ROS'lu simde robot hiç
         # doğmadı. Ayrı bölümde ne dışarıdan istek gelir ne dışarı yayın gider.
         os.environ["GZ_PARTITION"] = f"{PARTITION_PREFIX}{os.getpid()}"
+        # Bölüm yetmiyor: keşif portları ortak olunca süreçler birbirini yine
+        # keşfediyor ve her dünya yeniden kurulduğunda öteki süreçlere yeni
+        # bağlantılar açılıp kapanmıyor (16 ortamlı müfredat eğitiminde dünya
+        # başına ~32 soket + ~2 MB; v23 2.5M adımda "Too many open files" ile
+        # çöktü, 2026-09-27). Her süreç kendi keşif portlarında yalnız kalır.
+        msg_port, srv_port = discovery_ports(os.getpid())
+        os.environ["GZ_DISCOVERY_MSG_PORT"] = str(msg_port)
+        os.environ["GZ_DISCOVERY_SRV_PORT"] = str(srv_port)
         self._fixture = TestFixture(str(world))
         self._fixture.on_pre_update(self._pre)
         self._fixture.on_post_update(self._post)
