@@ -106,7 +106,7 @@ src/hexapod_hardware/     gerçek robot sürücü düğümü: eklem komutu -> Se
 src/hexapod_description/  simülasyon modeli, URDF, eklem arayüzü (interface.py)
 src/hexapod_gazebo/       Gazebo dünyaları, sim.launch.py, stand komutu
 src/hexapod_rl/           RL: süreç içi Gazebo (sim), ortam (env, task), taklit (demo, pretrain),
-                          PPO (train), ölçüm (evaluate, baseline), aktarma (export)
+                          PPO (train), ölçüm (evaluate, baseline, robustness), aktarma (export)
 src/hexapod_policy/       politika düğümü: torch'suz (numpy) MLP, /imu + /cmd_vel -> komut
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu

@@ -6,12 +6,13 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-27** (4. oturumun devamı: öğrenilmiş ayak
-> kaldırma ve orta yol modeli `ppo_kaldirma35_250k` §3.3, ders 35–36;
+> Son güncelleme: **2026-09-27** (4. oturumun devamı: dayanıklılık taraması
+> §7.8 ve ders 37; öğrenilmiş ayak kaldırma ve orta yol modeli
+> `ppo_kaldirma35_250k` §3.3, ders 35–36;
 > önceki: yeni bilgisayarda kurulum §0.5; zemine göre ayak teması §7.8;
 > her yöne politika `ppo_omni_250k` §3.2; kütle rastgeleleştirmesi;
 > zeminli eğitim `ppo_lift50_3750k` §3.3)
-> · Testler: **Linux 257/257**, Windows 213 geçti + 9 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 264/264**, Windows 218 geçti + 9 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -97,12 +98,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 213 geçti, 9 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 218 geçti, 9 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 257 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 264 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -914,6 +915,23 @@ taklit eder.
 - Gürültü eylem biriminde: artık eylemde aynı eklem gürültüsü için ×2.5
   (0.1 mutlak = 0.25 artık = 0.05 rad).
 
+**Sabit bozulmalar ve dayanıklılık taraması (2026-09-27):**
+- `task.Perturbation` (`HexapodEnv(perturbation=...)`, `evaluate(...,
+  perturbation=...)`): eğitimde rastgeleleştirilmeyen, robota geçişte
+  beklenen hatalar. `joint_offset_deg` (18 eklem): servo sıfırının
+  kalibrasyon hatası, eklem komut + ofset'e gider (`HexapodSim.joint_offset`),
+  gözlem komutu görür. `imu_tilt_deg` (roll, pitch): gözlemdeki yerçekimi ve
+  jiroskop döner. `delay_ms`: kontrol adımından uzun olabilen gecikme (tam
+  adımlar env kuyruğunda, kalanı `sim.latency_steps`); gözlem son komutu
+  görür (denetleyici gibi). `servo_strength`: durma torku çarpanı.
+  Varsayılan `Perturbation()` ortamı birebir aynı bırakır (eski koda göre
+  aynı yörünge özeti doğrulandı).
+- `python -m hexapod_rl.robustness tripod models/<ad>/model.zip ...`: her
+  model × (düz, basamak 45, engebe 40) × bozulma, 0.1 m/s, deterministik,
+  rastgeleleştirme kapalı; ofset ve IMU yönü tohumlu. Değerler ölçüm değil,
+  taranan büyüklükler. Sonuç tabloları models/README ("Dayanıklılık
+  taraması"), özet ders 37.
+
 **Aktarma (`export.py`):** `python -m hexapod_rl.export <zip> [--residual]
 [--omni]` → `policy.npz` (aktör ağı + sözleşme). Aktarım SB3 çıktısıyla
 karşılaştırılarak doğrulanır. `--omni`'de sözleşmeye ölü bölge
@@ -997,8 +1015,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 213 geçti, 9 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 257 geçti, ~40 s (yeni PC).
+- Windows: 218 geçti, 9 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 264 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1291,6 +1309,7 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | Deneme zeminlerine kaygan (μ) ve engebe (`rough`) eklendi; v17 (bunlarla eğitim) depoya alınmadı | G7 "bitti" şartının üç türü ölçülebilsin. v17 engel skorunu 0.763'ten 0.68–0.72'ye düşürdü (ders 34) |
 | 09-26 | Ödül v7 (`progress_overshoot`) eklendi ama varsayılan 0 (v6) kaldı; v15/v16 modelleri depoya alınmadı | Aşma biraz azaldı, enerji azalmadı, katsayı 3'te zemin bozuldu (ders 33). Raporlar ortak ödülle (`standard_reward`, v6) |
 | 09-26 | v14 (std 0.05, 2M) → `ppo_lift50_3750k` depoya; ara kayıt rastgeleleştirmeli 3 tohumla elle seçildi | Düzde aşma azalmadı ama 60 mm basamak 3/3, zemin skoru 0.957; eğitim içi deterministik seçim (500k) ikili durumlarda gürültülü (ders 32) |
+| 09-27 | Dayanıklılık taraması (`Perturbation`, `robustness`); IMU eğikliği ve uzun gecikme eğitime **eklenmedi** | 20°'lik IMU eğikliği ve 240 ms gecikme hiçbir modeli bozmadı. Hassas olunanlar kalibrasyon ofseti (σ ≥ 3°) ve servo gücü (×0.5 altı); ofseti politika göremiyor ve tripod da aynı kaybediyor, önce donanımda ölçülmeli (D6, D9), sonra aralığı eğitime girer (D10) |
 | 09-27 | **Öğrenilmiş ayak kaldırma** (19. çıkış, `lift_action`/`lift_range`) eklendi; seçim salınım başına | Sabit kaldırmada 25 mm düzde verimli ama engelde takılıyor, 50 mm tersi (ders 33); 18 eklemin keşfiyle bulunamayan hareket tek düğmeyle denenebilirdi. Her adım seçim keşfedilemedi (ders 36) |
 | 09-27 | v21 (35 mm'den öğrenilmiş kaldırma) son modeli alınmadı; 250k ara kaydı `ppo_kaldirma35_250k` olarak depoya | Kaldırma zemine göre değişmedi, 53 mm'ye kaydı ve `ppo_lift50_3750k`'dan kötü (ders 35). 250k düz verim ile engel arasında boş kalan bir noktayı dolduruyor (2.39 W, 45 mm engeller); D11'de seçenek |
 | 09-26 | **Ayak teması ve gövde yüksekliği zemin yüksekliği fonksiyonuna göre** (`terrain_height(x, y)`, `terrain_sdf` ile zorunlu çift); fizik motorunun temas sensörü değil | Sensör yolu (Contact sistemi + gz.transport) tek süreci 381 → 182 adım/s yavaşlattı ve mesajlar eşzamansız (tekrarlanabilirlik bozulur). Yükseklik yolu bedava, sensörle 0–20° eğimde %97.8–98.8 uyumlu (§12.26). Yüksekliksiz zemin reddedilir: z=0 varsaymak değer uydurmak olur |
@@ -1559,6 +1578,19 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     gSDE'nin (§12.24) aradığı şey de buydu; burada tek boyut için elle
     yapıldı. v18'de ayrıca target_kl 0.02 her güncellemede düşük std'li
     (0.05) eklem boyutlarında tükendi.
+37. **Robota geçişte asıl risk kalibrasyon ve servo torku; IMU ve gecikme
+    değil** (dayanıklılık taraması, models/README). Ofset σ2°'ye kadar düzde
+    ≤%4 kayıp, σ4°'de %7–12, σ8°'de %16–47; tripod da aynı kadar
+    kaybediyor (ayak yanlış yere basıyor, politika ofseti göremez). Engel
+    becerisinin payı kaldırmaya bağlı: 35 mm'lik model basamakta σ1°'de
+    0.80 → 0.62 m, σ3°'te 0.35 m (eşiğe yakın); 50 mm'lik σ4°'te 0.98 m.
+    Servo gücü ×0.5'te iki zemin modeli basamakta yarıya iniyor; 50 mm'lik
+    ×0.4'te düzde de devriliyor, 25 mm'likler ×0.4'te yürüyor (yüksek
+    kaldırmanın tork payı en dar). IMU 20°'ye kadar eğik takılı olsa da,
+    komut 240 ms gecikse de sonuç neredeyse aynı: açık döngü taban tripod
+    yürüyüşü taşıyor. Sonuç: donanım vardiyasında kalibrasyon doğruluğu
+    (~2°) ve yük altındaki servo gerilimi/torku öncelikli ölçülmeli;
+    ilk denemeler 25 mm'lik modelle.
 
 ---
 
@@ -1680,6 +1712,11 @@ zeminler.
     2026-09-27): kör politika kaldırmayı zemine göre seçmedi (ders 35).
     Yan ürün orta yol modeli `ppo_kaldirma35_250k` (§3.3). S7'den sonra
     mesafe sensörü gözleme girince aynı çıkışla yeniden denenmeli.
+14. ✅ **Dayanıklılık taraması** (2026-09-27): kalibrasyon ofseti, eğik IMU,
+    uzun gecikme, zayıf servo (`hexapod_rl.robustness`, ders 37). Açık:
+    ofset rastgeleleştirmesiyle eğitimin katkısı denenmedi (tripod da aynı
+    kaybettiği için katkısı sınırlı beklenir); donanımda ölçülen aralıkla
+    D10'da yapılır.
 
 **S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
 S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son
@@ -1754,7 +1791,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 213 geçti, 9 atlandı. WSL: 257 geçti.
+   - Windows: 218 geçti, 9 atlandı. WSL: 264 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).

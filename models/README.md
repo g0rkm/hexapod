@@ -16,6 +16,81 @@ python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Same
 python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip:residual
 ```
 
+## Dayanıklılık taraması: robota geçişte beklenen hatalar (2026-09-27)
+
+`python -m hexapod_rl.robustness tripod models/<ad>/model.zip ...`
+(`task.Perturbation`). Eğitimde rastgeleleştirilmeyen ama gerçek robotta
+kesin olacak hatalar sabit olarak eklenip modeller ölçüldü:
+
+- **ofset σ:** her eklemde servo sıfırının kalibrasyon hatası, N(0, σ); eklem
+  komut + ofset'e gider, politika bunu görmez.
+- **IMU θ:** IMU gövdeye θ kadar eğik takılı (yönü rastgele).
+- **gecikme:** komutun servoya ulaşması; eğitimde 0–18 ms.
+- **servo ×k:** durma torku simin katalog değerinin (1.08 N·m @6 V,
+  ölçülmedi) k katı; akü gerilimi düşünce ya da zayıf servoda. Eğitimde ×0.8–1.1.
+
+Değerler ölçüm değil, taranan büyüklükler. 0.1 m/s ileri, 10 s,
+deterministik, rastgeleleştirme kapalı; ofset ve IMU için ortalama (ilk
+tabloda 3, ikincide 5 tohum). Hücre: alınan yol (m), D = devrilen koşu sayısı.
+
+| Model | Zemin | yok | ofset σ1° | σ2° | σ4° | IMU 3° | 6° | 10° | gecikme 20 ms | 40 | 60 | 80 | servo ×0.7 | ×0.6 | ×0.5 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| tripod | düz | 0.98 | 0.97 | 0.95 | 0.87 | 0.98 | 0.98 | 0.98 | 0.98 | 0.97 | 0.97 | 0.97 | 0.98 | 0.98 | 0.98 |
+| tripod | basamak 45 | 0.09 | 0.09 | 0.09 | 0.12 | 0.09 | 0.09 | 0.09 | 0.09 | 0.09 | 0.10 | 0.10 | 0.09 | 0.10 | 0.10 |
+| tripod | engebe 40 | 0.57 | 0.55 | 0.55 | 0.50 | 0.57 | 0.57 | 0.57 | 0.44 | 0.55 | 0.47 | 0.47 | 0.41 | 0.57 | 0.16 |
+| ppo_omni_250k | düz | 1.00 | 1.00 | 0.98 | 0.88 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 0.99 | 0.99 | 1.00 | 1.01 | 1.01 |
+| ppo_omni_250k | basamak 45 | 0.08 | 0.08 | 0.08 | 0.11 | 0.08 | 0.08 | 0.08 | 0.08 | 0.08 | 0.08 | 0.08 | 0.08 | 0.09 | 0.09 |
+| ppo_omni_250k | engebe 40 | 0.57 | 0.59 | 0.59 | 0.41 | 0.56 | 0.55 | 0.60 | 0.61 | 0.55 | 0.55 | 0.55 | 0.56 | 0.59 | 0.58 |
+| ppo_kaldirma35_250k | düz | 1.02 | 1.01 | 0.99 | 0.95 | 1.02 | 1.02 | 1.02 | 1.02 | 1.02 | 1.01 | 1.01 | 1.02 | 1.03 | 1.02 |
+| ppo_kaldirma35_250k | basamak 45 | 0.80 | **0.62** | **0.54** | **0.51** | 0.80 | 0.79 | 0.80 | 0.81 | 0.77 | 0.83 | 0.80 | 0.81 | 0.73 | **0.43** |
+| ppo_kaldirma35_250k | engebe 40 | 0.80 | 0.85 | 0.84 | 0.81 | 0.74 | 0.68 | 0.74 | 0.71 | 0.87 | 0.65 | 0.66 | 0.86 | 0.92 | 0.70 |
+| ppo_lift50_3750k | düz | 1.14 | 1.12 | 1.10 | 1.06 | 1.13 | 1.13 | 1.14 | 1.13 | 1.12 | 1.12 | 1.11 | 1.14 | 1.14 | 1.15 |
+| ppo_lift50_3750k | basamak 45 | 1.02 | 0.99 | 1.00 | 0.98 | 1.02 | 1.02 | 1.02 | 1.00 | 0.99 | 1.00 | 0.99 | 1.08 | 0.93 | **0.49** |
+| ppo_lift50_3750k | engebe 40 | 1.05 | 1.01 | 1.03 | 1.00 | 1.03 | 1.03 | 1.04 | 1.02 | 0.97 | 0.98 | 1.02 | 1.07 | 1.11 | 0.92 |
+
+**Kırılma noktaları** (daha büyük bozulmalar, ofset ve IMU 5 tohum):
+
+| Model | Zemin | yok | ofset σ3° | σ6° | σ8° | IMU 15° | 20° | gecikme 120 ms | 160 | 240 | servo ×0.45 | ×0.4 | ×0.3 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| tripod | düz | 0.98 | 0.88 | 0.73 | 0.59 | 0.98 | 0.98 | 0.97 | 0.96 | 0.95 | 0.98 | 0.98 | 0.23 D1 |
+| tripod | basamak 45 | 0.09 | 0.10 | 0.16 | 0.13 | 0.09 | 0.09 | 0.10 | 0.10 | 0.09 | 0.10 | 0.10 | 0.07 |
+| tripod | engebe 40 | 0.57 | 0.46 | 0.34 | 0.31 | 0.57 | 0.57 | 0.49 | 0.40 | 0.45 | 0.12 | 0.09 | 0.02 |
+| ppo_omni_250k | düz | 1.00 | 0.94 | 0.76 | 0.53 | 1.00 | 1.00 | 0.99 | 0.98 | 0.98 | 1.01 | 1.00 | 0.17 D1 |
+| ppo_omni_250k | basamak 45 | 0.08 | 0.14 | 0.15 | 0.09 | 0.08 | 0.08 | 0.09 | 0.08 | 0.08 | 0.10 | 0.09 | 0.06 |
+| ppo_omni_250k | engebe 40 | 0.57 | 0.50 | 0.32 | 0.24 | 0.56 | 0.61 | 0.55 | 0.60 | 0.52 | 0.58 | 0.22 | 0.01 |
+| ppo_kaldirma35_250k | düz | 1.02 | 0.95 | 0.82 | 0.78 | 1.02 | 1.02 | 1.01 | 1.00 | 1.00 | 1.02 | 1.02 | 0.05 D1 |
+| ppo_kaldirma35_250k | basamak 45 | 0.80 | **0.35** | 0.35 | 0.25 | 0.80 | 0.81 | 0.79 | 0.78 | 0.74 | 0.29 | 0.40 | 0.05 D1 |
+| ppo_kaldirma35_250k | engebe 40 | 0.80 | 0.80 | 0.66 | 0.47 | 0.69 | 0.68 | 0.81 | 0.70 | 0.66 | 0.32 | 0.24 | 0.06 |
+| ppo_lift50_3750k | düz | 1.14 | 1.06 | 1.00 | 0.96 | 1.13 | 1.13 | 1.11 | 1.11 | 1.09 | 1.15 | **0.15 D1** | 0.02 D1 |
+| ppo_lift50_3750k | basamak 45 | 1.02 | 0.97 | 0.92 | 0.72 | 1.01 | 1.01 | 1.00 | 0.99 | 0.97 | **0.41 D1** | 0.06 D1 | 0.02 D1 |
+| ppo_lift50_3750k | engebe 40 | 1.05 | 0.99 | 0.92 | 0.85 | 1.02 | 1.01 | 1.01 | 1.01 | 0.99 | 0.30 D1 | 0.05 | 0.06 |
+
+- **Hassas olunan iki hata var: kalibrasyon ve servo gücü.**
+  - Düzde ofset σ2°'ye kadar herkes en çok %4 kaybediyor; σ4°'de %7–12,
+    σ6°'de %12–26, σ8°'de %16–47. 25 mm'li politika tripod kadar
+    kaybediyor, yani bu politikanın zaafı değil, ayakların yanlış yere
+    basması (politika ofseti göremez). Ayağı yüksek kaldıran modeller daha
+    az kaybediyor (`ppo_lift50_3750k` σ8°'de %16).
+  - `ppo_kaldirma35_250k`'nın basamak becerisinin payı dar: σ1°'de bile
+    0.80 → 0.62 m, σ3°'te 0.35 m. 35 mm kaldırma engeli geçme eşiğine
+    (28–35 mm) yakın; birkaç derecelik hata ayağı eşiğin altına indiriyor.
+    `ppo_lift50_3750k` σ4°'te basamakta hâlâ 0.98 m.
+  - Servo gücü: ×0.5'te iki zemin modeli de basamakta yarıya iniyor.
+    `ppo_lift50_3750k` ×0.45'te engelde, ×0.4'te düzde de devriliyor;
+    25 mm'li modeller ×0.4'te düzde hâlâ yürüyor. ×0.3'te herkes
+    devriliyor. **Yüksek kaldırmanın tork payı en dar.**
+- **IMU eğikliği (20°'ye kadar) ve gecikme (240 ms'ye kadar) neredeyse
+  etkisiz.** Açık döngü taban tripod yürüyüşü taşıyor, politikanın
+  düzeltmeleri küçük; yön ve IMU'ya bağımlılık az. (Kör politikanın
+  IMU'dan zemin çıkaramadığı ders 35 ile tutarlı.)
+- **Donanım vardiyası için:** kalibrasyonda eklem başına ~2°'lik doğruluk
+  hedeflenmeli (D6); servo beslemesinin yük altındaki gerilimi ve gerçek
+  tork ölçülmeli, önce 25 mm'lik modelle başlanmalı (D9). Gerçek robotta
+  ofset ve tork ölçülürse o aralıklar eğitimin rastgeleleştirmesine
+  eklenir (D10).
+
+**Gerçek robotta DENENMEDİ.**
+
 ## Öğrenilmiş ayak kaldırma — `ppo_kaldirma35_250k` (2026-09-27 gece)
 
 Politika taban tripod'un ayak kaldırmasını kendisi seçiyor: 19. çıkış,

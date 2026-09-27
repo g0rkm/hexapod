@@ -295,6 +295,27 @@ def sample_command(cfg: TaskConfig, rng) -> tuple[float, float, float]:
 
 
 @dataclass(frozen=True)
+class Perturbation:
+    """Ortamın ömrü boyunca sabit bozulmalar (env.HexapodEnv(perturbation=...);
+    dayanıklılık taraması hexapod_rl.robustness). Değerler ölçüm değil, taranan
+    büyüklükler: gerçek robotta ne kadar olacakları bilinmiyor.
+
+    joint_offset_deg: 18 eklem (interface sırası) için servo sıfırının
+        kalibrasyon hatası; eklem hedef + ofset'e gider, gözlem komutu görür.
+    imu_tilt_deg: (roll, pitch) IMU'nun gövdeye eğik takılması; gözlemdeki
+        yerçekimi yönü ve jiroskop bu dönmeyle ölçülür.
+    delay_ms: komutun servoya ek gecikmesi (rastgeleleştirmeninkine eklenir);
+        kontrol adımından (20 ms) uzun olabilir, gözlem yine son komutu görür.
+    servo_strength: durma torku çarpanı (rastgeleleştirmeninkiyle çarpılır).
+    """
+
+    joint_offset_deg: tuple[float, ...] = ()
+    imu_tilt_deg: tuple[float, float] = (0.0, 0.0)
+    delay_ms: float = 0.0
+    servo_strength: float = 1.0
+
+
+@dataclass(frozen=True)
 class Randomization:
     """Alan rastgeleleştirme aralıkları; her bölüm başında düzgün dağılımdan çekilir.
 

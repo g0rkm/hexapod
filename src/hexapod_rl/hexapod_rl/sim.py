@@ -74,7 +74,9 @@ Alan rastgeleleştirme düğmeleri (G7; bölüm başında env.py çeker):
 set_servo() durma torkunu ve sertliği ölçekler (akü gerilimi, servo farkı,
 TAHMİN olan Kp), latency_steps yeni hedefin servoya kaç fizik adımı sonra
 ulaştığı (I2C + PCA9685 + servo tepkisi), push() gövdeye bir süre yatay
-kuvvet uygular (itme, darbe).
+kuvvet uygular (itme, darbe). joint_offset (rad, eklem başına) servonun
+sıfırının kalibrasyon hatası: eklem hedef + ofset'e gider, durumdaki
+joint_target komut olarak kalır (dayanıklılık taraması, task.Perturbation).
 
 Bu modül ROS'a bağımlı değil ama gz.sim Python bağlarına bağımlı; onlar ROS 2
 Lyrical kurulumuyla geliyor (source /opt/ros/lyrical/setup.bash).
@@ -150,6 +152,7 @@ class HexapodSim:
         self._strength = 1.0                        # durma torku çarpanı
         self._stiffness = 1.0                       # sertlik (Kp) çarpanı
         self.latency_steps = 0                      # fizik adımı; < steps_per_action
+        self.joint_offset = [0.0] * len(self.names)  # rad; kalibrasyon hatası (hedef + ofset)
         self._push: tuple[float, float, float] | None = None
         self._push_left = 0
         self._k = 0                                 # kontrol adımı içindeki fizik adımı
@@ -273,7 +276,7 @@ class HexapodSim:
             w = joint.velocity(ecm)
             if not q or not w:
                 continue  # bağlandığı ilk adım: bileşenler henüz yok
-            tau = kp * (self._targets[i] - q[0]) - kd * w[0]
+            tau = kp * (self._targets[i] + self.joint_offset[i] - q[0]) - kd * w[0]
             # motor hareket yönünde itiyorsa tork-hız doğrusu, frenliyorsa durma torku
             limit = tau_s * max(0.0, 1.0 - abs(w[0]) / w0) if tau * w[0] > 0 else tau_s
             tau = max(-limit, min(limit, tau))

@@ -341,3 +341,73 @@ def test_ogrenilmis_ayak_kaldirma_salinimi_degistirir(tmp_path_factory):
         assert e.step(a)[4]["lift_mm"] == pytest.approx(60.0)
     finally:
         e.close()
+
+
+def test_bozulmalar(tmp_path_factory):
+    """Sabit bozulmalar (dayanıklılık taraması): kalibrasyon ofseti eklemi kaydırır
+    ama gözlem komutu görür; eğik IMU gözlemdeki yerçekimini döndürür; kontrol
+    adımından uzun gecikmede komut servoya d adım sonra ulaşır, gözlem hemen görür;
+    zayıf servo çarpanı dinamiğe yazılır."""
+    from hexapod_rl.env import Perturbation
+
+    ref = HexapodEnv(workdir=tmp_path_factory.mktemp("bozulma_ref"))
+    offsets = [0.0] * 18
+    offsets[1] = 5.0                                          # bir femur +5°
+    e = HexapodEnv(workdir=tmp_path_factory.mktemp("bozulma"),
+                   perturbation=Perturbation(joint_offset_deg=tuple(offsets),
+                                             imu_tilt_deg=(0.0, 10.0), delay_ms=60.0,
+                                             servo_strength=0.7))
+    try:
+        obs_ref, _ = ref.reset(seed=0)
+        obs, info = e.reset(seed=0)
+        assert info["dynamics"]["servo_strength"] == pytest.approx(0.7)
+        assert info["dynamics"]["latency_ms"] == pytest.approx(60.0)
+        assert e._delay_steps == 3 and e.sim.latency_steps == 0
+        # ofset: eklem komut + ofset'e yakın, gözlemdeki eklem hedefleri aynı
+        err = e._state.joint_pos[1] - e._state.joint_target[1]
+        assert math.degrees(err) == pytest.approx(5.0, abs=1.5)
+        np.testing.assert_allclose(obs[6:24], obs_ref[6:24], atol=1e-6)
+        # eğik IMU (pitch 10°): düz duran gövdede yerçekimi x bileşeni sin(10°)
+        assert abs(obs[0]) == pytest.approx(math.sin(math.radians(10.0)), abs=0.02)
+        assert np.linalg.norm(obs[0:3]) == pytest.approx(1.0, abs=0.01)
+        # gecikme: eylem gözlemde hemen, servoda 3 adım sonra
+        a = np.zeros(18, dtype=np.float32)
+        a[1] = 0.5
+        before = e._state.joint_target[1]
+        obs, *_ = e.step(a)
+        assert obs[6 + 1] == pytest.approx(0.5, abs=1e-5)
+        for _ in range(2):
+            assert e._state.joint_target[1] == pytest.approx(before)
+            e.step(a)
+        assert e._state.joint_target[1] == pytest.approx(before)
+        e.step(a)
+        assert e._state.joint_target[1] == pytest.approx(before + 0.5 * e.task.action_scale)
+    finally:
+        e.close()
+        ref.close()
+
+
+def test_bozulmasiz_ortam_eskisiyle_ayni(tmp_path_factory):
+    """Perturbation() (varsayılan) rastgeleleştirmeli ortamda dinamiği ve bölümü
+    değiştirmez; gecikme eskisi gibi kontrol adımının içinde kalır."""
+    from hexapod_rl.env import Perturbation
+    from hexapod_rl.task import Randomization, TaskConfig
+
+    task = TaskConfig(randomization=Randomization())
+    a = HexapodEnv(task=task, workdir=tmp_path_factory.mktemp("b0"))
+    b = HexapodEnv(task=task, workdir=tmp_path_factory.mktemp("b1"), perturbation=Perturbation())
+    try:
+        rng = np.random.default_rng(1)
+        actions = rng.uniform(-0.3, 0.3, size=(20, 18)).astype(np.float32)
+        for seed in (3, 4):
+            oa, ia = a.reset(seed=seed)
+            ob, ib = b.reset(seed=seed)
+            assert ia["dynamics"] == ib["dynamics"]
+            assert a._delay_steps == 0 and a.sim.latency_steps < a.sim.steps_per_action
+            for act in actions:
+                oa, *_ = a.step(act)
+                ob, *_ = b.step(act)
+            np.testing.assert_array_equal(oa, ob)
+    finally:
+        a.close()
+        b.close()
