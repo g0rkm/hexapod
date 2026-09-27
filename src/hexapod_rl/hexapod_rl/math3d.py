@@ -20,3 +20,14 @@ def rotate_inverse(q: Quat, v: Vec3) -> Vec3:
     return (r00 * v[0] + r10 * v[1] + r20 * v[2],
             r01 * v[0] + r11 * v[1] + r21 * v[2],
             r02 * v[0] + r12 * v[1] + r22 * v[2])
+
+
+def rotate(q: Quat, v: Vec3) -> Vec3:
+    """v'yi q ile döndür (gövde -> dünya); rotate_inverse'ün tersi."""
+    w, x, y, z = q
+    r00, r01, r02 = 1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)
+    r10, r11, r12 = 2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)
+    r20, r21, r22 = 2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)
+    return (r00 * v[0] + r01 * v[1] + r02 * v[2],
+            r10 * v[0] + r11 * v[1] + r12 * v[2],
+            r20 * v[0] + r21 * v[1] + r22 * v[2])

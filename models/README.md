@@ -16,6 +16,73 @@ python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Same
 python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip:residual
 ```
 
+## Mesafe sensörlü kaldırma refleksi (2026-09-27)
+
+Kör politika ayak kaldırmayı zemine göre seçemiyor (ders 33, 35). Soru: önüne
+bakan mesafe sensörleri (robotta 3 VL53L0X var) engeli görürse kaldırma
+zemine göre ayarlanabilir mi, sensör nereye bakmalı?
+
+`python -m hexapod_rl.reflex_probe` — eğitim yok: `ppo_kaldirma35_250k`'nın
+eklemleri, kaldırma çıkışı ise her adımda ya sabit ya da
+`hexapod_policy.lift_reflex.LiftReflex`'in kararı. Refleks: her sensörün
+ölçümünden ışının çarptığı noktanın robotun durduğu zemine göre yüksekliği
+(mesafe + sensör yeri + IMU'nun yerçekimi yönü; robotta da hesaplanabilir).
+Bir sensör art arda 2 okumada 20 mm'yi aşarsa engel sayılır; son 3 s'de
+görülen en yüksek engel + 15 mm kaldırma olur (25–60 mm), yoksa 25 mm.
+
+**Sensör yerleşimi DENEYSEL** (robot.yaml'da `null`, D8): gövde önünde üç
+sensör (x 0.10 m, z +0.02 m; bakış 0° ve ±25°, menzil 1 m), aşağı bakış
+açısı taranıyor. Işın idealdir (koni, yansıma yok); gürültü ve okuma
+düşmesi taranan büyüklükler. Rastgeleleştirme açık, 3 tohum, 0.1 m/s ileri,
+10 s. Hücre: yol, geçen tohum, ortalama güç, ortalama kaldırma.
+
+İdeal sensör:
+
+| Kaldırma | düz | basamak 45 | basamak 60 | çukur 45 ileri | engebe 40 | engebe 60 | yokuş 20 |
+|---|---|---|---|---|---|---|---|
+| sabit 25 mm | 1.02 (3/3) 3.95 W 25 mm | 0.08 (0/3) 5.46 W 25 mm | 0.08 (0/3) 5.47 W 25 mm | 0.13 (0/3) 5.39 W 25 mm | 0.57 (3/3) 5.58 W 25 mm | 0.12 (0/3) 6.57 W 25 mm | 0.86 (3/3) 4.34 W 25 mm |
+| sabit 35 mm | 1.03 (3/3) 4.38 W 35 mm | 0.81 (3/3) 5.87 W 35 mm | 0.08 (0/3) 5.89 W 35 mm | 0.68 (3/3) 6.12 W 35 mm | 0.86 (3/3) 5.99 W 35 mm | 0.64 (3/3) 6.28 W 35 mm | 0.87 (3/3) 4.71 W 35 mm |
+| sabit 50 mm | 1.04 (3/3) 4.45 W 50 mm | 0.88 (3/3) 6.08 W 50 mm | 0.41 (2/3) 7.16 W 50 mm | 0.94 (3/3) 6.00 W 50 mm | 0.91 (3/3) 6.15 W 50 mm | 0.91 (3/3) 6.59 W 50 mm | 0.88 (3/3) 4.83 W 50 mm |
+| refleks, 20° aşağı | 1.02 (3/3) 3.95 W 25 mm | 0.97 (3/3) 5.44 W 47 mm | **0.86 (3/3)** 6.19 W 55 mm | 0.98 (3/3) 5.48 W 49 mm | 0.76 (3/3) 5.92 W 36 mm | 0.75 (3/3) 6.13 W 45 mm | 0.87 (3/3) 4.44 W 59 mm |
+| refleks, 25° aşağı | 1.02 (3/3) 3.95 W 25 mm | 0.97 (3/3) 5.38 W 47 mm | 0.54 (3/3) 6.77 W 58 mm | 0.98 (3/3) 5.51 W 47 mm | 0.80 (3/3) 5.86 W 37 mm | 0.77 (3/3) 5.99 W 45 mm | 0.87 (3/3) 4.44 W 59 mm |
+| refleks, 30° aşağı | 1.02 (3/3) 3.95 W 25 mm | 0.98 (3/3) 5.45 W 47 mm | 0.61 (3/3) 6.86 W 58 mm | 0.97 (3/3) 5.51 W 46 mm | 0.84 (3/3) 5.70 W 34 mm | 0.71 (3/3) 6.04 W 42 mm | 0.87 (3/3) 4.44 W 59 mm |
+| refleks, 45° aşağı | 1.02 (3/3) 3.95 W 25 mm | 0.08 (0/3) 5.46 W 25 mm | 0.08 (0/3) 5.47 W 25 mm | 0.13 (0/3) 5.39 W 25 mm | 0.76 (3/3) 5.85 W 33 mm | 0.64 (3/3) 6.18 W 38 mm | 0.87 (3/3) 4.44 W 59 mm |
+
+Gürültülü sensör (bağıl %5 gürültü, okumaların %10'u gelmiyor, iki kontrol
+adımında bir okuma; `--noise 5 --drop 10 --every 2`):
+
+| Kaldırma | düz | basamak 45 | basamak 60 | çukur 45 ileri | engebe 40 | engebe 60 | yokuş 20 |
+|---|---|---|---|---|---|---|---|
+| refleks, 20° aşağı | 1.02 (3/3) 3.95 W 25 mm | 0.98 (3/3) 5.34 W 49 mm | **0.86 (3/3)** 6.11 W 57 mm | 0.98 (3/3) 5.49 W 51 mm | 0.89 (3/3) 5.91 W 39 mm | 0.78 (3/3) 6.05 W 46 mm | 0.87 (3/3) 4.44 W 59 mm |
+| refleks, 25° aşağı | 1.02 (3/3) 3.95 W 25 mm | 0.98 (3/3) 5.39 W 49 mm | 0.65 (3/3) 6.60 W 59 mm | 0.99 (3/3) 5.50 W 50 mm | 0.91 (3/3) 5.98 W 41 mm | 0.83 (3/3) 6.31 W 48 mm | 0.87 (3/3) 4.44 W 59 mm |
+| refleks, 30° aşağı | 1.02 (3/3) 3.95 W 25 mm | 0.98 (3/3) 5.35 W 48 mm | 0.69 (2/3) 6.28 W 56 mm | 0.98 (3/3) 5.50 W 48 mm | 0.89 (3/3) 5.92 W 39 mm | 0.76 (3/3) 5.98 W 44 mm | 0.87 (3/3) 4.44 W 59 mm |
+
+- **Kör politikanın ödünleşimi sensörle çözülüyor.** Refleks düzde sabit 25
+  mm'nin gücünde (3.95 W; rastgeleleştirme açıkken ölçüldü, sabit 50 mm
+  4.45 W), engellerde sabit 50 mm'den iyi: 45 mm basamak 0.97–0.98 (sabit
+  50: 0.88), 60 mm basamak 20°'de 0.86 3/3 (sabit 50: 0.41 2/3), çukur
+  0.98 (0.94). Engebe 60'ta sabit 50 hâlâ önde (0.91'e 0.75–0.83):
+  refleks engeli görene kadar 25 mm'de yürüyor.
+- **Bakış açısı önemli:** 45° çok dik; ışın gövdeye çok yakın düşüyor,
+  basamağı ön ayaklar dayandığında ancak alt kenarından görüyor (eşiği
+  aşmıyor), refleks hiç tetiklenmiyor. 20°'de ışın sensörden ~0.33 m ileride; 60 mm
+  basamakta en iyisi bu.
+- **Gürültü:** ilk sürüm (eşik 12 mm, tek okuma) %5 gürültüde düzde yanlış
+  alarmla kaldırmayı 25 → 32 mm'ye, gücü 3.95 → 4.35 W'a çıkarıyordu.
+  Eşik 20 mm + art arda 2 okuma bunu bitirdi (düzde 25 mm), engel
+  becerisi aynı kaldı.
+- **Sınırlar:** sensörler yalnız ileri bakıyor; yana/geri yürürken refleks
+  engeli görmez (25 mm). Işın ideal (VL53L0X'in görüş konisi, yansıtıcılık
+  ve ölçüm süresi modellenmedi). Kaldırma çıkışlı modelle çalışıyor
+  (öğrenilmiş kaldırmalı eğitimde eklemler 25–60 mm'ye alıştı). Robot
+  düğümüne bağlanması S7 (sürücü) ve D8'i (yerleşim) bekliyor.
+- **D8'e öneri:** mesafe sensörlerinden en az biri gövdenin önünde, yerin
+  ~12 cm üstünde, 20–25° aşağı bakacak şekilde. Yan sensörler ±25°.
+  Kesin yerleşim robotta ölçülüp robot.yaml'a girince bu tablo yeniden
+  koşulur (`--pitch`).
+
+**Gerçek robotta DENENMEDİ.**
+
 ## Müfredat: kolaydan zora zemin (2026-09-27, v22–v23)
 
 `train.py --curriculum deneme` (`terrain_probe.CURRICULA`): her ortam bir zemin

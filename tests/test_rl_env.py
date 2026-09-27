@@ -502,3 +502,28 @@ def test_dunya_yeniden_kurulurken_soket_sizmaz(tmp_path_factory):
         e.close()
         other.kill()
         other.wait()
+
+
+def test_mesafe_sensoru_olcumu_infoda_ve_basamagi_gorur(tmp_path_factory):
+    """range_sensors verilince her adımda info["ranges_m"]; düzde ışın geometriden
+    beklenen yere düşer, önünde basamak varken kısalır. Gözlem değişmez."""
+    from hexapod_policy.lift_reflex import RangeSensor
+    from hexapod_rl.terrain_probe import step
+
+    s = RangeSensor(0.10, 0.0, 0.02, 0.0, 20.0, 1.0)
+    flat = HexapodEnv(workdir=tmp_path_factory.mktemp("menzil_duz"), range_sensors=[s])
+    sdf, h = step(0.045, at_x=0.3)
+    stepped = HexapodEnv(workdir=tmp_path_factory.mktemp("menzil_basamak"), terrain_sdf=sdf,
+                         terrain_height=h, range_sensors=[s])
+    try:
+        obs, info = flat.reset(seed=0)
+        assert obs.shape == (OBS_SIZE,)
+        z = flat._state.base_pos[2] + 0.02                  # sensörün yerden yüksekliği
+        assert info["ranges_m"][0] == pytest.approx(z / math.sin(math.radians(20.0)), abs=0.01)
+        _, info_s = stepped.reset(seed=0)
+        assert info_s["ranges_m"][0] < info["ranges_m"][0] - 0.02   # basamağa çarpıyor
+        _, _, _, _, info = flat.step(np.zeros(18, dtype=np.float32))
+        assert len(info["ranges_m"]) == 1
+    finally:
+        flat.close()
+        stepped.close()

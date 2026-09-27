@@ -6,13 +6,14 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-27** (4. oturumun devamı: dayanıklılık taraması
+> Son güncelleme: **2026-09-27** (4. oturumun devamı: mesafe sensörlü kaldırma
+> refleksi §3.3 ve ders 41; dayanıklılık taraması
 > §7.8 ve ders 37; müfredat `--curriculum` §7.8; ders 38 (ölçüm hatası); öğrenilmiş ayak kaldırma ve orta yol modeli
 > `ppo_kaldirma35_250k` §3.3, ders 35–36;
 > önceki: yeni bilgisayarda kurulum §0.5; zemine göre ayak teması §7.8;
 > her yöne politika `ppo_omni_250k` §3.2; kütle rastgeleleştirmesi;
 > zeminli eğitim `ppo_lift50_3750k` §3.3)
-> · Testler: **Linux 267/267**, Windows 219 geçti + 9 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 277/277**, Windows 228 geçti + 9 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -98,12 +99,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 219 geçti, 9 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 228 geçti, 9 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 267 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 277 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -406,6 +407,16 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
   Payı olan kaygan yokuşu (10° μ 0.25)
   politika 3/3 çıkıyor, tripod 0/3. Bunları da eğitime katma denemesi
   (v17) iyileştirmedi (ders 34). Tablo: models/README.
+- **Mesafe sensörlü kaldırma refleksi (2026-09-27, ders 41):** eğitimsiz
+  bir kural (`hexapod_policy.lift_reflex`), önüne bakan sensörler engel
+  görünce kaldırmayı yükseltiyor. Simde DENEYSEL bir yerleşimle (robot.yaml'da
+  null) `ppo_kaldirma35_250k`'nın kaldırma çıkışını ezerek: düzde sabit 25
+  mm'nin gücünde (3.95 W, sabit 50 mm 4.45 W; rastgeleleştirme açık), 45
+  mm basamak 0.98 (sabit 50: 0.88), 60 mm basamak 0.86 3/3 (sabit 50: 0.41
+  2/3), %5 gürültü + %10 okuma düşmesi + yarı hızda da aynı. Sensör 20–25°
+  aşağı bakmalı; 45° hiç çalışmıyor. Kör politikanın ödünleşimi (ders 33)
+  sensörle çözülüyor. Robot düğümüne bağlanması S7 ve D8'i bekliyor.
+  Tablolar: models/README ("Mesafe sensörlü kaldırma refleksi").
 - **Müfredat (2026-09-27, v22–v23; `--curriculum`, §7.8):** sabit 25 mm
   tabanda müfredat küçük bir kazanç getirdi (engel skoru 0.338 → 0.371, v12
   0.316) ama 45 mm'lik engel yok. Öğrenilmiş kaldırmayla (25 mm'den) v20'nin
@@ -937,6 +948,15 @@ taklit eder.
 - Gürültü eylem biriminde: artık eylemde aynı eklem gürültüsü için ×2.5
   (0.1 mutlak = 0.25 artık = 0.05 rad).
 
+**Mesafe sensörü (DENEYSEL, 2026-09-27):** `HexapodEnv(range_sensors=[...])`
+her adımda `info["ranges_m"]` verir (gözlem değişmez): `rangefinder.read`,
+gövdeye bağlı ideal ışın zemin yüksekliği fonksiyonuna çarpana kadar
+ilerler (5 mm adım + ikiye bölme). `RangeSensor` (yer, bakış yönü, menzil)
+ve `obstacle_height` robotta da çalışan `hexapod_policy.lift_reflex`'te;
+yerleşim her kullanımda açıkça verilir, robot.yaml'dan okunmaz ve
+varsayılanı yok (robot.yaml'da null, D8). Deneme: `python -m
+hexapod_rl.reflex_probe [--pitch ...] [--noise %] [--drop %] [--every N]`.
+
 **Sabit bozulmalar ve dayanıklılık taraması (2026-09-27):**
 - `task.Perturbation` (`HexapodEnv(perturbation=...)`, `evaluate(...,
   perturbation=...)`): eğitimde rastgeleleştirilmeyen, robota geçişte
@@ -1037,8 +1057,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 219 geçti, 9 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 267 geçti, ~40 s (yeni PC).
+- Windows: 228 geçti, 9 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 277 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1331,6 +1351,7 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | Deneme zeminlerine kaygan (μ) ve engebe (`rough`) eklendi; v17 (bunlarla eğitim) depoya alınmadı | G7 "bitti" şartının üç türü ölçülebilsin. v17 engel skorunu 0.763'ten 0.68–0.72'ye düşürdü (ders 34) |
 | 09-26 | Ödül v7 (`progress_overshoot`) eklendi ama varsayılan 0 (v6) kaldı; v15/v16 modelleri depoya alınmadı | Aşma biraz azaldı, enerji azalmadı, katsayı 3'te zemin bozuldu (ders 33). Raporlar ortak ödülle (`standard_reward`, v6) |
 | 09-26 | v14 (std 0.05, 2M) → `ppo_lift50_3750k` depoya; ara kayıt rastgeleleştirmeli 3 tohumla elle seçildi | Düzde aşma azalmadı ama 60 mm basamak 3/3, zemin skoru 0.957; eğitim içi deterministik seçim (500k) ikili durumlarda gürültülü (ders 32) |
+| 09-27 | **Mesafe sensörlü kaldırma refleksi** (`LiftReflex`) eğitimsiz bir kural olarak; mesafe sensörü simde yalnız `info`'da, gözleme girmedi | Kural düzde 25 mm'nin enerjisinde, engelde 50 mm'den iyi (ders 41); politikaya sensör gözlemi verip yeniden eğitmek gerekmeden ödünleşimi çözüyor. Sensör gözlemli RL denenmedi: yerleşim ve sensör davranışı (D8, S7) bilinmeden gözlemi sabitlemek erken |
 | 09-27 | **Müfredat** (`--curriculum`, `CURRICULA`) eklendi, varsayılan değil; v22/v23 modelleri alınmadı | Sabit 25 mm tabanda 45 mm engel yok; öğrenilmiş kaldırmada yerel en iyiden çıkardı ama iyi bir başlangıçtan (35 mm) daha iyi bir yere varmadı (ders 40). S5'in zeminleri için altyapı olarak kalıyor |
 | 09-27 | Dayanıklılık taraması (`Perturbation`, `robustness`); IMU eğikliği ve uzun gecikme eğitime **eklenmedi** | 20°'lik IMU eğikliği ve 240 ms gecikme hiçbir modeli bozmadı. Hassas olunanlar kalibrasyon ofseti (σ ≥ 3°) ve servo gücü (×0.5 altı); ofseti politika göremiyor ve tripod da aynı kaybediyor, önce donanımda ölçülmeli (D6, D9), sonra aralığı eğitime girer (D10) |
 | 09-27 | **Öğrenilmiş ayak kaldırma** (19. çıkış, `lift_action`/`lift_range`) eklendi; seçim salınım başına | Sabit kaldırmada 25 mm düzde verimli ama engelde takılıyor, 50 mm tersi (ders 33); 18 eklemin keşfiyle bulunamayan hareket tek düğmeyle denenebilirdi. Her adım seçim keşfedilemedi (ders 36) |
@@ -1649,6 +1670,17 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     engeli geçirdiği için eğitimde 45–50 mm görünen seviye deterministik
     politikanın yeteneği değil (v23 1M: gürültülüyle 45 mm çukurdan 0.47 m,
     deterministikle 0.12 m).
+41. **Ödünleşimi ödül değil algı çözer; önce basit bir kuralla dene.** Kör
+    politikada düz verim ↔ zemin ödünleşimini ödülle (v7, ders 33),
+    öğrenilmiş kaldırmayla (ders 35) ve müfredatla (ders 40) çözemedik.
+    Önüne bakan mesafe sensörüne bakan eğitimsiz bir refleks
+    (`LiftReflex`) ilk denemede çözdü: düzde 25 mm'nin gücü, engellerde
+    50 mm'den iyi geçiş (models/README). Sensör gözlemiyle RL eğitmeden
+    önce kuralı denemek hem ucuz (1.5 dk) hem de sensörün nereye bakması
+    gerektiğini gösterdi: 45° aşağı bakan ışın engeli çok geç görüyor,
+    20–25° doğru. Gürültüde ilk eşik (12 mm, tek okuma) yanlış alarm
+    verdi; eşik 20 mm + art arda 2 okuma yeterli. Değerler robot.yaml'a
+    yazılmadı: yerleşim D8'in kararı, sim yalnız öneri.
 
 ---
 
@@ -1783,6 +1815,12 @@ zeminler.
     kör politikada yeni bir beceri açmadı (ders 40). Seviye kararını
     deterministik bir ölçümle vermek (ör. her N bölümde bir gürültüsüz
     bölüm) denenmedi.
+17. ✅ **Mesafe sensörlü kaldırma refleksi** (ders 41, `lift_reflex`,
+    `reflex_probe`): düz verim ↔ zemin ödünleşimi (madde 10) sensörle
+    çözülüyor. Açık: (a) robot düğümüne bağlama (S7'nin mesafe konuları +
+    D8'in yerleşimi robot.yaml'a girince); (b) yana/geri yürüyüş için
+    sensör ya da yedek kaldırma; (c) VL53L0X'in görüş konisi ve gerçek
+    gürültüsü (S7/D8'de ölçülünce); (d) sensör gözlemli RL.
 
 **S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
 S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son
@@ -1857,7 +1895,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 219 geçti, 9 atlandı. WSL: 267 geçti.
+   - Windows: 228 geçti, 9 atlandı. WSL: 277 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).

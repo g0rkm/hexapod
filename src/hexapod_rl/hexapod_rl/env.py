@@ -49,6 +49,8 @@ from hexapod_gazebo.pose import standing_pose
 from hexapod_kinematics import HexapodKinematics
 from hexapod_policy.tripod import PhaseTripod
 
+from . import rangefinder
+from .rangefinder import RangeSensor
 from .sim import HexapodSim, TerrainHeight
 from .task import (
     ACTION_SIZE,
@@ -93,7 +95,8 @@ class HexapodEnv(gym.Env):
                  config_path: str | Path | None = None, workdir: Path | None = None,
                  terrain_sdf: str = "", terrain_height: TerrainHeight | None = None,
                  body_mass_scale: float = 1.0, perturbation: Perturbation | None = None,
-                 terrain_levels: Sequence[TerrainMaker] | None = None) -> None:
+                 terrain_levels: Sequence[TerrainMaker] | None = None,
+                 range_sensors: Sequence[RangeSensor] | None = None) -> None:
         """terrain_sdf: düz zeminin yerine geçen statik <model> SDF parçası (S5'in
         zemin üreteci; boşsa düz zemin); terrain_height(x, y): aynı zeminin üst
         yüzeyinin z'si, m (ikisi birlikte). Kısıtlar HexapodSim açıklamasında.
@@ -101,7 +104,9 @@ class HexapodEnv(gym.Env):
         ömrü boyunca sabit (task.body_mass_scales). perturbation: sabit
         bozulmalar (Perturbation; dayanıklılık taraması). terrain_levels:
         müfredat, kolaydan zora zemin üreteçleri (terrain_probe.CURRICULA);
-        verilirse terrain_sdf/terrain_height verilmez, seviye 0'dan başlar."""
+        verilirse terrain_sdf/terrain_height verilmez, seviye 0'dan başlar.
+        range_sensors: DENEYSEL mesafe sensörü yerleşimi (rangefinder); her
+        adımda ölçümler info["ranges_m"]'de, gözlem değişmez."""
         super().__init__()
         self.task = task or TaskConfig()
         config = RobotConfig.load(config_path)
@@ -109,6 +114,8 @@ class HexapodEnv(gym.Env):
         self.body_mass_scale = body_mass_scale
         self._model, self._physics_step = model, physics_step
         self.terrain_levels = list(terrain_levels) if terrain_levels else None
+        self.range_sensors = tuple(range_sensors) if range_sensors else None
+        self.ranges: list[float] | None = None
         self.level = 0
         if self.terrain_levels is not None:
             if terrain_sdf or terrain_height is not None:
@@ -190,6 +197,8 @@ class HexapodEnv(gym.Env):
         info = {"command": self._command, "dynamics": dict(self.dynamics)}
         if self.terrain_levels is not None:
             info["terrain_level"] = self.level
+        if self.range_sensors is not None:
+            info["ranges_m"] = self._read_ranges()
         return self._obs(), info
 
     def step(self, action):
@@ -234,12 +243,21 @@ class HexapodEnv(gym.Env):
                 "base_pos": state.base_pos, "foot_contact": state.foot_contact,
                 "lift_mm": lift if lift is not None else
                 (self.task.lift_mm if self.base is not None else None)}
+        if self.range_sensors is not None:
+            info["ranges_m"] = self._read_ranges()
         return self._obs(), float(r), fell, self._steps >= self.max_steps, info
 
     def close(self) -> None:
         """Gazebo dünyasını bırak (HexapodSim.close)."""
         self.sim.close()
         super().close()
+
+    def _read_ranges(self) -> list[float]:
+        """Mesafe sensörlerinin ölçümü (ideal ışın, rangefinder.read)."""
+        s = self._state
+        self.ranges = rangefinder.read(self.range_sensors, s.base_pos, s.base_quat,
+                                       self.sim.height)
+        return list(self.ranges)
 
     # -- müfredat ----------------------------------------------------------------
 
