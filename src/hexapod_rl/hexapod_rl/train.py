@@ -34,6 +34,14 @@ güncellemede progress.csv'ye yazılır (mufredat/<tür>, 0 en kolay).
 --terrains ile birlikte verilmez; ara kayıt seçimi aynı adın EVAL_CASES'ini
 ölçer.
 
+--reflex AÇI: mesafe sensörlü kaldırma refleksi açık (hexapod_policy.lift_reflex;
+DENEYSEL yerleşim: gövde kenarında ileri ve ±90°, AÇI derece aşağı;
+reflex_probe.ring_sensors). Taban tripod'un kaldırmasını refleks seçer,
+eklemler buna uyum sağlar; yürüyüş yönüne sensör bakmıyorsa politikanın
+kaldırma çıkışı (robottaki PolicyController ile aynı). --range-noise /
+--range-drop (%): ölçüm gürültüsü ve düşen okuma. Ara kayıt seçimi de
+refleksle ölçer.
+
 En iyi ara kayıt (2026-09-26): uzun eğitimde politika yine hedef hızı
 aşmaya kayıyordu, en iyisi 250k ara kaydıydı (ders 25). Her ara kayıtta
 (250 bin adımda bir) politika deterministik ölçülür (evaluate.eval_commands:
@@ -80,7 +88,7 @@ PPO_KWARGS = dict(
 
 
 def measure_model(model, task, commands, terrain_cases=(), seconds: float = 10.0,
-                  env=None) -> tuple[float, dict]:
+                  env=None, env_kwargs: dict | None = None) -> tuple[float, dict]:
     """Ara kayıt seçiminin ölçütü: düz zemindeki komutlar (env yeniden kullanılır)
     + zemin durumları (her biri kendi dünyasında, kurulup kapatılır), hepsi
     deterministik ve rastgeleleştirmesiz; skor adım başı ödüllerin ortalaması.
@@ -93,7 +101,7 @@ def measure_model(model, task, commands, terrain_cases=(), seconds: float = 10.0
            for c, r in zip(commands, results)}
     fell = sum(r["devrildi"] for r in results)
     for label, sdf, height, cmd in terrain_cases:
-        e = HexapodEnv(task=task, terrain_sdf=sdf, terrain_height=height)
+        e = HexapodEnv(task=task, terrain_sdf=sdf, terrain_height=height, **(env_kwargs or {}))
         try:
             r = evaluate(model, seconds, vx=cmd[0], vy=cmd[1], wz=cmd[2], env=e)
         finally:
@@ -106,9 +114,10 @@ def measure_model(model, task, commands, terrain_cases=(), seconds: float = 10.0
 
 
 def best_checkpoint_callback(every: int, out: Path, task, seconds: float = 10.0,
-                             terrain_cases=()):
+                             terrain_cases=(), env_kwargs: dict | None = None):
     """Her `every` çağrıda politikayı ölçüp (measure_model) en iyisini
-    best_model.zip olarak saklar. terrain_cases: (ad, sdf, yükseklik, komut)."""
+    best_model.zip olarak saklar. terrain_cases: (ad, sdf, yükseklik, komut).
+    env_kwargs: ölçüm ortamlarına (ör. mesafe sensörü ve refleks)."""
     from stable_baselines3.common.callbacks import BaseCallback
 
     from .env import HexapodEnv
@@ -130,9 +139,9 @@ def best_checkpoint_callback(every: int, out: Path, task, seconds: float = 10.0,
 
         def measure(self) -> None:
             if self.env is None:
-                self.env = HexapodEnv(task=task)
+                self.env = HexapodEnv(task=task, **(env_kwargs or {}))
             score, cols = measure_model(self.model, task, commands, terrain_cases, seconds,
-                                        env=self.env)
+                                        env=self.env, env_kwargs=env_kwargs)
             row = {"adim": self.num_timesteps, **cols}
             new = not self.csv.exists()
             with self.csv.open("a", newline="", encoding="utf-8") as f:
@@ -203,6 +212,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="ortam başına zemin seti (terrain_probe.TRAIN_SETS; S5 gelince onunki)")
     parser.add_argument("--curriculum", default=None,
                         help="kolaydan zora zemin müfredatı (terrain_probe.CURRICULA)")
+    parser.add_argument("--reflex", type=float, default=None, metavar="AÇI",
+                        help="mesafe sensörlü kaldırma refleksi; sensörler bu kadar derece aşağı")
+    parser.add_argument("--range-noise", type=float, default=0.0,
+                        help="mesafe ölçümüne bağıl gürültü, %%")
+    parser.add_argument("--range-drop", type=float, default=0.0,
+                        help="mesafe okumasının gelmeme olasılığı, %%")
     parser.add_argument("--lift-mm", type=float, default=None,
                         help="artık eylemde taban tripod'un ayak kaldırması (varsayılan TaskConfig)")
     parser.add_argument("--lift-range", type=float, nargs=2, default=None, metavar=("EN_AZ", "EN_COK"),
@@ -255,8 +270,19 @@ def main(argv: list[str] | None = None) -> int:
         step = next(k for k in range(args.envs // 2 + 1, args.envs + 1)
                     if math.gcd(k, args.envs) == 1)   # n ile aralarında asal: permütasyon
         masses = [masses[(i * step) % args.envs] for i in range(args.envs)]
+    sensor_kwargs = {}
+    if args.reflex is not None:
+        from hexapod_policy.lift_reflex import LiftReflex
+
+        from .reflex_probe import ring_sensors
+        if task.action_mode != "residual":
+            parser.error("--reflex yalnız artık eylem modunda (--residual)")
+        sensor_kwargs = dict(range_sensors=ring_sensors((0.0, 90.0, -90.0), args.reflex),
+                             lift_reflex=LiftReflex(), range_noise=args.range_noise / 100,
+                             range_drop=args.range_drop / 100)
     venv = VecMonitor(SubprocVecEnv([make_env(args.seed * 100 + i, task, body_mass_scale=m,
-                                              terrain_sdf=sdf, terrain_height=h, terrain_levels=lv)
+                                              terrain_sdf=sdf, terrain_height=h, terrain_levels=lv,
+                                              **sensor_kwargs)
                                      for i, (m, (_, sdf, h), lv)
                                      in enumerate(zip(masses, terrains, levels))],
                                     start_method="fork"))
@@ -288,7 +314,9 @@ def main(argv: list[str] | None = None) -> int:
         f"omni: {args.omni}\nenvs: {args.envs}\n"
         f"body_mass_scales: {[round(m, 3) for m in masses]}\n"
         f"terrains: {[t[0] for t in terrains]}\n"
-        f"curriculum: {args.curriculum}\n",
+        f"curriculum: {args.curriculum}\n"
+        f"reflex: {args.reflex}, range_noise: {args.range_noise} %, "
+        f"range_drop: {args.range_drop} %\n",
         encoding="utf-8")
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     every = max(250_000 // args.envs, 1)  # 250 bin adımda bir ara kayıt
@@ -297,7 +325,10 @@ def main(argv: list[str] | None = None) -> int:
     if set_name:   # ara kayıt seçimi zemini de görsün (ders 30)
         from .terrain_probe import EVAL_CASES, eval_cases
         cases = eval_cases(set_name) if set_name in EVAL_CASES else []
-    best = best_checkpoint_callback(every, out, eval_task, terrain_cases=cases)
+    eval_kwargs = {k: v for k, v in sensor_kwargs.items()
+                   if k in ("range_sensors", "lift_reflex")}   # ölçüm gürültüsüz
+    best = best_checkpoint_callback(every, out, eval_task, terrain_cases=cases,
+                                    env_kwargs=eval_kwargs)
     callbacks = [CheckpointCallback(every, str(out / "checkpoints"), "ppo"), best]
     if args.curriculum:
         callbacks.append(curriculum_log_callback(

@@ -34,6 +34,7 @@ kontrol adımından uzun gecikme, zayıf servo). Dayanıklılık taraması
 
 from __future__ import annotations
 
+import copy
 import math
 from collections import deque
 from dataclasses import replace
@@ -48,6 +49,8 @@ from hexapod_driver.config import RobotConfig
 from hexapod_gazebo.pose import standing_pose
 from hexapod_kinematics import HexapodKinematics
 from hexapod_policy.tripod import PhaseTripod
+
+from hexapod_policy.lift_reflex import LiftReflex, covers, obstacle_height
 
 from . import rangefinder
 from .rangefinder import RangeSensor
@@ -96,7 +99,9 @@ class HexapodEnv(gym.Env):
                  terrain_sdf: str = "", terrain_height: TerrainHeight | None = None,
                  body_mass_scale: float = 1.0, perturbation: Perturbation | None = None,
                  terrain_levels: Sequence[TerrainMaker] | None = None,
-                 range_sensors: Sequence[RangeSensor] | None = None) -> None:
+                 range_sensors: Sequence[RangeSensor] | None = None,
+                 lift_reflex: LiftReflex | None = None, range_noise: float = 0.0,
+                 range_drop: float = 0.0) -> None:
         """terrain_sdf: düz zeminin yerine geçen statik <model> SDF parçası (S5'in
         zemin üreteci; boşsa düz zemin); terrain_height(x, y): aynı zeminin üst
         yüzeyinin z'si, m (ikisi birlikte). Kısıtlar HexapodSim açıklamasında.
@@ -106,7 +111,12 @@ class HexapodEnv(gym.Env):
         müfredat, kolaydan zora zemin üreteçleri (terrain_probe.CURRICULA);
         verilirse terrain_sdf/terrain_height verilmez, seviye 0'dan başlar.
         range_sensors: DENEYSEL mesafe sensörü yerleşimi (rangefinder); her
-        adımda ölçümler info["ranges_m"]'de, gözlem değişmez."""
+        adımda ölçümler info["ranges_m"]'de, gözlem değişmez. range_noise /
+        range_drop: ölçüme bağıl gürültü (std) ve okumanın gelmeme olasılığı.
+        lift_reflex: taban tripod'un kaldırmasını refleks seçer (robottaki
+        PolicyController ile aynı kural: salınım başında; yürüyüş yönüne sensör
+        bakmıyorsa politikanın kaldırma çıkışı ya da tabanınki). Kopyalanır:
+        her ortamın kendi durumu olur."""
         super().__init__()
         self.task = task or TaskConfig()
         config = RobotConfig.load(config_path)
@@ -116,6 +126,11 @@ class HexapodEnv(gym.Env):
         self.terrain_levels = list(terrain_levels) if terrain_levels else None
         self.range_sensors = tuple(range_sensors) if range_sensors else None
         self.ranges: list[float] | None = None
+        self.lift_reflex = copy.deepcopy(lift_reflex)
+        self.range_noise, self.range_drop = float(range_noise), float(range_drop)
+        self._reflex_lift: float | None = None
+        if self.lift_reflex is not None and self.range_sensors is None:
+            raise ValueError("refleks için mesafe sensörü yerleşimi (range_sensors) gerekir")
         self.level = 0
         if self.terrain_levels is not None:
             if terrain_sdf or terrain_height is not None:
@@ -158,6 +173,8 @@ class HexapodEnv(gym.Env):
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (OBS_SIZE,), np.float32)
         if self.task.lift_action is not None and self.base is None:
             raise ValueError("öğrenilmiş ayak kaldırma yalnız artık eylem modunda")
+        if self.lift_reflex is not None and self.base is None:
+            raise ValueError("refleks taban tripod'un kaldırmasını seçer: yalnız artık eylem modunda")
         self.n_actions = action_dim(self.task)
         self.action_space = gym.spaces.Box(-1.0, 1.0, (self.n_actions,), np.float32)
         self.max_steps = int(round(self.task.episode_s / self.dt))
@@ -197,6 +214,8 @@ class HexapodEnv(gym.Env):
         info = {"command": self._command, "dynamics": dict(self.dynamics)}
         if self.terrain_levels is not None:
             info["terrain_level"] = self.level
+        if self.lift_reflex is not None:
+            self.lift_reflex.reset()
         if self.range_sensors is not None:
             info["ranges_m"] = self._read_ranges()
         return self._obs(), info
@@ -204,15 +223,23 @@ class HexapodEnv(gym.Env):
     def step(self, action):
         action = [float(a) for a in np.asarray(action, dtype=np.float64).reshape(-1)]
         joints, lift = action[:ACTION_SIZE], None
-        if self.task.lift_action is not None:   # son eylem: ayak kaldırma
-            if len(action) != self.n_actions:
-                raise ValueError(f"{self.n_actions} eylem bekleniyordu, {len(action)} geldi")
-            # Yalnız salınımın ilk adımında seçilir, salınım boyunca sabit: her adım
-            # seçilse keşif gürültüsü bir salınım içinde ortalanır ve yüksek bir
-            # salınım hiç denenmez (v18, v19); yörünge de titrer.
+        if len(action) != self.n_actions:
+            raise ValueError(f"{self.n_actions} eylem bekleniyordu, {len(action)} geldi")
+        if self.task.lift_action is not None or self.lift_reflex is not None:
+            # Kaldırma yalnız salınımın ilk adımında seçilir, salınım boyunca sabit:
+            # her adım seçilse keşif gürültüsü bir salınım içinde ortalanır ve yüksek
+            # bir salınım hiç denenmez (v18, v19); yörünge de titrer. Refleks
+            # görüyorsa onun, yoksa son eylemin (öğrenilmiş kaldırma), o da yoksa
+            # tabanın kaldırması (hexapod_policy.PolicyController ile aynı).
             group = self.base.swing_group(self._phase)
             if group != self._lift_group:
-                self._lift = lift_from_action(action[ACTION_SIZE], self.task.lift_action)
+                if (self.lift_reflex is not None and self._reflex_lift is not None
+                        and covers(self.range_sensors, self._command[0], self._command[1])):
+                    self._lift = self._reflex_lift
+                elif self.task.lift_action is not None:
+                    self._lift = lift_from_action(action[ACTION_SIZE], self.task.lift_action)
+                else:
+                    self._lift = None
                 self._lift_group = group
             lift = self._lift
         if self.base is None:
@@ -253,10 +280,22 @@ class HexapodEnv(gym.Env):
         super().close()
 
     def _read_ranges(self) -> list[float]:
-        """Mesafe sensörlerinin ölçümü (ideal ışın, rangefinder.read)."""
+        """Mesafe sensörlerinin ölçümü (ideal ışın, rangefinder.read; istenirse
+        gürültü ve düşen okuma); refleks varsa onu da günceller."""
         s = self._state
-        self.ranges = rangefinder.read(self.range_sensors, s.base_pos, s.base_quat,
-                                       self.sim.height)
+        ranges = rangefinder.read(self.range_sensors, s.base_pos, s.base_quat, self.sim.height)
+        if self.range_noise > 0 or self.range_drop > 0:
+            u = self.np_random
+            ranges = [sensor.max_m if u.uniform() < self.range_drop
+                      else (d * (1.0 + u.normal(0.0, self.range_noise)) if d < sensor.max_m else d)
+                      for sensor, d in zip(self.range_sensors, ranges)]
+        self.ranges = ranges
+        if self.lift_reflex is not None:
+            g = s.gravity_in_base()
+            stand = self.task.stand_height_mm / 1000.0
+            self._reflex_lift = self.lift_reflex.update(
+                self._steps * self.dt,
+                [obstacle_height(sensor, d, g, stand) for sensor, d in zip(self.range_sensors, ranges)])
         return list(self.ranges)
 
     # -- müfredat ----------------------------------------------------------------
@@ -341,12 +380,14 @@ class HexapodEnv(gym.Env):
 
 def make_env(rank: int, task: TaskConfig | None = None, physics_step: float = 0.002,
              terrain_sdf: str = "", terrain_height: TerrainHeight | None = None,
-             body_mass_scale: float = 1.0, terrain_levels: Sequence[TerrainMaker] | None = None):
-    """SubprocVecEnv için fabrika; her süreç kendi Gazebo dünyasını kurar."""
+             body_mass_scale: float = 1.0, terrain_levels: Sequence[TerrainMaker] | None = None,
+             **sensor_kwargs):
+    """SubprocVecEnv için fabrika; her süreç kendi Gazebo dünyasını kurar.
+    sensor_kwargs: range_sensors, lift_reflex, range_noise, range_drop."""
     def _init():
         env = HexapodEnv(task=task, physics_step=physics_step, terrain_sdf=terrain_sdf,
                          terrain_height=terrain_height, body_mass_scale=body_mass_scale,
-                         terrain_levels=terrain_levels)
+                         terrain_levels=terrain_levels, **sensor_kwargs)
         env.reset(seed=rank)
         return env
     return _init

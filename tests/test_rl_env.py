@@ -527,3 +527,28 @@ def test_mesafe_sensoru_olcumu_infoda_ve_basamagi_gorur(tmp_path_factory):
     finally:
         flat.close()
         stepped.close()
+
+
+def test_ortamda_refleks_kaldirmayi_secer(tmp_path_factory):
+    """lift_reflex verilince taban tripod'un kaldırmasını refleks seçer (salınım
+    başında): önünde 45 mm basamak görünce 60 mm; yürüyüş yönüne sensör
+    bakmıyorsa (geri) refleks devre dışı, tabanın kaldırması (25 mm)."""
+    from hexapod_policy.lift_reflex import LiftReflex, RangeSensor
+    from hexapod_rl.task import TaskConfig
+    from hexapod_rl.terrain_probe import step
+
+    sensor = RangeSensor(0.10, 0.0, 0.02, 0.0, 20.0, 1.0)
+    sdf, h = step(0.045, at_x=0.3)
+    e = HexapodEnv(task=TaskConfig(action_mode="residual"), workdir=tmp_path_factory.mktemp("rf"),
+                   terrain_sdf=sdf, terrain_height=h, range_sensors=[sensor],
+                   lift_reflex=LiftReflex())
+    try:
+        zero = np.zeros(18, dtype=np.float32)
+        for command, want in (((0.05, 0.0, 0.0), 60.0), ((-0.05, 0.0, 0.0), 25.0)):
+            e.reset(seed=0, options={"command": command})
+            lifts = [e.step(zero)[4]["lift_mm"] for _ in range(40)]   # > bir salınım
+            assert lifts[-1] == pytest.approx(want), (command, lifts)
+        with pytest.raises(ValueError):                              # yerleşimsiz refleks
+            HexapodEnv(task=TaskConfig(action_mode="residual"), lift_reflex=LiftReflex())
+    finally:
+        e.close()
