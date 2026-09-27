@@ -1,8 +1,10 @@
 # Eğitim kayıtları
 
-Bütün PPO/taklit eğitimlerinin hafif kayıtları (2026-09-24 – 26). Eğitimi yapan
+Bütün PPO/taklit eğitimlerinin hafif kayıtları (2026-09-24 – 27). Eğitimi yapan
 makinede `~/hexapod_runs/<ad>/` altındaydılar; bilgisayar değişince kaybolmasın
-diye buraya kopyalandı.
+diye buraya kopyalandı. Aşağıda "→ models/<ad>" ile gösterilen eski modellerin
+bir kısmı (`tork_v2_10M`, `ppo_v4_4M`, `ppo_v7_8M`, `ppo_res_250k`,
+`ppo_lift50_2250k`) 2026-09-27'de depodan kaldırıldı; git geçmişinde.
 
 Her klasörde (varsa):
 

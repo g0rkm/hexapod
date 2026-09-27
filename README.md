@@ -319,7 +319,7 @@ ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.1}}"
 
 Her yöne model geri (`x: -0.1`), yana (`linear: {y: 0.06}`) ve dönüş (`angular: {z: 0.4}`) komutlarında da yürür; sıfıra yakın komutta ayakta bekler.
 
-Politika yalnızca eğitildiği komutları yürür (eski `ppo_res_250k` yalnız ileri 0.05–0.15 m/s). Komut kesilirse,
+Politika yalnızca eğitildiği komutları yürür (hangi model ne için: `models/README.md`). Komut kesilirse,
 IMU gelmezse ya da robot devrilirse ayakta duruşa geçer.
 
 ## RL eğitimi (WSL)

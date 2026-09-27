@@ -1,6 +1,6 @@
 """Basit deneme zeminleri: eğim ve basamakta tripod ile politikaları karşılaştır (G7).
 
-    python -m hexapod_rl.terrain_probe tripod models/ppo_res_250k/model.zip:residual
+    python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip
     python -m hexapod_rl.terrain_probe tripod phase AD/best_model.zip:residual --vx 0.1
 
 Model tanımı: "tripod" (Samet'in TripodGait'i), "phase" (düzeltmesiz

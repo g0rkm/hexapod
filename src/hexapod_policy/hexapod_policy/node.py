@@ -1,6 +1,6 @@
 """Politika düğümü (GOREVLER.md G8).
 
-    ros2 run hexapod_policy policy --ros-args -p policy:=/yol/models/ppo_v4_4M/policy.npz
+    ros2 run hexapod_policy policy --ros-args -p policy:=/yol/models/ppo_omni_250k/policy.npz
     ros2 run hexapod_policy policy --ros-args -p policy:=... -p use_sim_time:=true   # simde
 
 /imu (sensor_msgs/Imu) ve /cmd_vel (geometry_msgs/Twist) dinler, eğitilmiş

@@ -1,7 +1,7 @@
 """PPO eğitimi (Stable-Baselines3), paralel süreç içi Gazebo ortamlarıyla.
 
     python -m hexapod_rl.train --steps 1000000 --envs 8 --name deneme1
-    python -m hexapod_rl.train --steps 5000000 --name v3 --init-from models/tork_v2_10M/model.zip
+    python -m hexapod_rl.train --steps 3000000 --envs 16 --name v3 --residual --omni --init-from models/ppo_omni_250k/model.zip
     python -m hexapod_rl.train --steps 10000000 --name v5 --init-from ~/hexapod_runs/bc/model.zip --randomize
 
 --init-from: sıfırdan değil, eğitilmiş bir modelin ağırlıklarından devam

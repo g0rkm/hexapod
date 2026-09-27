@@ -1,19 +1,37 @@
 # Eğitilmiş politikalar
 
-Her klasör bir PPO eğitiminin son modeli (`model.zip`, Stable-Baselines3) ve
-değerlendirmesi. `policy.npz`: aynı politikanın torch'suz hâli (robotta
-`hexapod_policy` düğümü okur; `python -m hexapod_rl.export <model.zip>` üretir). Eğitimlerin tam çıktıları (ara kayıtlar, `progress.csv`)
-eğitimi yapan makinede `~/hexapod_runs/<ad>/` altında; depoda yalnızca
-kayda değer modeller tutulur.
+Her klasör bir PPO eğitiminin modeli (`model.zip`, Stable-Baselines3), görev
+ayarı (`gorev.json`) ve `policy.npz`: aynı politikanın torch'suz hâli (robotta
+`hexapod_policy` düğümü okur; `python -m hexapod_rl.export <model.zip>`
+üretir). Eğitimlerin tam çıktıları (ara kayıtlar) eğitimi yapan makinede
+`~/hexapod_runs/<ad>/` altında, hafif kayıtları `egitim_kayitlari/`'nda;
+depoda yalnızca kullanılan modeller tutulur.
 
-Değerlendirmek için (WSL, ortam: `tools/wsl/rl_kurulum.sh`):
+**Depodaki modeller (2026-09-27):**
+
+| Model | Ne için |
+|---|---|
+| `ppo_omni_250k` | düz zemin, her yöne, en verimli (taban 25 mm) |
+| `ppo_lift50_3750k` | zemin, sensörsüz (taban 50 mm; düzde pahalı) |
+| `ppo_kaldirma35_250k` | orta yol (kör ~35 mm); mesafe sensörlü refleksle düzde en verimli |
+| `ppo_refleks_1500k` | refleks açıkken eğitildi; refleksle engelde en iyi |
+| `taklit_bc_v4` | yalnız testler (mutlak mod, taklit) |
+
+Eski modeller (`tork_v2_10M`, `ppo_v4_4M`, `ppo_v7_8M`, `ppo_res_250k`,
+`ppo_lift50_2250k`) 2026-09-27'de depodan kaldırıldı: yerlerini yukarıdakiler
+aldı. Aşağıdaki bölümleri ve tabloları tarihçe olarak duruyor; dosyalar git
+geçmişinde (`git log --all -- models/<ad>`).
+
+Değerlendirmek için (WSL, ortam: `tools/wsl/rl_kurulum.sh`; görev ayarı
+modelin `gorev.json`'ından):
 
 ```bash
-python -m hexapod_rl.evaluate models/ppo_omni_250k/model.zip --residual --vx -0.1   # geri
-python -m hexapod_rl.evaluate models/ppo_omni_250k/model.zip --residual --vx 0 --wz 0.4
-python -m hexapod_rl.evaluate models/ppo_v4_4M/model.zip --vx 0.1 --noise 0.1
+python -m hexapod_rl.evaluate models/ppo_omni_250k/model.zip --vx -0.1   # geri
+python -m hexapod_rl.evaluate models/ppo_omni_250k/model.zip --vx 0 --wz 0.4
+python -m hexapod_rl.evaluate models/ppo_omni_250k/model.zip --vx 0.1 --noise 0.25
 python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Samet'in tripod'u
-python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip:residual
+python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip
+python -m hexapod_rl.reflex_probe --model models/ppo_kaldirma35_250k/model.zip --pitch 20
 ```
 
 ## Mesafe sensörlü kaldırma refleksi (2026-09-27)
@@ -358,7 +376,7 @@ orada engelde ödül farkı yok, düzde güç cezası aşağı itiyor.
 
 **Gerçek robotta DENENMEDİ.**
 
-## Zeminli eğitim — `ppo_lift50_3750k` ve `ppo_lift50_2250k` (2026-09-26 öğleden sonra)
+## Zeminli eğitim — `ppo_lift50_3750k` ve `ppo_lift50_2250k` (2026-09-26 öğleden sonra; 2250k (depodan kaldırıldı 2026-09-27; git geçmişinde))
 
 İlk zeminde eğitilmiş politika. Her yöne, artık eylem; **taban tripod ayağı
 50 mm kaldırıyor** (öncekiler 25 mm). Eğitim 16 ortamda, deneme zeminleriyle
@@ -554,7 +572,7 @@ Hiçbiri devrilmedi.
 
 **Gerçek robotta DENENMEDİ.**
 
-## Artık eylem (tripod + düzeltme) — en iyi sonuç (2026-09-26 sabah)
+## Artık eylem (tripod + düzeltme) — ilk sonuç (2026-09-26 sabah)
 
 `ppo_res_250k`: politika eklem açısını değil, adım saatinin tripod'una
 (`hexapod_policy.tripod.PhaseTripod`) eklenen düzeltmeyi üretir (`--residual`).
@@ -630,7 +648,7 @@ Hiçbiri devrilmedi. Özet: gürültü altında PPO hızını koruyor ve en yük
 kaybediyor. Gürültüsüz düz zeminde tripod hâlâ biraz önde, PPO 3–4 kat
 enerji harcıyor. Asıl karşılaştırma zeminli dünyalarda yapılacak (S5, S6).
 
-## tork_v2_10M — ilk yürüyen politika (2026-09-25)
+## tork_v2_10M — ilk yürüyen politika (2026-09-25) (depodan kaldırıldı 2026-09-27; git geçmişinde)
 
 - **Eğitim:** 10M adım, 8 paralel ortam, 8.1 saat (341 adım/s). Tork tabanlı
   servo modeli (`hexapod_rl.sim`), ödül v2 (`hexapod_rl.task`, ilerleme +
@@ -667,7 +685,7 @@ düzeltmedi (10 s'de −119..−124°). v3'ün anlık hız izleme terimleri PPO'
 keşif gürültüsünde dönen yürüyüşü düz yürüyüşten çok ödüllendiriyordu;
 ödül v4 bu terimlerde 0.5 s'lik ortalama hıza bakıyor (`hexapod_rl.task`).
 
-## ppo_v4_4M — ödül v4, taklitten PPO (2026-09-26)
+## ppo_v4_4M — ödül v4, taklitten PPO (2026-09-26) (depodan kaldırıldı 2026-09-27; git geçmişinde)
 
 - **Eğitim:** taklit_bc_v4'ten başlayarak 4M adım, 8 paralel ortam, ~2.3 saat
   (~500 adım/s). 5M planlanmıştı; bilgisayar kapatılacağı için 4.17M'de
@@ -681,7 +699,7 @@ keşif gürültüsünde dönen yürüyüşü düz yürüyüşten çok ödüllend
 
 **Gerçek robotta DENENMEDİ** (tork_v2_10M'deki not geçerli).
 
-## ppo_v7_8M — düşük gürültüyle devam, ödül v6 (2026-09-26)
+## ppo_v7_8M — düşük gürültüyle devam, ödül v6 (2026-09-26) (depodan kaldırıldı 2026-09-27; git geçmişinde)
 
 - **Eğitim:** iki aşama, ikisi de rastgeleleştirme açık.
   1. v5_dr: taklitten (bc_v5), ödül v5, lr 3e-4, std 0.15 → 0.094,
@@ -698,7 +716,7 @@ keşif gürültüsünde dönen yürüyüşü düz yürüyüşten çok ödüllend
 
 **Gerçek robotta DENENMEDİ.**
 
-## ppo_res_250k — artık eylem, en iyi (2026-09-26)
+## ppo_res_250k — artık eylem, ilk (2026-09-26) (depodan kaldırıldı 2026-09-27; git geçmişinde)
 
 - **Eğitim:** taklit (bc_res: düzeltme 0, kritik tripod + gürültünün
   getirileriyle; 64 bölüm, 63 s) sonra PPO v9_res: ödül v6, artık eylem

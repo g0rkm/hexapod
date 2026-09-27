@@ -1,6 +1,6 @@
 """Eğitilmiş politikayı Pi'de torch'suz çalışacak biçime aktar (GOREVLER.md G8).
 
-    python -m hexapod_rl.export models/ppo_v4_4M/model.zip       # -> models/ppo_v4_4M/policy.npz
+    python -m hexapod_rl.export models/ppo_omni_250k/model.zip   # -> models/ppo_omni_250k/policy.npz
     python -m hexapod_rl.export model.zip --out /yol/policy.npz
 
 SB3 PPO'nun aktör ağı (gözlem -> eylem ortalaması) numpy dizilerine yazılır;
