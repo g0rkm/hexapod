@@ -114,6 +114,51 @@ kalıp politikanın kendi (kör, ~35 mm) kaldırmasına dönüyor
 
 **Gerçek robotta DENENMEDİ.**
 
+### Refleks açıkken eğitim — `ppo_refleks_1500k` (v24, 2026-09-27)
+
+`ppo_kaldirma35_250k`'nın eklemleri ~35 mm kaldırmayla eğitilmişti; refleks
+kaldırmayı 25–60 mm arasında değiştiriyor. `train.py --reflex 20
+--range-noise 5 --range-drop 10` ile 3M adım (deneme zeminleri, her yöne,
+rastgeleleştirme açık; yerleşim ileri + ±90°; 29 dk, 1742 adım/s):
+kaldırmayı refleks seçiyor, eklemler buna uyum sağlıyor; yürüyüş yönüne
+sensör bakmıyorsa politikanın kendi kaldırması. Ara kayıt seçimi refleksle
+ölçüyor, en iyisi 1.5M.
+
+Refleksle ölçüm (gürültülü sensör, önde 0°/±25°, 20° aşağı; yukarıdaki
+tabloyla aynı koşul):
+
+| Model | düz güç | basamak 45 | basamak 60 | çukur 45 | engebe 40 | engebe 60 | yokuş 20 |
+|---|---|---|---|---|---|---|---|
+| ppo_kaldirma35_250k | **3.95 W** | 0.98 | 0.86 | 0.98 | 0.89 | 0.78 | 0.87 |
+| v24 1M | 4.26 W | 0.98 | 0.76 | 1.01 | 0.79 | 0.90 | 0.91 |
+| **ppo_refleks_1500k** (v24 1.5M) | 4.37 W | **1.01** | 0.89 | **1.02** | 0.89 | **0.90** | 0.92 |
+| v24 2M | 4.41 W | 1.00 | **0.99** | 1.02 | 0.88 | 0.86 | 0.93 |
+| v24 3M (son) | 4.36 W | 1.00 | 0.71 (2/3) | 1.03 | 0.94 | 0.85 | 0.92 |
+
+Dört yönde (ileri + ±90° yerleşim, yürüyüş yönünde 45 mm basamak; ileri /
+sola / geri kör / çapraz): ppo_kaldirma35_250k 0.97 / 0.60 / 0.73 / 0.76,
+düz güç 3.95 / 3.67 / 4.47 / 3.76 W; ppo_refleks_1500k 1.01 / 0.57 / 0.79
+/ 0.80, düz güç 4.37 / 3.97 / 5.21 / 4.05 W.
+
+Kapalı döngü (policy.npz + PolicyController + refleks + süreç içi Gazebo,
+ROS'suz, 10 s): 45 mm basamak 0.98 m (ppo_kaldirma35_250k 0.94), **60 mm
+basamağın tamamen üstünde** 0.63 m, z 158 mm (ppo_kaldirma35_250k 0.48 m,
+yarı yolda); düz 1.03 m, 25 mm.
+
+Refleks olmadan (sensör arızası; deterministik, rastgeleleştirme kapalı):
+kaldırma ~34 mm, 45 mm basamak 0.78 m, engebe 40 0.89 m, düz 2.80 W
+(ppo_kaldirma35_250k 2.39 W).
+
+- **Engelde daha iyi, düzde daha pahalı:** refleksle eğitim 60 mm basamak
+  ve engebe 60'ı iyileştirdi ama aynı 25 mm kaldırmada düz güç %8–17 arttı
+  (eklemler sertleşiyor; zemin eğitimlerinin bilinen eğilimi, ders 33).
+- **Hangisi ne zaman:** engebeli, basamaklı arazide `ppo_refleks_1500k`;
+  düz ağırlıklı kullanımda `ppo_kaldirma35_250k` (ikisi de refleksle).
+  Robot düğümüne refleks bağlanana kadar (S7, D8) ikisi de kör çalışır:
+  kör davranışta da `ppo_kaldirma35_250k` düzde daha verimli.
+
+**Gerçek robotta DENENMEDİ.**
+
 ## Müfredat: kolaydan zora zemin (2026-09-27, v22–v23)
 
 `train.py --curriculum deneme` (`terrain_probe.CURRICULA`): her ortam bir zemin

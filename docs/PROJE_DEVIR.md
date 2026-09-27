@@ -313,7 +313,7 @@ artık geçersiz ya da güncellendi:
 | 5 | Klasik yürüyüş (tripod) | ✅ Samet: `hexapod_gait` (S2), `hexapod_teleop` (S3) |
 | 6 | Gerçek robot sürücü düğümü (`hexapod_hardware`) | ✅ Samet (S4); yalnız dry-run, donanımda denenmedi |
 | 7 | RL ortamı (`hexapod_rl`) | ✅ (G6); tripod aynı ortamda ölçüldü |
-| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_omni_250k` (her yöne); zeminde `models/ppo_lift50_3750k` (deneme zeminlerinde eğitildi, 45–60 mm engeller); arada `models/ppo_kaldirma35_250k` (düzde +%20 güçle 45 mm engeller). Asıl zeminler S5'i bekliyor |
+| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_omni_250k` (her yöne); zeminde `models/ppo_lift50_3750k` (deneme zeminlerinde eğitildi, 45–60 mm engeller); arada `models/ppo_kaldirma35_250k` (düzde +%20 güçle 45 mm engeller); mesafe sensörlü refleksle (S7/D8'i bekliyor) `ppo_kaldirma35_250k` düzde verimli, refleks açıkken eğitilen `models/ppo_refleks_1500k` engelde en iyisi. Asıl zeminler S5'i bekliyor |
 | 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu Gazebo'da yürüdü; son G7 politikasıyla tekrar aktarılacak |
 | 10 | Pi 4'e aktarma | ⛔ donanım vardiyası (D11) |
 
@@ -421,6 +421,14 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
   dönüyor (`covers`); dört yönde de 45 mm basamak geçiliyor. Robot
   düğümüne bağlanması S7 ve D8'i bekliyor.
   Tablolar: models/README ("Mesafe sensörlü kaldırma refleksi").
+- **Refleks açıkken eğitim (v24, 2026-09-27): `models/ppo_refleks_1500k`.**
+  `train.py --reflex 20 --range-noise 5 --range-drop 10`,
+  `ppo_kaldirma35_250k`'dan 3M; kaldırmayı refleks seçiyor, eklemler uyum
+  sağlıyor. Refleksle 60 mm basamak 0.86 → 0.89 (2M'de 0.99), engebe 60
+  0.78 → 0.90; kapalı döngüde 60 mm basamağın tamamen üstüne çıkıyor (0.63
+  m, z 158 mm; öteki 0.48 m yarı yolda). Bedeli: aynı 25 mm kaldırmada düz
+  güç %8–17 fazla (3.95 → 4.37 W). Refleks olmadan da çalışıyor (kör ~34
+  mm). Engebeli arazide bu, düz ağırlıklı kullanımda `ppo_kaldirma35_250k`.
 - **Müfredat (2026-09-27, v22–v23; `--curriculum`, §7.8):** sabit 25 mm
   tabanda müfredat küçük bir kazanç getirdi (engel skoru 0.338 → 0.371, v12
   0.316) ama 45 mm'lik engel yok. Öğrenilmiş kaldırmayla (25 mm'den) v20'nin
@@ -1373,6 +1381,7 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | Deneme zeminlerine kaygan (μ) ve engebe (`rough`) eklendi; v17 (bunlarla eğitim) depoya alınmadı | G7 "bitti" şartının üç türü ölçülebilsin. v17 engel skorunu 0.763'ten 0.68–0.72'ye düşürdü (ders 34) |
 | 09-26 | Ödül v7 (`progress_overshoot`) eklendi ama varsayılan 0 (v6) kaldı; v15/v16 modelleri depoya alınmadı | Aşma biraz azaldı, enerji azalmadı, katsayı 3'te zemin bozuldu (ders 33). Raporlar ortak ödülle (`standard_reward`, v6) |
 | 09-26 | v14 (std 0.05, 2M) → `ppo_lift50_3750k` depoya; ara kayıt rastgeleleştirmeli 3 tohumla elle seçildi | Düzde aşma azalmadı ama 60 mm basamak 3/3, zemin skoru 0.957; eğitim içi deterministik seçim (500k) ikili durumlarda gürültülü (ders 32) |
+| 09-27 | v24'ün 1.5M'i `ppo_refleks_1500k` olarak depoya; `ppo_kaldirma35_250k` yerinde kalıyor | Refleksle engelde en iyi (60 mm basamak, engebe 60) ama düzde %8–17 pahalı; ikisi farklı kullanıma. En iyi ara kayıt refleksli ölçümle seçildi; 2M 60 mm basamakta daha iyi (0.99) ama çaprazda ve geride (kör) daha kötü, düzde daha pahalı |
 | 09-27 | **Mesafe sensörlü kaldırma refleksi** (`LiftReflex`) eğitimsiz bir kural olarak; mesafe sensörü simde yalnız `info`'da, gözleme girmedi | Kural düzde 25 mm'nin enerjisinde, engelde 50 mm'den iyi (ders 41); politikaya sensör gözlemi verip yeniden eğitmek gerekmeden ödünleşimi çözüyor. Sensör gözlemli RL denenmedi: yerleşim ve sensör davranışı (D8, S7) bilinmeden gözlemi sabitlemek erken |
 | 09-27 | **Müfredat** (`--curriculum`, `CURRICULA`) eklendi, varsayılan değil; v22/v23 modelleri alınmadı | Sabit 25 mm tabanda 45 mm engel yok; öğrenilmiş kaldırmada yerel en iyiden çıkardı ama iyi bir başlangıçtan (35 mm) daha iyi bir yere varmadı (ders 40). S5'in zeminleri için altyapı olarak kalıyor |
 | 09-27 | Dayanıklılık taraması (`Perturbation`, `robustness`); IMU eğikliği ve uzun gecikme eğitime **eklenmedi** | 20°'lik IMU eğikliği ve 240 ms gecikme hiçbir modeli bozmadı. Hassas olunanlar kalibrasyon ofseti (σ ≥ 3°) ve servo gücü (×0.5 altı); ofseti politika göremiyor ve tripod da aynı kaybediyor, önce donanımda ölçülmeli (D6, D9), sonra aralığı eğitime girer (D10) |
@@ -1846,7 +1855,8 @@ zeminler.
     bağlama (S7'nin mesafe konuları + D8'in yerleşimi robot.yaml'a
     girince); (b) geri yürüyüşte sensör yok (kör kaldırma, ~35 mm);
     (c) VL53L0X'in görüş konisi ve gerçek gürültüsü (S7/D8'de ölçülünce);
-    (d) sensör gözlemli RL; (e) refleks açıkken politikayı eğitmek.
+    (d) sensör gözlemli RL. (e) ✅ refleks açıkken eğitim: v24 →
+    `ppo_refleks_1500k` (engelde daha iyi, düzde %8–17 pahalı).
 
 **S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
 S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son

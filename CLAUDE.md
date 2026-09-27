@@ -207,7 +207,10 @@ donanım bilgileri config'e sonradan girilir.
    (tripod + öğrenilmiş düzeltme, her yöne); zeminde `models/ppo_lift50_3750k`
    (taban 50 mm ayak kaldırma, deneme zeminlerinde eğitildi, 60 mm engeller);
    arada `models/ppo_kaldirma35_250k` (öğrenilmiş kaldırma ~35 mm: düzde
-   +%20 güçle 45 mm engeller); asıl zeminler S5'i bekliyor
+   +%20 güçle 45 mm engeller). Mesafe sensörlü kaldırma refleksiyle
+   (`hexapod_policy.lift_reflex`, S7/D8'i bekliyor) düzde 25 mm'nin
+   enerjisi + engelde 50 mm'den iyi geçiş; refleks açıkken eğitilen
+   `models/ppo_refleks_1500k` engelde en iyisi. Asıl zeminler S5'i bekliyor
 7. 🔄 Pi 4'e aktarma: politika düğümü (`hexapod_policy`) ve sürücü düğümü
    (`hexapod_hardware`) yazıldı, simde çalışıyor; Pi'de denenmedi
 
