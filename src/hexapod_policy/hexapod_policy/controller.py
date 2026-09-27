@@ -28,6 +28,14 @@ Eğitim aralığının dışındaki komut aralığa kırpılır (clipped_command
 Artık eylem modunda (sözleşme action_mode = "residual") hedef, adım
 saatinin tripod'u (tripod.PhaseTripod; eğitimdekiyle aynı kod) + politikanın
 düzeltmesidir; bunun için robotun kinematiği (kin) verilmelidir.
+
+Mesafe sensörlü kaldırma refleksi (isteğe bağlı; lift_reflex, 2026-09-27):
+range_sensors (yerleşim) + reflex verilirse her salınımın başında taban
+tripod'un ayak kaldırmasını refleks seçer (on_ranges ile gelen mesafeler +
+IMU). Mesafe gelmiyor ya da bayatsa (range_timeout_s) refleks devre dışı,
+politika kör davranışına döner: kaldırma çıkışı varsa onun seçtiği, yoksa
+tabanın sabit kaldırması (reflex_status). Yerleşim robot.yaml'dan (D8)
+gelmeli; bu katman varsayılan koymaz.
 """
 
 from __future__ import annotations
@@ -37,6 +45,7 @@ from typing import Sequence
 
 import numpy as np
 
+from .lift_reflex import LiftReflex, RangeSensor, obstacle_height
 from .mlp import MlpPolicy
 from .tripod import PhaseTripod
 
@@ -61,7 +70,9 @@ class PolicyController:
 
     def __init__(self, policy: MlpPolicy, limits: Sequence[tuple[float, float]],
                  cmd_timeout_s: float = 0.5, imu_timeout_s: float = 0.2,
-                 max_tilt_deg: float = 45.0, kin=None) -> None:
+                 max_tilt_deg: float = 45.0, kin=None,
+                 range_sensors: Sequence[RangeSensor] | None = None,
+                 reflex: LiftReflex | None = None, range_timeout_s: float = 0.2) -> None:
         c = policy.contract
         self.base = None
         if c.action_mode == "residual":
@@ -88,6 +99,19 @@ class PolicyController:
         self.clipped_command = False
         self.lift_mm: float | None = None   # öğrenilmiş ayak kaldırmada son seçilen, mm
         self._lift_group: int | None = None
+        # mesafe sensörlü kaldırma refleksi
+        self.range_sensors = tuple(range_sensors) if range_sensors else None
+        self.reflex = reflex
+        if (self.reflex is None) != (self.range_sensors is None):
+            raise ValueError("refleks için mesafe sensörü yerleşimi ve LiftReflex birlikte verilir")
+        if self.reflex is not None and self.base is None:
+            raise ValueError("refleks taban tripod'un kaldırmasını seçer: yalnız artık eylem modunda")
+        self.range_timeout_s = range_timeout_s
+        self._ranges: tuple[float, ...] | None = None
+        self._ranges_at = -math.inf
+        self._ranges_new = False
+        self._reflex_lift: float | None = None
+        self.reflex_status: str | None = None   # "görüyor" / "mesafe yok" / "mesafe bayat"
 
     # -- girdiler -----------------------------------------------------------------
 
@@ -103,6 +127,17 @@ class PolicyController:
         self._imu = (tuple(v / n for v in q), tuple(float(v) for v in gyro))
         self._imu_at = now
 
+    def on_ranges(self, distances: Sequence[float], now: float) -> None:
+        """Mesafe sensörlerinin yeni ölçümü, m, range_sensors sırasıyla (menzil
+        dışı: sensörün max_m'si). Bozuk ölçüm yok sayılır; bayatlayınca refleks
+        devre dışı kalır."""
+        if self.range_sensors is None:
+            return
+        d = tuple(float(v) for v in distances)
+        if len(d) != len(self.range_sensors) or not all(math.isfinite(v) and v >= 0 for v in d):
+            return
+        self._ranges, self._ranges_at, self._ranges_new = d, now, True
+
     # -- kontrol adımı ------------------------------------------------------------
 
     def tick(self, now: float) -> list[float]:
@@ -111,6 +146,9 @@ class PolicyController:
         if reason is not None:
             self._phase = 0.0
             self.lift_mm, self._lift_group = None, None
+            if self.reflex is not None:
+                self.reflex.reset()
+                self._reflex_lift = None
             self._targets = list(self.stand)
             self.status = reason
             return list(self._targets)
@@ -118,13 +156,20 @@ class PolicyController:
         command = self._effective_command()
         out = np.clip(self.policy(self.observation(command)), -1.0, 1.0)
         action = out[:c.action_size]
-        if c.lift_range is not None and self.base is not None:
-            # son çıkış: ayak kaldırma (eğitimdeki eşlemeyle); eğitimdeki gibi yalnız
-            # salınımın ilk adımında seçilir, salınım boyunca sabit (hexapod_rl.env)
+        reflex_lift = self._update_reflex(now)
+        if self.base is not None and (c.lift_range is not None or self.reflex is not None):
+            # ayak kaldırma yalnız salınımın ilk adımında seçilir, salınım boyunca
+            # sabit (hexapod_rl.env ile aynı): refleks görüyorsa onun seçtiği, yoksa
+            # politikanın son çıkışı (eğitimdeki eşlemeyle), o da yoksa tabanınki
             group = self.base.swing_group(self._phase)
             if group != self._lift_group:
-                lo, hi = c.lift_range
-                self.lift_mm = lo + (float(out[c.action_size]) + 1.0) * 0.5 * (hi - lo)
+                if reflex_lift is not None:
+                    self.lift_mm = reflex_lift
+                elif c.lift_range is not None:
+                    lo, hi = c.lift_range
+                    self.lift_mm = lo + (float(out[c.action_size]) + 1.0) * 0.5 * (hi - lo)
+                else:
+                    self.lift_mm = None
                 self._lift_group = group
         if self.base is None:
             base, scale = c.default_rad, c.action_scale
@@ -147,6 +192,27 @@ class PolicyController:
         return obs
 
     # -- iç -----------------------------------------------------------------------
+
+    def _update_reflex(self, now: float) -> float | None:
+        """Refleksin kaldırması, mm; refleks yoksa ya da mesafe gelmiyorsa None.
+        Refleks yalnız YENİ bir ölçümle güncellenir (sensör kontrol hızından
+        yavaşsa aynı ölçüm art arda sayılmasın)."""
+        if self.reflex is None:
+            return None
+        if self._ranges is None or now - self._ranges_at > self.range_timeout_s:
+            self.reflex_status = "mesafe yok" if self._ranges is None else "mesafe bayat"
+            self.reflex.reset()
+            self._reflex_lift = None
+            return None
+        if self._ranges_new or self._reflex_lift is None:
+            g = gravity_in_base(self._imu[0])
+            stand = self.policy.contract.base_gait["height_mm"] / 1000.0
+            heights = [obstacle_height(s, d, g, stand)
+                       for s, d in zip(self.range_sensors, self._ranges)]
+            self._reflex_lift = self.reflex.update(now, heights)
+            self._ranges_new = False
+        self.reflex_status = "görüyor"
+        return self._reflex_lift
 
     def _hold_reason(self, now: float) -> str | None:
         if self._command is None:

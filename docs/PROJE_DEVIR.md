@@ -13,7 +13,7 @@
 > önceki: yeni bilgisayarda kurulum §0.5; zemine göre ayak teması §7.8;
 > her yöne politika `ppo_omni_250k` §3.2; kütle rastgeleleştirmesi;
 > zeminli eğitim `ppo_lift50_3750k` §3.3)
-> · Testler: **Linux 277/277**, Windows 228 geçti + 9 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 282/282**, Windows 232 geçti + 9 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -99,12 +99,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 228 geçti, 9 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 232 geçti, 9 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 277 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 282 geçti, ~40 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_res_250k/model.zip --residual --vx 0.1`.
      Beklenen: ~0.105 m/s, yön ~+5°, devrildi False.
    - ROS'lu sim: `ros2 launch hexapod_gazebo sim.launch.py`, ayrı terminalde
@@ -1035,6 +1035,19 @@ models/ppo_omni_250k/model.zip --residual --omni`.
   eğitimdeki gibi yalnız salınımın ilk adımında, beklemeden sonra ilk
   adımda yeniden seçilir (`ctl.lift_mm`). Eski dosyalarda alan yok,
   davranış aynı. ROS'lu simde `ppo_kaldirma35_250k` ile doğrulandı (§3.3).
+- **Mesafe sensörlü kaldırma refleksi** (2026-09-27): `PolicyController(...,
+  range_sensors=[RangeSensor...], reflex=LiftReflex())` + `on_ranges(mesafeler,
+  now)`. Her salınımın başında kaldırmayı refleks seçer (yalnız yeni ölçümle
+  güncellenir; sensör yavaşsa aynı ölçüm art arda sayılmaz). Mesafe yok ya
+  da `range_timeout_s` (0.2 s) bayatsa kör davranışa döner: kaldırma çıkışı
+  varsa onun, yoksa tabanın kaldırması (`reflex_status`). Yalnız artık eylem
+  modunda. Kapalı döngü (numpy politika + denetleyici + süreç içi Gazebo,
+  ROS'suz, `ppo_kaldirma35_250k`, 10 s): düzde refleks 25 mm (politika 35),
+  ikisi ~1.0 m; 45 mm basamak politika 0.70 m, refleks 0.94 m; 60 mm
+  basamak politika 0.07 m takılı, refleks 0.48 m (ön kısmı üstte).
+  **Düğüme bağlanmadı:** mesafe konuları S7'nin, yerleşim D8'in
+  (robot.yaml'da alan yok: `direction_deg` dışında yer ve aşağı açı
+  gerekecek); o zaman `node.py` konulara abone olup `on_ranges`'i çağırır.
 - Çıkarım: PC'de tick başına 44 µs; Pi 4 için <0.5 ms tahmini.
 - **ROS'lu simde her yön politikası** (`ppo_omni_250k`, 2026-09-26; tork
   servo modeli, hız gz poz yayınından sim zamanıyla, hareketin orta %80'i,
@@ -1057,8 +1070,8 @@ models/ppo_omni_250k/model.zip --residual --omni`.
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 228 geçti, 9 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 277 geçti, ~40 s (yeni PC).
+- Windows: 232 geçti, 9 atlandı, ~3 s.
+- WSL (ROS + venv kaynaklı): 282 geçti, ~40 s (yeni PC).
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.
@@ -1819,8 +1832,8 @@ zeminler.
     bölüm) denenmedi.
 17. ✅ **Mesafe sensörlü kaldırma refleksi** (ders 41, `lift_reflex`,
     `reflex_probe`): düz verim ↔ zemin ödünleşimi (madde 10) sensörle
-    çözülüyor. Açık: (a) robot düğümüne bağlama (S7'nin mesafe konuları +
-    D8'in yerleşimi robot.yaml'a girince); (b) yana/geri yürüyüş için
+    çözülüyor. Denetleyici çekirdeği hazır (§7.9). Açık: (a) düğüme
+    bağlama (S7'nin mesafe konuları + D8'in yerleşimi robot.yaml'a girince); (b) yana/geri yürüyüş için
     sensör ya da yedek kaldırma; (c) VL53L0X'in görüş konisi ve gerçek
     gürültüsü (S7/D8'de ölçülünce); (d) sensör gözlemli RL.
 
@@ -1897,7 +1910,7 @@ değerlendirmeler) depoda `egitim_kayitlari/`, önemli modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 228 geçti, 9 atlandı. WSL: 277 geçti.
+   - Windows: 232 geçti, 9 atlandı. WSL: 282 geçti.
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).

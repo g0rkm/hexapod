@@ -143,3 +143,49 @@ def test_her_yon_politikasi_robottaki_koduyla_yurur(tmp_path, command):
     if wz:
         assert turned / (wz * seconds) > 0.7 and math.hypot(dx, dy) < 0.05
     assert state.base_pos[2] > 0.08
+
+
+def test_refleksli_denetleyici_45_mm_basamagi_cikar(tmp_path):
+    """Robottaki yol, ROS'suz: ppo_kaldirma35_250k/policy.npz + mesafe sensörlü
+    refleks (DENEYSEL yerleşim) -> denetleyici -> Gazebo, 45 mm basamak. Mesafe
+    rangefinder.read ile simden (robotta sürücüden gelecek). Refleks basamağı
+    görüp kaldırmayı yükseltmeli ve robot basamağın üstüne çıkmalı; refleks
+    olmadan (yalnız politika, ~35 mm) de ölçülüp karşılaştırılır."""
+    from hexapod_kinematics import HexapodKinematics
+    from hexapod_policy.lift_reflex import LiftReflex, RangeSensor
+    from hexapod_rl import rangefinder
+    from hexapod_rl.terrain_probe import step
+
+    npz = REPO / "models" / "ppo_kaldirma35_250k" / "policy.npz"
+    config = RobotConfig.load(REPO / "config" / "robot.yaml")
+    model = RobotModel.from_config(config)
+    limits = [(model.limits[(int(n[3]), n.split("_")[1])].lower,
+               model.limits[(int(n[3]), n.split("_")[1])].upper) for n in joint_names(model.mounts)]
+    sensors = [RangeSensor(0.10, 0.0, 0.02, 0.0, 20.0, 1.0),
+               RangeSensor(0.095, 0.03, 0.02, 25.0, 20.0, 1.0),
+               RangeSensor(0.095, -0.03, 0.02, -25.0, 20.0, 1.0)]
+    sdf, height = step(0.045, at_x=0.3)
+    results = {}
+    for use_reflex in (False, True):
+        sim = HexapodSim(model, workdir=tmp_path / f"sim{int(use_reflex)}", terrain_sdf=sdf,
+                         terrain_height=height)
+        kw = dict(range_sensors=sensors, reflex=LiftReflex()) if use_reflex else {}
+        c = PolicyController(MlpPolicy.load(npz), limits,
+                             kin=HexapodKinematics.from_config(config), **kw)
+        state = sim.reset()
+        x0, lifts = state.base_pos[0], []
+        for _ in range(500):                                   # 10 s, 0.1 m/s ileri
+            now = state.time
+            c.on_imu(state.base_quat, state.ang_vel_in_base(), now)
+            c.on_command(0.1, 0.0, 0.0, now)
+            if use_reflex:
+                c.on_ranges(rangefinder.read(sensors, state.base_pos, state.base_quat, height),
+                            now)
+            state = sim.step(c.tick(now))
+            lifts.append(c.lift_mm)
+        results[use_reflex] = (state.base_pos[0] - x0, state.base_pos[2], max(lifts))
+        sim.close()
+    dist, z, top = results[True]
+    assert dist > 0.6 and z > 0.13, results                   # basamağın üstünde (0.1 + 0.045)
+    assert top > 55.0, results                                # refleks kaldırmayı yükseltti
+    assert results[False][2] < 40.0, results                  # yalnız politika: ~35 mm

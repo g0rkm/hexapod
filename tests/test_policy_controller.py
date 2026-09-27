@@ -330,3 +330,90 @@ def test_salinim_grubu_ayak_yorungesiyle_uyumlu():
         feet = tripod.feet(phase % 1.0, (0.1, 0.0, 0.0))
         assert all(feet[leg][2] > -100.0 for leg in groups[g]), phase
         assert all(feet[leg][2] == pytest.approx(-100.0) for leg in groups[1 - g]), phase
+
+
+def _reflex_controller(lift_range=None, **kw):
+    """Artık eylem, düzeltme 0; lift_range verilirse kaldırma çıkışı 20+0.5*... = 50 mm."""
+    from pathlib import Path
+
+    from hexapod_driver import RobotConfig
+    from hexapod_kinematics import HexapodKinematics
+    from hexapod_policy.lift_reflex import LiftReflex, RangeSensor
+
+    kin = HexapodKinematics.from_config(
+        RobotConfig.load(Path(__file__).resolve().parent.parent / "config" / "robot.yaml"))
+    base_gait = {"groups": [[0, 2, 4], [1, 3, 5]], "reach_mm": 130.0, "height_mm": 100.0,
+                 "lift_mm": 25.0}
+    c = PolicyContract(obs_size=OBS_SIZE, action_size=ACTION_SIZE, action_scale=0.5, gait_hz=1.5,
+                       control_hz=50.0, default_rad=DEFAULT, command_ranges=RANGES,
+                       action_mode="residual", residual_scale=0.2, base_gait=base_gait,
+                       lift_range=lift_range)
+    n = ACTION_SIZE + (1 if lift_range else 0)
+    bias = np.zeros(n)
+    if lift_range:
+        bias[-1] = 0.5                                        # -> 50 mm (20-60 aralığında)
+    policy = MlpPolicy([(np.zeros((n, OBS_SIZE)), bias)], "tanh", c)
+    sensor = RangeSensor(0.10, 0.0, 0.02, 0.0, 20.0, 1.0)
+    ctl = PolicyController(policy, [(-3.0, 3.0)] * ACTION_SIZE, kin=kin, range_sensors=[sensor],
+                           reflex=LiftReflex(), **kw)
+    ctl.on_imu(LEVEL, (0, 0, 0), 0.0)
+    ctl.on_command(0.1, 0.0, 0.0, 0.0)
+    flat = 0.12 / math.sin(math.radians(20.0))                # düz zeminde ışının boyu
+    step45 = (0.12 - 0.045) / math.sin(math.radians(20.0))    # 45 mm yüksekliğe çarpan
+    return ctl, flat, step45
+
+
+def _run(ctl, t0, n, distance=None):
+    """n kontrol adımı; distance verilirse her adımda yeni ölçüm. Son zaman."""
+    t = t0
+    for _ in range(n):
+        ctl.on_imu(LEVEL, (0, 0, 0), t)
+        ctl.on_command(0.1, 0.0, 0.0, t)
+        if distance is not None:
+            ctl.on_ranges([distance], t)
+        ctl.tick(t)
+        t += 0.02
+    return t
+
+
+def test_refleks_duzde_dusuk_engelde_yuksek_kaldirma():
+    """Düz zeminde refleks 25 mm; 45 mm engel görününce (art arda 2 ölçüm) bir
+    sonraki salınımdan itibaren 45 + 15 = 60 mm."""
+    ctl, flat, step45 = _reflex_controller()
+    t = _run(ctl, 0.0, 40, flat)
+    assert ctl.reflex_status == "görüyor" and ctl.lift_mm == pytest.approx(25.0)
+    t = _run(ctl, t, 40, step45)                              # > bir salınım
+    assert ctl.lift_mm == pytest.approx(60.0)
+
+
+def test_refleks_ayni_olcumu_iki_kez_saymaz_ve_bayatlayinca_kor_davranisa_doner():
+    """Sensör yavaşsa aynı ölçüm art arda sayılmaz (tek ölçüm = tek okuma);
+    mesafe gelmeyince kaldırma çıkışlı politikada politikanın seçtiği (50 mm)."""
+    ctl, flat, step45 = _reflex_controller(lift_range=(20.0, 60.0))
+    t = _run(ctl, 0.0, 40, flat)
+    assert ctl.lift_mm == pytest.approx(25.0)
+    ctl.on_ranges([step45], t)                                # tek bir yeni ölçüm
+    t = _run(ctl, t, 5)                                       # aynı ölçüm, yeni değil
+    assert ctl._reflex_lift == pytest.approx(25.0)            # art arda 2 okuma olmadı
+    t = _run(ctl, t + 0.3, 40)                                # 0.3 s ölçüm yok: bayat
+    assert ctl.reflex_status == "mesafe bayat" and ctl.lift_mm == pytest.approx(50.0)
+
+
+def test_refleks_mesafe_hic_gelmezse_tabanin_kaldirmasi():
+    ctl, _, _ = _reflex_controller()
+    _run(ctl, 0.0, 40)
+    assert ctl.reflex_status == "mesafe yok" and ctl.lift_mm is None   # taban: 25 mm sabit
+
+
+def test_refleks_yanlis_kurulum_reddedilir():
+    from hexapod_policy.lift_reflex import LiftReflex, RangeSensor
+
+    c = PolicyContract(obs_size=OBS_SIZE, action_size=ACTION_SIZE, action_scale=0.5, gait_hz=1.5,
+                       control_hz=50.0, default_rad=DEFAULT, command_ranges=RANGES)
+    policy = MlpPolicy([(np.zeros((ACTION_SIZE, OBS_SIZE)), np.zeros(ACTION_SIZE))], "tanh", c)
+    sensor = RangeSensor(0.10, 0.0, 0.02, 0.0, 20.0, 1.0)
+    with pytest.raises(ValueError):                           # mutlak mod: taban yok
+        PolicyController(policy, [(-3.0, 3.0)] * ACTION_SIZE, range_sensors=[sensor],
+                         reflex=LiftReflex())
+    with pytest.raises(ValueError):                           # yerleşimsiz refleks
+        PolicyController(policy, [(-3.0, 3.0)] * ACTION_SIZE, reflex=LiftReflex())
