@@ -37,6 +37,12 @@ class PhaseTripod:
     height_mm: float          # gövde yüksekliği
     lift_mm: float = 25.0     # salınımda ayak kaldırma
 
+    @staticmethod
+    def swing_group(phase: float) -> int:
+        """phase anında havadaki grup: 0 -> groups[0], 1 -> groups[1]. Değiştiği
+        adım yeni bir salınımın başı (öğrenilmiş kaldırma orada seçilir)."""
+        return 0 if phase % 1.0 < 0.5 else 1
+
     def feet(self, phase: float, command, lift_mm: float | None = None) -> dict[int, Vec3]:
         """Adım saatinin phase ([0, 1)) anında ayak hedefleri, gövde çerçevesi, mm.
         lift_mm: bu an için ayak kaldırma (öğrenilmiş kaldırma; verilmezse

@@ -98,6 +98,7 @@ class HexapodEnv(gym.Env):
         self._state = None
         self._command = (0.0, 0.0, 0.0)
         self._phase = 0.0
+        self._lift, self._lift_group = None, None   # öğrenilmiş kaldırma: salınım başında seçilen
         self._steps = 0
         self._prev_action = [0.0] * self.n_actions
         self._vel = VelocityFilter(self.dt, self.task.vel_filter_s)
@@ -114,6 +115,7 @@ class HexapodEnv(gym.Env):
         if options and "command" in options:
             self._command = tuple(float(v) for v in options["command"])
         self._phase = 0.0
+        self._lift, self._lift_group = None, None
         self._steps = 0
         self._prev_action = [0.0] * self.n_actions
         self._vel.reset()
@@ -127,7 +129,14 @@ class HexapodEnv(gym.Env):
         if self.task.lift_action is not None:   # son eylem: ayak kaldırma
             if len(action) != self.n_actions:
                 raise ValueError(f"{self.n_actions} eylem bekleniyordu, {len(action)} geldi")
-            lift = lift_from_action(action[ACTION_SIZE], self.task.lift_action)
+            # Yalnız salınımın ilk adımında seçilir, salınım boyunca sabit: her adım
+            # seçilse keşif gürültüsü bir salınım içinde ortalanır ve yüksek bir
+            # salınım hiç denenmez (v18, v19); yörünge de titrer.
+            group = self.base.swing_group(self._phase)
+            if group != self._lift_group:
+                self._lift = lift_from_action(action[ACTION_SIZE], self.task.lift_action)
+                self._lift_group = group
+            lift = self._lift
         if self.base is None:
             targets = action_to_targets(action, self.default, self.task.action_scale, self.limits)
         else:   # artık eylem: tripod(saat, komut[, kaldırma]) + düzeltme

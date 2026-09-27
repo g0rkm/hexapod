@@ -268,3 +268,65 @@ def test_ogrenilmis_ayak_kaldirma_tabana_gecer():
         lift = 50.0                                        # son katman doğrusal: çıkış = sapma
         assert ctl.lift_mm == pytest.approx(lift)
         assert targets == pytest.approx(tripod.targets(phase, (0.1, 0.0, 0.0), lift), abs=1e-9)
+
+
+def test_ogrenilmis_ayak_kaldirma_salinim_boyunca_sabit():
+    """Kaldırma eğitimdeki gibi yalnız salınımın ilk adımında seçilir: çıkış
+    salınım ortasında değişse de yeni salınıma kadar eski değer kalır; durunca
+    (bekleme) sıfırlanır ve ilk adımda yeniden seçilir."""
+    from pathlib import Path
+
+    from hexapod_driver import RobotConfig
+    from hexapod_kinematics import HexapodKinematics
+
+    kin = HexapodKinematics.from_config(
+        RobotConfig.load(Path(__file__).resolve().parent.parent / "config" / "robot.yaml"))
+    base_gait = {"groups": [[0, 2, 4], [1, 3, 5]], "reach_mm": 130.0, "height_mm": 100.0,
+                 "lift_mm": 25.0}
+    c = PolicyContract(obs_size=OBS_SIZE, action_size=ACTION_SIZE, action_scale=0.5, gait_hz=1.5,
+                       control_hz=50.0, default_rad=DEFAULT, command_ranges=RANGES,
+                       action_mode="residual", residual_scale=0.2, base_gait=base_gait,
+                       lift_range=(20.0, 60.0))
+
+    def policy(lift_out):
+        bias = np.zeros(ACTION_SIZE + 1)
+        bias[-1] = lift_out
+        return MlpPolicy([(np.zeros((ACTION_SIZE + 1, OBS_SIZE)), bias)], "tanh", c)
+
+    ctl = PolicyController(policy(-1.0), [(-3.0, 3.0)] * ACTION_SIZE, kin=kin)
+    ctl.on_imu(LEVEL, (0, 0, 0), 0.0)
+    ctl.on_command(0.1, 0.0, 0.0, 0.0)
+    ctl.tick(0.0)
+    assert ctl.lift_mm == pytest.approx(20.0)            # ilk adım: seçildi
+    ctl.policy = policy(1.0)
+    while ctl._phase < 0.5:                               # ilk salınım sürüyor
+        ctl.tick(0.0)
+        assert ctl.lift_mm == pytest.approx(20.0)
+    ctl.tick(0.0)
+    assert ctl.lift_mm == pytest.approx(60.0)            # öteki grubun salınımı başladı
+    ctl.policy = policy(0.0)
+    ctl.tick(10.0)                                        # IMU bayat: bekler
+    assert ctl.lift_mm is None and ctl._phase == 0.0
+    ctl.on_imu(LEVEL, (0, 0, 0), 10.0)
+    ctl.on_command(0.1, 0.0, 0.0, 10.0)
+    ctl.tick(10.0)
+    assert ctl.lift_mm == pytest.approx(40.0)            # yeniden başlarken hemen seçilir
+
+
+def test_salinim_grubu_ayak_yorungesiyle_uyumlu():
+    """swing_group'un söylediği grup gerçekten havada, öteki yerde."""
+    from pathlib import Path
+
+    from hexapod_driver import RobotConfig
+    from hexapod_kinematics import HexapodKinematics
+    from hexapod_policy.tripod import PhaseTripod
+
+    kin = HexapodKinematics.from_config(
+        RobotConfig.load(Path(__file__).resolve().parent.parent / "config" / "robot.yaml"))
+    groups = ((0, 2, 4), (1, 3, 5))
+    tripod = PhaseTripod(kin, groups, 1.5, 130.0, 100.0, 25.0)
+    for phase in (0.1, 0.3, 0.45, 0.6, 0.8, 0.95, 1.2):
+        g = PhaseTripod.swing_group(phase)
+        feet = tripod.feet(phase % 1.0, (0.1, 0.0, 0.0))
+        assert all(feet[leg][2] > -100.0 for leg in groups[g]), phase
+        assert all(feet[leg][2] == pytest.approx(-100.0) for leg in groups[1 - g]), phase

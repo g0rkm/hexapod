@@ -47,7 +47,8 @@ class PolicyContract:
     command_deadband: float = 0.0
     # Öğrenilmiş ayak kaldırma (2026-09-27): (en az, en çok) mm verilirse ağın
     # action_size'dan sonraki bir çıkışı daha var: [-1, 1] -> taban tripod'un
-    # o anki ayak kaldırması. None: base_gait["lift_mm"] sabit.
+    # ayak kaldırması; eğitimdeki gibi her salınımın ilk adımında seçilir,
+    # salınım boyunca sabit (controller.tick). None: base_gait["lift_mm"] sabit.
     lift_range: tuple[float, float] | None = None
 
     @property

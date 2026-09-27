@@ -330,5 +330,14 @@ def test_ogrenilmis_ayak_kaldirma_salinimi_degistirir(tmp_path_factory):
             peaks.append(peak)
             assert info["lift_mm"] == pytest.approx(20.0 if lift_a < 0 else 60.0)
         assert peaks[1] - peaks[0] > 0.02, peaks
+        # kaldırma salınım boyunca sabit: salınım ortasında eylem değişse de
+        # yeni salınıma (öteki grup) kadar ilk adımda seçilen kalır
+        e.reset(seed=0, options={"command": (0.05, 0.0, 0.0)})
+        a[-1] = -1.0
+        assert e.step(a)[4]["lift_mm"] == pytest.approx(20.0)
+        a[-1] = 1.0
+        while e._phase < 0.5:
+            assert e.step(a)[4]["lift_mm"] == pytest.approx(20.0)
+        assert e.step(a)[4]["lift_mm"] == pytest.approx(60.0)
     finally:
         e.close()

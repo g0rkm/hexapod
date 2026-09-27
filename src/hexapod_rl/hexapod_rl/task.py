@@ -153,7 +153,8 @@ class TaskConfig:
     # komut örnekleme (sample_command); varsayılanlar eski davranış: aralıktan düz çekim
     # Öğrenilmiş ayak kaldırma (2026-09-27): (en az, en çok) mm verilirse eylem
     # 19 boyutlu, son eylem [-1, 1] -> bu aralıkta taban tripod'un ayak kaldırması
-    # (yalnız artık eylem modunda). None: sabit lift_mm.
+    # (yalnız artık eylem modunda). Her salınımın ilk adımında seçilir, salınım
+    # boyunca sabit (env.step). None: sabit lift_mm.
     lift_action: "tuple[float, float] | None" = None
     command_zero_prob: float = 0.0  # her bileşen bu olasılıkla 0 (saf ileri/yana/dönüş sık gelsin)
     min_command_frac: float = 0.0   # command_fraction bunun altındaysa yeniden çek ("dur" değil)

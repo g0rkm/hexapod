@@ -87,6 +87,7 @@ class PolicyController:
         self.status = "başlıyor"
         self.clipped_command = False
         self.lift_mm: float | None = None   # öğrenilmiş ayak kaldırmada son seçilen, mm
+        self._lift_group: int | None = None
 
     # -- girdiler -----------------------------------------------------------------
 
@@ -109,6 +110,7 @@ class PolicyController:
         reason = self._hold_reason(now)
         if reason is not None:
             self._phase = 0.0
+            self.lift_mm, self._lift_group = None, None
             self._targets = list(self.stand)
             self.status = reason
             return list(self._targets)
@@ -116,10 +118,14 @@ class PolicyController:
         command = self._effective_command()
         out = np.clip(self.policy(self.observation(command)), -1.0, 1.0)
         action = out[:c.action_size]
-        self.lift_mm = None
-        if c.lift_range is not None:   # son çıkış: ayak kaldırma (eğitimdeki eşlemeyle)
-            lo, hi = c.lift_range
-            self.lift_mm = lo + (float(out[c.action_size]) + 1.0) * 0.5 * (hi - lo)
+        if c.lift_range is not None and self.base is not None:
+            # son çıkış: ayak kaldırma (eğitimdeki eşlemeyle); eğitimdeki gibi yalnız
+            # salınımın ilk adımında seçilir, salınım boyunca sabit (hexapod_rl.env)
+            group = self.base.swing_group(self._phase)
+            if group != self._lift_group:
+                lo, hi = c.lift_range
+                self.lift_mm = lo + (float(out[c.action_size]) + 1.0) * 0.5 * (hi - lo)
+                self._lift_group = group
         if self.base is None:
             base, scale = c.default_rad, c.action_scale
         else:
