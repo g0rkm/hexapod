@@ -406,6 +406,13 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
   Payı olan kaygan yokuşu (10° μ 0.25)
   politika 3/3 çıkıyor, tripod 0/3. Bunları da eğitime katma denemesi
   (v17) iyileştirmedi (ders 34). Tablo: models/README.
+- **Müfredat (2026-09-27, v22–v23; `--curriculum`, §7.8):** sabit 25 mm
+  tabanda müfredat küçük bir kazanç getirdi (engel skoru 0.338 → 0.371, v12
+  0.316) ama 45 mm'lik engel yok. Öğrenilmiş kaldırmayla (25 mm'den) v20'nin
+  28 mm'deki yerel en iyisinden çıktı (4M'de 33.6 mm, 45 mm basamak 3/3,
+  engel skoru 0.499), ama 35 mm'den müfredatsız başlayan
+  `ppo_kaldirma35_250k` (0.496, 2.39 W) ile aynı yere, daha çok güçle (3.15
+  W) vardı; model alınmadı (ders 40). Tablolar: models/README ("Müfredat").
 - **Adil karşılaştırma:** Samet'in `TripodGait`'i de 50 mm adımla
   ölçüldü: zemin skoru 0.548 (25 mm'de 0.404), RL 0.879. Aynı adım
   yüksekliğinde de RL açık ara önde; 45 mm çukurdan yana çıkış ve 60 mm
@@ -1324,6 +1331,7 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | Deneme zeminlerine kaygan (μ) ve engebe (`rough`) eklendi; v17 (bunlarla eğitim) depoya alınmadı | G7 "bitti" şartının üç türü ölçülebilsin. v17 engel skorunu 0.763'ten 0.68–0.72'ye düşürdü (ders 34) |
 | 09-26 | Ödül v7 (`progress_overshoot`) eklendi ama varsayılan 0 (v6) kaldı; v15/v16 modelleri depoya alınmadı | Aşma biraz azaldı, enerji azalmadı, katsayı 3'te zemin bozuldu (ders 33). Raporlar ortak ödülle (`standard_reward`, v6) |
 | 09-26 | v14 (std 0.05, 2M) → `ppo_lift50_3750k` depoya; ara kayıt rastgeleleştirmeli 3 tohumla elle seçildi | Düzde aşma azalmadı ama 60 mm basamak 3/3, zemin skoru 0.957; eğitim içi deterministik seçim (500k) ikili durumlarda gürültülü (ders 32) |
+| 09-27 | **Müfredat** (`--curriculum`, `CURRICULA`) eklendi, varsayılan değil; v22/v23 modelleri alınmadı | Sabit 25 mm tabanda 45 mm engel yok; öğrenilmiş kaldırmada yerel en iyiden çıkardı ama iyi bir başlangıçtan (35 mm) daha iyi bir yere varmadı (ders 40). S5'in zeminleri için altyapı olarak kalıyor |
 | 09-27 | Dayanıklılık taraması (`Perturbation`, `robustness`); IMU eğikliği ve uzun gecikme eğitime **eklenmedi** | 20°'lik IMU eğikliği ve 240 ms gecikme hiçbir modeli bozmadı. Hassas olunanlar kalibrasyon ofseti (σ ≥ 3°) ve servo gücü (×0.5 altı); ofseti politika göremiyor ve tripod da aynı kaybediyor, önce donanımda ölçülmeli (D6, D9), sonra aralığı eğitime girer (D10) |
 | 09-27 | **Öğrenilmiş ayak kaldırma** (19. çıkış, `lift_action`/`lift_range`) eklendi; seçim salınım başına | Sabit kaldırmada 25 mm düzde verimli ama engelde takılıyor, 50 mm tersi (ders 33); 18 eklemin keşfiyle bulunamayan hareket tek düğmeyle denenebilirdi. Her adım seçim keşfedilemedi (ders 36) |
 | 09-27 | v21 (35 mm'den öğrenilmiş kaldırma) son modeli alınmadı; 250k ara kaydı `ppo_kaldirma35_250k` olarak depoya | Kaldırma zemine göre değişmedi, 53 mm'ye kaydı ve `ppo_lift50_3750k`'dan kötü (ders 35). 250k düz verim ile engel arasında boş kalan bir noktayı dolduruyor (2.39 W, 45 mm engeller); D11'de seçenek |
@@ -1629,6 +1637,18 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     her süreç kendi keşif portlarında (`GZ_DISCOVERY_MSG_PORT/SRV_PORT`,
     `sim.discovery_ports`). Test öteki süreci gerçekten başlatıp soket
     sayısına bakıyor; düzeltmesiz kodda 17 → 29 ile düşüyor.
+40. **Müfredat yerel en iyiden çıkarır, iyi bir başlangıcın yerini tutmaz;
+    kör politikada yeni beceri açmaz.** Öğrenilmiş kaldırma sabit sette 25
+    mm'den 28 mm'de takılıyordu (v20); müfredatla (v23) 4M'de 33.6 mm'ye
+    çıktı, 45 mm basamak geçildi. Ama sonuç 35 mm'den müfredatsız başlayan
+    modelle aynı engel skorunda (0.499 / 0.496) ve düzde daha pahalı (3.15
+    / 2.39 W). Sabit 25 mm tabanda (v22) çukur seviyesi 500k'dan beri ~35
+    mm'de kaldı: eklem düzeltmesinin taşıyabildiği yükseklik bu. Bir de:
+    seviye, eğitimdeki gürültülü politikanın başarısına göre değişiyor;
+    kaldırma gürültüsü (salınım boyunca sabit, std 0.5) yüksek salınımlarla
+    engeli geçirdiği için eğitimde 45–50 mm görünen seviye deterministik
+    politikanın yeteneği değil (v23 1M: gürültülüyle 45 mm çukurdan 0.47 m,
+    deterministikle 0.12 m).
 
 ---
 
@@ -1758,8 +1778,11 @@ zeminler.
 15. ✅ **RL sim ↔ ROS'lu sim farkı** (45 mm çukurdan yana çıkış): fark yoktu,
     ROS ölçüm aracında komutlar sıfırlanmadan art arda koşuyordu (ders 38).
     Araç başlangıç/bitiş z'sini yazıyor.
-16. 🔄 **Kolaydan zora müfredat** (`--curriculum`, §7.8): altyapı hazır;
-    v22 (25 mm taban, `ppo_omni_250k`'dan) v12 ile karşılaştırılıyor.
+16. ✅ **Kolaydan zora müfredat** (`--curriculum`, §7.8): altyapı hazır,
+    S5 gelince zemin türleri `CURRICULA`'ya yazılır. Denemeler (v22, v23):
+    kör politikada yeni bir beceri açmadı (ders 40). Seviye kararını
+    deterministik bir ölçümle vermek (ör. her N bölümde bir gürültüsüz
+    bölüm) denenmedi.
 
 **S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
 S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son

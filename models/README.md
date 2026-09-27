@@ -16,6 +16,42 @@ python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Same
 python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip:residual
 ```
 
+## Müfredat: kolaydan zora zemin (2026-09-27, v22–v23)
+
+`train.py --curriculum deneme` (`terrain_probe.CURRICULA`): her ortam bir zemin
+türünde (çukur, yayla, eğim x/y, düz) en kolay seviyeden başlar; bölümde 0.5 m
+ilerlerse zorlaşır, devrilir ya da takılırsa kolaylaşır. Çukur ve yayla 10 →
+60 mm, eğim 5 → 25°. Soru: sabit setin (v12, v20) takıldığı yerden müfredat
+çıkarır mı? Ham ölçümler ve seviye eğrileri:
+`egitim_kayitlari/v23_mufredat_kaldirma/olcum.md`.
+
+| Eğitim | Başlangıç | Karşılaştırma | Sonuç |
+|---|---|---|---|
+| v22_mufredat | ppo_omni_250k, taban 25 mm sabit | v12 (sabit set) | çukur seviyesi 500k'dan beri ~35 mm; 45 mm'lik hiçbir engel yok; engel skoru 0.338 → 0.371 (v12 0.316); 2.25M'de durduruldu |
+| v23 + v23b | ppo_omni_250k genişletildi, öğrenilmiş kaldırma 25 mm'den | v20 (sabit set, ~28 mm'de takıldı) | kaldırma 25 → 30.6 (2M) → 33.6 mm (4M); 45 mm basamak 3/3; engel skoru 0.499 |
+
+| Model | Kaldırma | Düz güç (ileri 0.1) | Engel skoru | Basamak 45 |
+|---|---|---|---|---|
+| ppo_omni_250k | 25 mm | 2.00 W | 0.338 | 0/3 |
+| v22 2M | 25 mm | 2.65 W | 0.371 | 0/3 |
+| **ppo_kaldirma35_250k** (35 mm'den, müfredatsız) | 35.2 mm | **2.39 W** | 0.496 | 3/3 |
+| v23b son (4M, müfredatlı) | 33.6 mm | 3.15 W | 0.499 | 3/3 |
+
+- **Müfredat öğrenilmiş kaldırmayı yerel en iyiden çıkardı** (v20 aynı
+  başlangıçla 28 mm'de durmuştu), ama vardığı nokta 35 mm'den müfredatsız
+  başlayan modelle aynı engel skorunda ve daha çok güçle. Model alınmadı.
+- **Sabit 25 mm tabanda müfredat sınırlı:** eklem düzeltmesi 35–40 mm'lik
+  çukurlara kadar taşıyor, ötesine geçemiyor.
+- **Kaldırma yine zeminden bağımsız:** basamağa yaklaşınca 31.1 → 32.9 mm
+  (ilk kez küçük bir tepki); düzde 32.6 mm.
+- **Seviye gürültülü politikayla ölçülüyor:** eğitimde çukur seviyesi 45–50
+  mm'ye çıktı; deterministik politika aynı anda 45 mm'de takılıyordu (v23
+  1M: gürültülüyle 45 mm çukurdan 0.47 m, deterministikle 0.12 m).
+  Kaldırma gürültüsü (std 0.5, salınım boyunca sabit) yüksek salınımlarla
+  engeli geçiriyor.
+- Altyapı S5 için hazır: türler ve seviyeler `CURRICULA`'ya, S5'in üreteci
+  yazılır.
+
 ## Dayanıklılık taraması: robota geçişte beklenen hatalar (2026-09-27)
 
 `python -m hexapod_rl.robustness tripod models/<ad>/model.zip ...`

@@ -47,6 +47,8 @@ tablolar: `models/README.md`.
 | `v19_kaldirma25` | aynı, `ppo_omni_250k`'dan 25 mm, std 0.1, kaldırma std 0.4, her adım seçim; 750k'da durduruldu | kaldırma 25.7 → 26.1 mm, basamakta da artmıyor (ders 36) |
 | `v20_kaldirma_salinim` | aynı, kaldırma salınım başına seçiliyor, kaldırma std 0.5; 1M'de durduruldu | kaldırma 25.5 → 27.8 mm, ~28 mm'de yerel en iyi (ders 35) |
 | `v21_kaldirma35` | aynı, 35 mm'den başlangıç (`--lift-start 35`), 4M, 46 dk (1456 adım/s) | kaldırma zeminden bağımsız 35 → 53 mm; son model `ppo_lift50_3750k`'dan kötü. 250k ara kaydı → `models/ppo_kaldirma35_250k` (orta yol). Ham ölçümler `olcum.md` |
+| `v22_mufredat` | müfredat (`--curriculum deneme`), `ppo_omni_250k`'dan, taban 25 mm, v12'nin ayarları; 2.25M'de durduruldu | çukur seviyesi ~35 mm'de kaldı, 45 mm engel yok; engel skoru 0.371 (v12 0.316). Ölçümler `v23_mufredat_kaldirma/olcum.md` |
+| `v23_mufredat_kaldirma`, `v23b_mufredat_kaldirma` | müfredat + öğrenilmiş kaldırma (25 mm'den, v20'nin ayarları); v23 2.5M'de soket sızıntısıyla çöktü (`cokus.txt`, ders 39), v23b 2.5M kaydından 1.5M devam (toplam 4M, 1740 adım/s) | kaldırma 33.6 mm, engel skoru 0.499, düz 3.15 W; `ppo_kaldirma35_250k`'dan iyi değil, model alınmadı (ders 40). Ham ölçümler `v23_mufredat_kaldirma/olcum.md` |
 | `omni_olcum_2026-09-26.txt` | v10/v11 ve tabanların ham ölçüm çıktısı (her yön, ileri, rastgeleleştirme, gürültü, kütle, deneme zeminleri) | tablolar `models/README.md`'de |
 
 Yeni PC'den (2026-09-26 öğlen) itibaren her eğitimde ayrıca:

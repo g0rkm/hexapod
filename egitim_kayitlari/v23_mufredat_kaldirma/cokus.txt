@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/multiprocessing/process.py", line 320, in _bootstrap
+  File "/usr/lib/python3.14/multiprocessing/process.py", line 108, in run
+  File "/home/user/hexapod_venv/lib/python3.14/site-packages/stable_baselines3/common/vec_env/subproc_vec_env.py", line 42, in _worker
+  File "/home/user/hexapod_ws/build/hexapod_rl/hexapod_rl/env.py", line 171, in reset
+  File "/home/user/hexapod_ws/build/hexapod_rl/hexapod_rl/env.py", line 258, in _update_level
+  File "/home/user/hexapod_ws/build/hexapod_rl/hexapod_rl/env.py", line 268, in set_level
+  File "/home/user/hexapod_ws/build/hexapod_rl/hexapod_rl/sim.py", line 162, in __init__
+  File "/home/user/hexapod_ws/build/hexapod_rl/hexapod_rl/sim.py", line 341, in _write_world
+  File "/usr/lib/python3.14/pathlib/__init__.py", line 810, in write_text
+  File "/usr/lib/python3.14/pathlib/__init__.py", line 772, in open
+OSError: [Errno 24] Too many open files: '/tmp/hexapod_rl_on0lh87r/robot.urdf'
