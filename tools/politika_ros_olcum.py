@@ -10,6 +10,12 @@ Yöntem (PROJE_DEVIR ders 23): robotun pozu gz poz yayınından
 hareketinin orta %80'inde hız hesaplanır. Her adımın yer değiştirmesi o
 anki gövde yönüne çevrilir: dönerken ilerleme komutunda da gövde
 çerçevesindeki hız doğru çıkar. Sonuç Markdown tablosu.
+
+Komutlar AYNI dünyada, robot sıfırlanmadan art arda koşulur. Düz zeminde
+hız ölçümü için sorun değil; zeminde (çukur, basamak) her komutu ayrı bir
+koşuda verin, yoksa ikinci komut ilkinin bıraktığı yerden başlar (ders 38:
+çukurdan "yana çıkış" böyle yanlış ölçüldü). Yükseklik sütunu ortalama ve
+başlangıç → bitiş z'sini yazar.
 """
 
 from __future__ import annotations
@@ -114,7 +120,8 @@ def main(argv=None) -> int:
         height = sum(s[3] for s in seg) / len(seg)
         path = math.hypot(seg[-1][1] - seg[0][1], seg[-1][2] - seg[0][2])
         print(f"| {cmd} | {vx:+.3f} | {vy:+.3f} | {wz:+.3f} | {track} | {path:.2f} m | "
-              f"{1000 * height:.0f} mm (z {1000 * seg[-1][3]:.0f}) |", flush=True)
+              f"{1000 * height:.0f} mm (z {1000 * seg[0][3]:.0f} → {1000 * seg[-1][3]:.0f}) |",
+              flush=True)
     pub.publish(Twist())
     sys.stdout.flush()
     # gz.transport + rclpy birlikte kapanırken çöküyor (segfault); ölçüm bitti,

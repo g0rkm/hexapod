@@ -96,3 +96,17 @@ Deneme zemini dünyaları (`WORLD=... WORLD_NAME=zemin SURE=12`):
 | basamak60 | (0.1, 0.0, 0.0) | -0.001 | -0.002 | %-1 | 0.08 m | 100 mm (z 100) |
 | cukur45 | (-0.1, 0.0, 0.0) | -0.063 | -0.003 | %63 | 0.85 m | 127 mm (z 144) |
 | cukur45 | (0.0, 0.06, 0.0) | -0.002 | +0.063 | %105 | 0.75 m | 144 mm (z 144) |
+
+**Düzeltme (2026-09-27):** son satır geçersiz. İki komut aynı dünyada robot
+sıfırlanmadan art arda koşuldu; yana komutu robot geri komutuyla çukurdan
+çıktıktan sonra başladı (ortalama yükseklik 144 mm: baştan dışarıda). Yana
+komutu tek başına (`KOMUTLAR="0,0.06,0"`):
+
+| Model | gövde vx | gövde vy | izleme | yol | yükseklik |
+|---|---|---|---|---|---|
+| ppo_kaldirma35_250k | -0.001 | +0.013 | %21 | 0.20 m | 99 mm (z 99), çukurda kaldı |
+| ppo_lift50_3750k | -0.009 | +0.054 | %90 | 0.68 m | 119 mm (z 143), çıktı |
+
+RL simde aynı durum (yana, 45 mm çukur): ppo_kaldirma35_250k 0.11–0.21 m
+(rastgeleleştirme açık/kapalı, fizik 1/2 ms, 10/12 s; hepsi çukurda);
+geri 0.68–1.00 m (çıkıyor).

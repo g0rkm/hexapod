@@ -7,7 +7,7 @@
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
 > Son güncelleme: **2026-09-27** (4. oturumun devamı: dayanıklılık taraması
-> §7.8 ve ders 37; öğrenilmiş ayak kaldırma ve orta yol modeli
+> §7.8 ve ders 37; müfredat `--curriculum` §7.8; ders 38 (ölçüm hatası); öğrenilmiş ayak kaldırma ve orta yol modeli
 > `ppo_kaldirma35_250k` §3.3, ders 35–36;
 > önceki: yeni bilgisayarda kurulum §0.5; zemine göre ayak teması §7.8;
 > her yöne politika `ppo_omni_250k` §3.2; kütle rastgeleleştirmesi;
@@ -423,10 +423,12 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
 - **Yan ürün, orta yol modeli `ppo_kaldirma35_250k`** (v21'in 250k'sı,
   kaldırma ~35 mm, zeminden bağımsız): düzde 2.39 W (`ppo_omni_250k` 2.00,
   `ppo_lift50_3750k` 3.99), engel skoru 0.496 (0.338 / 0.763). 45 mm
-  basamak, 60 mm engebe, 10° kaygan yokuş 3/3; 60 mm basamak ve çukurlar
-  RL simde geçilmiyor. ROS'lu simde gerçek düğümle düzde her komutta
-  %100–107; 45 mm basamak ve 45 mm çukurdan geri/yana çıkıyor, 60 mm
-  basamakta takılıyor. Tablolar: models/README ("Öğrenilmiş ayak kaldırma").
+  basamak, 60 mm engebe, 10° kaygan yokuş 3/3, 45 mm çukurdan geri
+  çıkış; 60 mm basamak, 60 mm çukur ve 45 mm çukurdan yana çıkış yok. ROS'lu
+  simde gerçek düğümle düzde her komutta %100–107; 45 mm basamak ve 45 mm
+  çukurdan geri çıkıyor; yana ve 60 mm basamakta takılıyor (iki sim aynı;
+  ilk yazılan "yana çıkıyor" ölçüm hatasıydı, ders 38). Tablolar:
+  models/README ("Öğrenilmiş ayak kaldırma").
 
 ---
 
@@ -1601,6 +1603,18 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     yürüyüşü taşıyor. Sonuç: donanım vardiyasında kalibrasyon doğruluğu
     (~2°) ve yük altındaki servo gerilimi/torku öncelikli ölçülmeli;
     ilk denemeler 25 mm'lik modelle.
+38. **İki sim çelişirse önce ölçüm koşullarını karşılaştır.**
+    `ppo_kaldirma35_250k` için "45 mm çukurdan yana: RL simde 0/3, ROS'lu
+    simde 0.75 m çıkıyor" yazılmıştı. RL simde rastgeleleştirme, fizik
+    adımı (1/2 ms) ve süre (10/12 s) değiştirilince hep 0.11–0.21 m'de
+    kaldı. Sebep ROS ölçüm aracıydı: `KOMUTLAR="-0.1,0,0;0,0.06,0"` aynı
+    dünyada robot sıfırlanmadan art arda koşuyor; yana komutu, robot geri
+    komutuyla çukurdan çıktıktan sonra başlamıştı (ortalama yükseklik 144
+    mm = baştan dışarıda). Tek başına koşunca ROS'lu simde de 0.20 m,
+    çukurda (RL simle aynı); `ppo_lift50_3750k` iki simde de çıkıyor.
+    Araç artık yükseklik sütununda başlangıç → bitiş z'sini yazıyor;
+    zeminde her komut ayrı koşulur. Sim-sim farkı sanılan şey ölçüm
+    hatasıydı; gerçek bir fark bulunsaydı sim-to-real için uyarı olurdu.
 
 ---
 
@@ -1727,6 +1741,11 @@ zeminler.
     ofset rastgeleleştirmesiyle eğitimin katkısı denenmedi (tripod da aynı
     kaybettiği için katkısı sınırlı beklenir); donanımda ölçülen aralıkla
     D10'da yapılır.
+15. ✅ **RL sim ↔ ROS'lu sim farkı** (45 mm çukurdan yana çıkış): fark yoktu,
+    ROS ölçüm aracında komutlar sıfırlanmadan art arda koşuyordu (ders 38).
+    Araç başlangıç/bitiş z'sini yazıyor.
+16. 🔄 **Kolaydan zora müfredat** (`--curriculum`, §7.8): altyapı hazır;
+    v22 (25 mm taban, `ppo_omni_250k`'dan) v12 ile karşılaştırılıyor.
 
 **S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
 S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son

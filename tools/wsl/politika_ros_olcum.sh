@@ -12,6 +12,8 @@
 #     WORLD=/yol/dunya.sdf WORLD_NAME=zemin KOMUTLAR="0.1,0,0" SURE=15 \
 #         bash tools/wsl/politika_ros_olcum.sh models/ppo_lift50_3750k/policy.npz
 #     (deneme zemini dünyası: terrain_probe.world_sdf(...))
+#     Komutlar robot sıfırlanmadan art arda koşar: zeminde her komutu ayrı
+#     çalıştırın (PROJE_DEVIR ders 38).
 #
 # Başka bir simülasyon ya da eğitimle çakışmasın diye kendi ROS_DOMAIN_ID'si
 # ve GZ_PARTITION'ı var (PROJE_DEVIR ders 22).

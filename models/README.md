@@ -157,16 +157,23 @@ orada engelde ödül farkı yok, düzde güç cezası aşağı itiyor.
   skoru 0.652 < 0.763, düz güç 4.65 > 3.99 W). Kaydedilmedi.
 - **`ppo_kaldirma35_250k` iki model arasında bir orta nokta:** düzde
   ppo_omni_250k'dan %20 fazla güç (ppo_lift50_3750k %100 fazla), 45 mm
-  basamak, 60 mm engebe ve 10° kaygan yokuş 3/3; 60 mm basamak ve
-  çukurlar RL simde geçilmiyor. Kaldırması sabit sayılır (35.1–35.2 mm,
-  zeminden bağımsız).
+  basamak, 60 mm engebe ve 10° kaygan yokuş 3/3; 45 mm çukurdan geri
+  çıkıyor (RL simde 10 s'de 0.68–0.79 m, rastgeleleştirme açık, 3 tohum);
+  60 mm basamak, 60 mm çukurdan geri ve 45 mm çukurdan yana çıkış yok.
+  Kaldırması sabit sayılır (35.1–35.2 mm, zeminden bağımsız).
 - **ROS'lu simde gerçek düğümle** (`tools/wsl/politika_ros_olcum.sh`,
   düğüm kaldırmayı salınım başında seçiyor): düzde her komutta %100–107,
   sıfır komutta hareket yok. Deneme dünyalarında (12 s): 45 mm basamak
-  0.93 m (üstte, z 143 mm), 45 mm çukurdan geri 0.85 m ve yana 0.75 m
-  (ikisi de dışarıda, z 144 mm), 60 mm basamakta 0.08 m'de takılı.
-  Çukurdan çıkış ROS'lu simde RL simdekinden iyi (orada 0/3); farkın
-  sebebine bakılmadı.
+  0.93 m (üstte, z 143 mm), 45 mm çukurdan geri 0.85 m (dışarıda, z 144
+  mm), 60 mm basamakta 0.08 m'de takılı. 45 mm çukurdan yana (komut tek
+  başına) 0.20 m, çukurda kalıyor (z 99 mm); RL simle aynı.
+  `ppo_lift50_3750k` aynı ölçümde yana çıkıyor (0.68 m, z 143 mm).
+  **Düzeltme (2026-09-27):** ilk ölçümde "yana 0.75 m, dışarıda" yazılmıştı
+  ve bu RL simle çelişiyordu. Sebep ölçüm aracı: komutlar aynı dünyada
+  robot sıfırlanmadan art arda koşuyor; yana komutu, robot geri komutuyla
+  çukurdan çıktıktan sonra başlamıştı (başlangıç yüksekliği zaten 144 mm).
+  Araç artık başlangıç ve bitiş z'sini yazıyor; zeminde her komut ayrı
+  koşulmalı (PROJE_DEVIR ders 38).
 - `gorev.json`'daki `lift_mm: 25` bu modelde kullanılmıyor (kaldırma
   `lift_action` aralığından geliyor); widen'ın kaynak modelinden kalma.
 
