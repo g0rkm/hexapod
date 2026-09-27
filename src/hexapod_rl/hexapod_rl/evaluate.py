@@ -158,8 +158,10 @@ def main(argv: list[str] | None = None) -> int:
         if trained is not None:
             task = standard_reward(replace(
                 trained, randomization=Randomization() if args.randomize else None))
+            lift = (f"öğrenilmiş ayak kaldırma {task.lift_action[0]:g}–{task.lift_action[1]:g} mm"
+                    if task.lift_action is not None else f"ayak kaldırma {task.lift_mm:g} mm")
             print(f"# görev ayarı modelin gorev.json'ından (eylem modu {task.action_mode}, "
-                  f"ayak kaldırma {task.lift_mm:g} mm)", file=sys.stderr)
+                  f"{lift})", file=sys.stderr)
     print(format_result(evaluate(model, args.seconds, args.vx, seed=args.seed,
                                  noise=args.noise, task=task, vy=args.vy, wz=args.wz,
                                  body_mass_scale=args.mass)))

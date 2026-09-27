@@ -43,6 +43,10 @@ tablolar: `models/README.md`.
 | `v14_lift50_std05` | `ppo_lift50_2250k`'dan std 0.05 ile devam, 2M; ara kayıt seçimi zemini de ölçüyor | 1.5M ara kaydı → `models/ppo_lift50_3750k` (60 mm 3/3); düzde aşma azalmadı (`zemin_olcumu.md`, `duz_olcumu.txt`) |
 | `v15_odul_v7`, `v16_odul_v7_k3` | `ppo_lift50_3750k`'dan ödül v7 (aşma cezası, katsayı 1 ve 3) ile devam, 2M'şer | aşma biraz azaldı (0.114 → 0.110/0.107), enerji azalmadı, katsayı 3'te zemin bozuldu; depoya model alınmadı (ders 33) |
 | `v17_deneme2` | `ppo_lift50_3750k`'dan kaygan eğim + engebe eklenmiş setle (`deneme2`), 3M, 49 dk | iyileştirmedi, engel skoru 0.763 → 0.68–0.72; model alınmadı (`zemin_olcumu.md`, ders 34) |
+| `v18_kaldirma` | öğrenilmiş ayak kaldırma (`widen`, 20–60 mm), `ppo_lift50_3750k`'dan 50 mm, std 0.05, kaldırma std 0.3, her adım seçim; 1M'de durduruldu | kaldırma 50–51.5 mm'de kaldı, KL sınırı her güncellemede doldu (ders 36) |
+| `v19_kaldirma25` | aynı, `ppo_omni_250k`'dan 25 mm, std 0.1, kaldırma std 0.4, her adım seçim; 750k'da durduruldu | kaldırma 25.7 → 26.1 mm, basamakta da artmıyor (ders 36) |
+| `v20_kaldirma_salinim` | aynı, kaldırma salınım başına seçiliyor, kaldırma std 0.5; 1M'de durduruldu | kaldırma 25.5 → 27.8 mm, ~28 mm'de yerel en iyi (ders 35) |
+| `v21_kaldirma35` | aynı, 35 mm'den başlangıç (`--lift-start 35`), 4M, 46 dk (1456 adım/s) | kaldırma zeminden bağımsız 35 → 53 mm; son model `ppo_lift50_3750k`'dan kötü. 250k ara kaydı → `models/ppo_kaldirma35_250k` (orta yol). Ham ölçümler `olcum.md` |
 | `omni_olcum_2026-09-26.txt` | v10/v11 ve tabanların ham ölçüm çıktısı (her yön, ileri, rastgeleleştirme, gürültü, kütle, deneme zeminleri) | tablolar `models/README.md`'de |
 
 Yeni PC'den (2026-09-26 öğlen) itibaren her eğitimde ayrıca:

@@ -1,0 +1,1 @@
+/home/user/hexapod_runs/w_kaldirma25b/model.zip

@@ -204,7 +204,8 @@ donanım bilgileri config'e sonradan girilir.
 6. 🔄 RL ortamı (✅) + PPO eğitimi: düz zeminde en iyi `models/ppo_omni_250k`
    (tripod + öğrenilmiş düzeltme, her yöne); zeminde `models/ppo_lift50_3750k`
    (taban 50 mm ayak kaldırma, deneme zeminlerinde eğitildi, 60 mm engeller);
-   asıl zeminler S5'i bekliyor
+   arada `models/ppo_kaldirma35_250k` (öğrenilmiş kaldırma ~35 mm: düzde
+   +%20 güçle 45 mm engeller); asıl zeminler S5'i bekliyor
 7. 🔄 Pi 4'e aktarma: politika düğümü (`hexapod_policy`) ve sürücü düğümü
    (`hexapod_hardware`) yazıldı, simde çalışıyor; Pi'de denenmedi
 

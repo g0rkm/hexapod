@@ -16,6 +16,87 @@ python -m hexapod_rl.evaluate tripod --vx 0.1          # karşılaştırma: Same
 python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip:residual
 ```
 
+## Öğrenilmiş ayak kaldırma — `ppo_kaldirma35_250k` (2026-09-27 gece)
+
+Politika taban tripod'un ayak kaldırmasını kendisi seçiyor: 19. çıkış,
+20–60 mm (`TaskConfig.lift_action`, `PolicyContract.lift_range`). Her
+salınımın ilk adımında seçilir, salınım boyunca sabit. Soru: kör politika
+düzde az, engelde çok kaldırmayı öğrenebilir mi (25 mm verim ↔ 50 mm
+engel ödünleşimi, PROJE_DEVIR ders 33)?
+
+**Cevap: hayır.** Kaldırma bütün zeminlerde aynı kalıyor; politika onu
+eğitim zemin karışımı için tek bir değere ayarlıyor. Engeli ancak
+gördüğünde (ileri bakan mesafe sensörü, S7) zemine göre seçebilir;
+altyapı buna hazır.
+
+**Denemeler** (hepsi deneme zeminlerinde, her yöne, rastgeleleştirme açık,
+lr 1e-4; kayıtlar `egitim_kayitlari/`):
+
+| Eğitim | Başlangıç | Kaldırma seçimi | Sonuç |
+|---|---|---|---|
+| v18_kaldirma | ppo_lift50_3750k, 50 mm, std 0.05 | her adım | 1M'de 50–51.5 mm; KL sınırına her güncellemede takıldı, durduruldu |
+| v19_kaldirma25 | ppo_omni_250k, 25 mm, kaldırma std 0.4 | her adım | 750k'da 25.7 → 26.1 mm, basamakta da artmıyor, durduruldu |
+| v20_kaldirma_salinim | ppo_omni_250k, 25 mm, kaldırma std 0.5 | salınım başı | 1M'de 27.8 mm'de yavaşladı (yerel en iyi), durduruldu |
+| v21_kaldirma35 | ppo_omni_250k, **35 mm**, kaldırma std 0.5 | salınım başı | 4M: 35 → 38 (1M) → 40 (2M) → 53 mm (4M), her zeminde aynı |
+
+**Kaldırma elle sabitlenince** (v20'nin 250k ara kaydı, aynı politika,
+0.1 m/s, 10 s, deterministik): engeller 28–35 mm arasında bir eşikte
+geçilmeye başlıyor. 25 mm'den başlayan eğitim eşiğin altında kalıyor:
+orada engelde ödül farkı yok, düzde güç cezası aşağı itiyor.
+
+| Kaldırma | Düz yol / güç | Basamak 45 | Çukur 45 | Engebe 40 |
+|---|---|---|---|---|
+| 25 mm | 1.00 m / 2.00 W | 0.08 m | 0.13 m | 0.57 m |
+| 35 mm | 1.01 m / 2.36 W | 0.78 m | 0.77 m | 0.78 m |
+| 45 mm | 1.04 m / 2.80 W | 0.89 m | 0.84 m | 0.93 m |
+| 55 mm | 1.03 m / 3.81 W | 0.94 m | 0.93 m | 0.95 m |
+
+**v21 ara kayıtları, düz zemin** (her yön seti, 10 s, deterministik):
+
+| Model | Her yön ödül | Her yön güç | İleri 0.10 hız | İleri güç | Kaldırma |
+|---|---|---|---|---|---|
+| ppo_omni_250k | **2.868** | **1.98 W** | 0.100 | 2.00 W | 25 mm |
+| **ppo_kaldirma35_250k** (v21 250k) | 2.855 | 2.43 W | 0.102 | 2.39 W | 35.2 mm |
+| v21 1M | 2.830 | 2.69 W | 0.103 | 2.65 W | 37.8 mm |
+| v21 2M | 2.816 | 2.93 W | 0.106 | 3.07 W | 40.3 mm |
+| v21 best_model (2.25M) | 2.803 | 3.02 W | 0.110 | 3.19 W | 42.3 mm |
+| v21 3M | 2.758 | 3.55 W | 0.111 | 3.79 W | 46.5 mm |
+| v21 4M (son) | 2.716 | 4.31 W | 0.108 | 4.65 W | 52.7 mm |
+| ppo_lift50_3750k | 2.693 | 4.02 W | 0.114 | 3.99 W | 50 mm |
+
+**Bütün zemin türleri** (aşağıdaki "Bütün zemin türleri" tablosuyla aynı
+ölçüm: rastgeleleştirme açık, 3 tohum, 10 s):
+
+| Model | Basamak 45 / 60 | Çukur 60 geri | Çukur 45 yana | Yokuş 20° | Kaygan 10° μ0.25 | Kaygan 15° μ0.3 | Kaygan 20° μ0.4 | Kaygan yan 15° | Engebe 40 / 60 | Engebe 40 yana | Engel skoru |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| ppo_omni_250k | 0.08 / 0.08 | 0.12 (0/3) | 0.11 (0/3) | 0.85 | 0.47 (2/3) | −0.45 | −0.52 | 1.01 | 0.58 / 0.07 | 0.36 (0/3) | 0.338 |
+| **ppo_kaldirma35_250k** | 0.80 (3/3) / 0.08 | 0.12 (0/3) | 0.14 (0/3) | 0.87 | 0.57 (3/3) | −0.26 | −0.32 | 1.04 | 0.83 / 0.65 (3/3) | 0.48 (3/3) | 0.496 |
+| v21 1M | 0.83 / 0.08 | 0.12 (0/3) | 0.14 (0/3) | 0.86 | 0.61 (3/3) | −0.05 | −0.05 | 1.06 | 0.91 / 0.71 | 0.56 | 0.523 |
+| v21 2M | 0.81 / 0.25 (1/3) | 0.12 (0/3) | 0.30 (1/3) | 0.93 | 0.60 (3/3) | −0.05 | 0.04 | 1.09 | 0.79 / 0.86 | 0.54 | 0.567 |
+| v21 best_model | 0.79 / 0.46 (2/3) | 0.12 (0/3) | 0.29 (1/3) | 0.95 | 0.62 (3/3) | −0.06 | −0.00 | 1.14 | 1.02 / 0.90 | 0.53 | 0.599 |
+| v21 3M | 0.83 / 0.41 (2/3) | 0.58 (3/3) | 0.23 (1/3) | 0.96 | 0.57 (3/3) | −0.04 | 0.08 | 1.13 | 0.96 / 0.98 | 0.58 | 0.643 |
+| v21 4M (son) | 0.97 / 0.31 (1/3) | 0.49 (3/3) | 0.39 (2/3) | 0.94 | 0.46 (2/3) | −0.26 | −0.17 | 1.08 | 1.01 / 1.02 | 0.62 | 0.652 |
+| **ppo_lift50_3750k** | **1.04 / 0.70 (3/3)** | **0.98 (3/3)** | **0.63 (3/3)** | 0.94 | 0.57 (3/3) | −0.20 | −0.14 | 1.14 | 0.99 / 0.97 | 0.62 | **0.763** |
+
+- **v21'in son modeli ppo_lift50_3750k'dan iki yönden de kötü** (engel
+  skoru 0.652 < 0.763, düz güç 4.65 > 3.99 W). Kaydedilmedi.
+- **`ppo_kaldirma35_250k` iki model arasında bir orta nokta:** düzde
+  ppo_omni_250k'dan %20 fazla güç (ppo_lift50_3750k %100 fazla), 45 mm
+  basamak, 60 mm engebe ve 10° kaygan yokuş 3/3; 60 mm basamak ve
+  çukurlar RL simde geçilmiyor. Kaldırması sabit sayılır (35.1–35.2 mm,
+  zeminden bağımsız).
+- **ROS'lu simde gerçek düğümle** (`tools/wsl/politika_ros_olcum.sh`,
+  düğüm kaldırmayı salınım başında seçiyor): düzde her komutta %100–107,
+  sıfır komutta hareket yok. Deneme dünyalarında (12 s): 45 mm basamak
+  0.93 m (üstte, z 143 mm), 45 mm çukurdan geri 0.85 m ve yana 0.75 m
+  (ikisi de dışarıda, z 144 mm), 60 mm basamakta 0.08 m'de takılı.
+  Çukurdan çıkış ROS'lu simde RL simdekinden iyi (orada 0/3); farkın
+  sebebine bakılmadı.
+- `gorev.json`'daki `lift_mm: 25` bu modelde kullanılmıyor (kaldırma
+  `lift_action` aralığından geliyor); widen'ın kaynak modelinden kalma.
+
+**Gerçek robotta DENENMEDİ.**
+
 ## Zeminli eğitim — `ppo_lift50_3750k` ve `ppo_lift50_2250k` (2026-09-26 öğleden sonra)
 
 İlk zeminde eğitilmiş politika. Her yöne, artık eylem; **taban tripod ayağı

@@ -6,9 +6,11 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-26** (4. oturum: yeni bilgisayarda kurulum §0.5;
-> zemine göre ayak teması §7.8; her yöne politika `ppo_omni_250k` §3.2;
-> kütle rastgeleleştirmesi; zeminli eğitim `ppo_lift50_3750k` §3.3)
+> Son güncelleme: **2026-09-27** (4. oturumun devamı: öğrenilmiş ayak
+> kaldırma ve orta yol modeli `ppo_kaldirma35_250k` §3.3, ders 35–36;
+> önceki: yeni bilgisayarda kurulum §0.5; zemine göre ayak teması §7.8;
+> her yöne politika `ppo_omni_250k` §3.2; kütle rastgeleleştirmesi;
+> zeminli eğitim `ppo_lift50_3750k` §3.3)
 > · Testler: **Linux 257/257**, Windows 213 geçti + 9 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
@@ -309,7 +311,7 @@ artık geçersiz ya da güncellendi:
 | 5 | Klasik yürüyüş (tripod) | ✅ Samet: `hexapod_gait` (S2), `hexapod_teleop` (S3) |
 | 6 | Gerçek robot sürücü düğümü (`hexapod_hardware`) | ✅ Samet (S4); yalnız dry-run, donanımda denenmedi |
 | 7 | RL ortamı (`hexapod_rl`) | ✅ (G6); tripod aynı ortamda ölçüldü |
-| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_omni_250k` (her yöne); zeminde `models/ppo_lift50_3750k` (deneme zeminlerinde eğitildi, 45–60 mm engeller). Asıl zeminler S5'i bekliyor |
+| 8 | PPO eğitimi | 🔄 (G7). Düz zeminde en iyisi `models/ppo_omni_250k` (her yöne); zeminde `models/ppo_lift50_3750k` (deneme zeminlerinde eğitildi, 45–60 mm engeller); arada `models/ppo_kaldirma35_250k` (düzde +%20 güçle 45 mm engeller). Asıl zeminler S5'i bekliyor |
 | 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu Gazebo'da yürüdü; son G7 politikasıyla tekrar aktarılacak |
 | 10 | Pi 4'e aktarma | ⛔ donanım vardiyası (D11) |
 
@@ -407,6 +409,23 @@ Ayrıntı ve tablolar: [models/README.md](../models/README.md) ("Zeminli eğitim
   ölçüldü: zemin skoru 0.548 (25 mm'de 0.404), RL 0.879. Aynı adım
   yüksekliğinde de RL açık ara önde; 45 mm çukurdan yana çıkış ve 60 mm
   çukurdan geri çıkış tripod'da 0/3, RL'de 3/3.
+- **Öğrenilmiş ayak kaldırma (2026-09-27, v18–v21):** politika taban
+  tripod'un kaldırmasını 19. çıkışla (20–60 mm) kendisi seçiyor; her
+  salınımın başında seçilir, salınım boyunca sabit (§7.8). Amaç düzde az,
+  engelde çok kaldırmaktı. **Olmadı:** kör politika kaldırmayı zemine göre
+  değiştirmiyor, eğitim zemin karışımı için tek bir değere ayarlıyor
+  (ders 35). 25 mm'den başlayınca ~28 mm'de takılıyor (engeller 28–35 mm
+  arasındaki bir eşikte geçilmeye başlıyor); 35 mm'den başlayınca 4M'de
+  53 mm'ye çıkıyor ve son model `ppo_lift50_3750k`'dan iki yönden de kötü
+  (engel skoru 0.652 < 0.763, düz güç 4.65 > 3.99 W). Her adım seçilen
+  kaldırma hiç kıpırdamadı (ders 36).
+- **Yan ürün, orta yol modeli `ppo_kaldirma35_250k`** (v21'in 250k'sı,
+  kaldırma ~35 mm, zeminden bağımsız): düzde 2.39 W (`ppo_omni_250k` 2.00,
+  `ppo_lift50_3750k` 3.99), engel skoru 0.496 (0.338 / 0.763). 45 mm
+  basamak, 60 mm engebe, 10° kaygan yokuş 3/3; 60 mm basamak ve çukurlar
+  RL simde geçilmiyor. ROS'lu simde gerçek düğümle düzde her komutta
+  %100–107; 45 mm basamak ve 45 mm çukurdan geri/yana çıkıyor, 60 mm
+  basamakta takılıyor. Tablolar: models/README ("Öğrenilmiş ayak kaldırma").
 
 ---
 
@@ -861,6 +880,19 @@ taklit eder.
   aynı zeminlerde toplanabilir (`pretrain --terrains`).
 - `--lift-mm`: artık eylemde taban tripod'un ayak kaldırması (varsayılan 25;
   zeminli eğitimde 50, §3.3).
+- `--lift-range EN_AZ EN_COK` (+ `--lift-std`): **öğrenilmiş ayak kaldırma**
+  (2026-09-27; `TaskConfig.lift_action`). Eylem 19 boyutlu; son eylem
+  [-1, 1] → bu aralıkta kaldırma (`task.lift_from_action`). Yalnız her
+  salınımın ilk adımında (`PhaseTripod.swing_group` değişince) seçilir,
+  salınım boyunca sabit; reset'te sıfırlanır (ders 36). Gözlem değişmedi:
+  politika tutulan kaldırmayı kendi eklem hedeflerinden görüyor. Düzeltme
+  cezası yalnız eklem eylemlerine; kaldırmanın bedelini güç cezası öder.
+  `--lift-std` yalnız bu boyutun keşif std'si.
+- `python -m hexapod_rl.widen MODEL --lift-range 20 60 --lift-std 0.5
+  [--lift-start 35] --out W/model.zip`: eğitilmiş bir artık eylem modelinin
+  ağına kaldırma çıkışı ekler (sıcak başlangıç; yeni satır 0, sapma
+  başlangıç kaldırmasına karşılık gelen eylem; eklemler birebir aynı,
+  test). Sonra `train --lift-range 20 60 --init-from W/model.zip`.
 - Çıktılar `~/hexapod_runs/<ad>/`: model.zip (son), **best_model.zip**,
   checkpoints/ (250k'da bir), progress.csv, ara_degerlendirme.csv,
   ayarlar.txt, degerlendirme.txt.
@@ -938,6 +970,11 @@ models/ppo_omni_250k/model.zip --residual --omni`.
   - Aralık dışı komut kırpılır.
 - `tripod.py`, `PhaseTripod`: adım saatinin fonksiyonu olan tripod. Eğitim ve
   robot aynı kodu kullanır.
+- **Öğrenilmiş ayak kaldırma** (`PolicyContract.lift_range`, 2026-09-27):
+  alan varsa ağın 19. çıkışı eğitimdeki eşlemeyle kaldırmaya çevrilir;
+  eğitimdeki gibi yalnız salınımın ilk adımında, beklemeden sonra ilk
+  adımda yeniden seçilir (`ctl.lift_mm`). Eski dosyalarda alan yok,
+  davranış aynı. ROS'lu simde `ppo_kaldirma35_250k` ile doğrulandı (§3.3).
 - Çıkarım: PC'de tick başına 44 µs; Pi 4 için <0.5 ms tahmini.
 - **ROS'lu simde her yön politikası** (`ppo_omni_250k`, 2026-09-26; tork
   servo modeli, hız gz poz yayınından sim zamanıyla, hareketin orta %80'i,
@@ -1254,6 +1291,8 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-26 | Deneme zeminlerine kaygan (μ) ve engebe (`rough`) eklendi; v17 (bunlarla eğitim) depoya alınmadı | G7 "bitti" şartının üç türü ölçülebilsin. v17 engel skorunu 0.763'ten 0.68–0.72'ye düşürdü (ders 34) |
 | 09-26 | Ödül v7 (`progress_overshoot`) eklendi ama varsayılan 0 (v6) kaldı; v15/v16 modelleri depoya alınmadı | Aşma biraz azaldı, enerji azalmadı, katsayı 3'te zemin bozuldu (ders 33). Raporlar ortak ödülle (`standard_reward`, v6) |
 | 09-26 | v14 (std 0.05, 2M) → `ppo_lift50_3750k` depoya; ara kayıt rastgeleleştirmeli 3 tohumla elle seçildi | Düzde aşma azalmadı ama 60 mm basamak 3/3, zemin skoru 0.957; eğitim içi deterministik seçim (500k) ikili durumlarda gürültülü (ders 32) |
+| 09-27 | **Öğrenilmiş ayak kaldırma** (19. çıkış, `lift_action`/`lift_range`) eklendi; seçim salınım başına | Sabit kaldırmada 25 mm düzde verimli ama engelde takılıyor, 50 mm tersi (ders 33); 18 eklemin keşfiyle bulunamayan hareket tek düğmeyle denenebilirdi. Her adım seçim keşfedilemedi (ders 36) |
+| 09-27 | v21 (35 mm'den öğrenilmiş kaldırma) son modeli alınmadı; 250k ara kaydı `ppo_kaldirma35_250k` olarak depoya | Kaldırma zemine göre değişmedi, 53 mm'ye kaydı ve `ppo_lift50_3750k`'dan kötü (ders 35). 250k düz verim ile engel arasında boş kalan bir noktayı dolduruyor (2.39 W, 45 mm engeller); D11'de seçenek |
 | 09-26 | **Ayak teması ve gövde yüksekliği zemin yüksekliği fonksiyonuna göre** (`terrain_height(x, y)`, `terrain_sdf` ile zorunlu çift); fizik motorunun temas sensörü değil | Sensör yolu (Contact sistemi + gz.transport) tek süreci 381 → 182 adım/s yavaşlattı ve mesajlar eşzamansız (tekrarlanabilirlik bozulur). Yükseklik yolu bedava, sensörle 0–20° eğimde %97.8–98.8 uyumlu (§12.26). Yüksekliksiz zemin reddedilir: z=0 varsaymak değer uydurmak olur |
 
 ---
@@ -1497,6 +1536,29 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     zaten ne yaptığını ölç (engebe: iyi); fiziksel olarak çözülebilir mi
     bak (kaygan yokuşta μ > tan θ payı); set oranlarını koru ya da ortam
     sayısını artır. S5 gelince müfredat bunu gözetmeli.
+35. **Kör politika verilen düğmeyi zemine göre çeviremez.** Öğrenilmiş
+    ayak kaldırmada (v20, v21) kaldırma düz, basamak ve engebede aynı
+    (±1 mm; basamağa takılınca yükselmiyor). Politika düğmeyi eğitim
+    zemin karışımına göre tek bir değere ayarlıyor, ayar da başlangıca
+    bağlı: 25 mm'den ~28 mm'de yerel en iyide kalıyor, çünkü engeller
+    28–35 mm arasında bir eşikte geçilmeye başlıyor ve arada ödül farkı
+    yok (sabit kaldırma taraması: models/README); 35 mm'den başlayınca
+    53 mm'ye kadar çıkıyor. Engele takılmayı IMU'dan sezmek yetmedi.
+    Zemine göre seçim için engeli görmek gerekir (ileri bakan mesafe
+    sensörü, S7/D8); kaldırma çıkışı ve düğüm tarafı buna hazır. Mesafe
+    sensörünün yönü/yeri robot.yaml'da `null`, simülasyona o değerler
+    olmadan eklenmez.
+36. **Keşif gürültüsünün zaman ölçeği eylemin etki ölçeğine uymalı.**
+    Kaldırma her kontrol adımında (50 Hz) bağımsız gürültüyle seçilince
+    (v18, v19) bir salınım (~17 adım) içinde gürültü ortalanıyor, servo
+    da süzüyor: ayak hiçbir zaman belirgin yüksek bir salınım yapmıyor,
+    engeli geçmek gibi eşikli bir ödül hiç görülmüyor. v19'da 750k adımda
+    ortalama 25.7 → 26.1 mm, kaldırma std'si 0.40 → 0.41. Seçim salınım
+    başına alınınca (v20) aynı gürültü bütün salınıma yayıldı ve kaldırma
+    öğrenilmeye başladı. Yan kazanç: yörünge salınım içinde titremiyor.
+    gSDE'nin (§12.24) aradığı şey de buydu; burada tek boyut için elle
+    yapıldı. v18'de ayrıca target_kl 0.02 her güncellemede düşük std'li
+    (0.05) eklem boyutlarında tükendi.
 
 ---
 
@@ -1614,6 +1676,10 @@ zeminler.
 12. Eğimde `orientation` cezası dünyaya göre (§13.2-1): v13 20° yokuşta
     yürüdü; cezanın gövdeyi yataya çekmeye zorladığına dair işaret yok,
     ama S5'in eğimlerinde bakılmalı.
+13. ✅ **Öğrenilmiş ayak kaldırma** (madde 10'un bir çözüm denemesi,
+    2026-09-27): kör politika kaldırmayı zemine göre seçmedi (ders 35).
+    Yan ürün orta yol modeli `ppo_kaldirma35_250k` (§3.3). S7'den sonra
+    mesafe sensörü gözleme girince aynı çıkışla yeniden denenmeli.
 
 **S5 gelince:** zemin listesini S5'in üreteciyle değiştir, müfredat, sonra
 S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son
