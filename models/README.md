@@ -22,6 +22,19 @@ Eski modeller (`tork_v2_10M`, `ppo_v4_4M`, `ppo_v7_8M`, `ppo_res_250k`,
 aldı. Aşağıdaki bölümleri ve tabloları tarihçe olarak duruyor; dosyalar git
 geçmişinde (`git log --all -- models/<ad>`).
 
+> [!WARNING]
+> **2026-09-28'den önceki bütün güç (W) ve enerji sayıları bu dosyada tek
+> anlık örnekten ölçüldü ve yaklaşık yarı yarıya düşük** (PROJE_DEVIR ders
+> 48): güç, kontrol adımının yalnız son fizik adımından okunuyordu; artık
+> adımın ortalaması (`SimState.mean_power`). Aynı modeller düzeltilmiş
+> ölçümle (temiz, düz, 0.1 m/s): tripod 1.91 → 3.69 W, `ppo_omni_250k` 2.00 →
+> 3.75, `ppo_kaldirma35_250k` 2.39 → 4.58, `ppo_lift50_3750k` 3.99 → 5.59 W.
+> Temiz koşuda sıralama korunuyor; rastgeleleştirmeli koşularda eski sayılar
+> gecikmeye göre 4 kata kadar oynuyordu, onlarla yorum yapmayın. Ayrıca
+> `tripod:50` 2026-09-28'e kadar eylem kırpması yüzünden ~30 mm kaldırıyordu
+> (ders 49). Güncel karşılaştırma: [docs/olcumler/](../docs/olcumler/).
+> Aşağıdaki tablolar tarihçe; hız, yol ve geçti/geçemedi sütunları geçerli.
+
 Değerlendirmek için (WSL, ortam: `tools/wsl/rl_kurulum.sh`; görev ayarı
 modelin `gorev.json`'ından):
 

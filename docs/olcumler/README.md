@@ -3,10 +3,15 @@
 Denetleyicilerin S5 zeminlerindeki karşılaştırması. Üreten araç:
 
 ```bash
-python -m hexapod_rl.olcum tripod tripod:50 models/<ad>/model.zip \
-    --tohum 3 --saniye 10 --temiz \
+python -m hexapod_rl.olcum tripod tripod:50 models/<ad>/model.zip models/<ad>/model.zip+refleks \
+    --tohum 3 --saniye 10 --temiz --paralel 8 \
     --csv docs/olcumler/tripod_vs_politika.csv -o docs/olcumler/tablo.md
 ```
+
+`+refleks`: mesafe sensörlü kaldırma refleksi açık (DENEYSEL yerleşim: gövde
+kenarında ileri ve ±90°, 20° aşağı; robot.yaml'da yok, D8). Tekrarlarda sensöre
+%5 gürültü + %10 düşen okuma, temiz ölçümde ideal sensör. `--paralel N`: N
+süreçte (eski PC'de 8; tam tablo ~10 dk).
 
 ## Hücreler nasıl okunur
 
@@ -37,43 +42,59 @@ Bu, tek deterministik ölçümün sınır durumlarda yanıltıcı olduğu dersin
 `--temiz` ayrıca rastgeleleştirmesiz tek ölçüm alır; CSV'de `rastgele=0`
 satırı odur, tablodaki ortalamaya karışmaz.
 
-## Sonuçlar (2026-09-28, ilk tam tablo)
+## Sonuçlar (2026-09-28 öğleden sonra, düzeltilmiş ölçüm)
 
 Komut ileri 0.1 m/s, 10 s, 3 tohum, rastgeleleştirme açık. Tablo:
 [tablo.md](tablo.md).
 
-**1. Düz zeminde herkes başa baş, fark zorlu zeminde açılıyor.** Düzde hepsi
-0.098-0.114 m/s. 45 mm basamakta `ppo_lift50_3750k` 0.107 m/s, düz tripod
-0.019 m/s — **5.6 kat**. 40 mm çukurda 0.107'ye karşı 0.014 (7.6 kat). Bu,
-"düz zeminde tripod tavanı" dersinin (§12.28) ölçülmüş hâli.
+> [!IMPORTANT]
+> Sabahki ilk tabloda iki ölçüm hatası vardı, ikisi de düzeltildi ve tablo
+> baştan ölçüldü (eskisi git geçmişinde):
+> 1. **Güç tek anlık örnekti** (PROJE_DEVIR ders 48): kontrol adımının yalnız
+>    son fizik adımından okunuyordu; servo gecikmesine göre 4 kata kadar
+>    oynuyor, temiz koşuda gerçeğin yarısını gösteriyordu. Artık adım boyunca
+>    ortalama. İlk tablodaki "tohumlar arasında güç ikiye katlanıyor"
+>    gözleminin sebebi buydu.
+> 2. **`tripod:50` 50 mm kaldırmıyordu** (ders 49): tripod sarmalayıcısında
+>    eylem ±0.5 rad'a kırpılıyordu, 50 mm femurda 49° ister; ~30 mm
+>    kaldırıyordu. İlk tablodaki "yüksek adım düzde %31 daha ucuz" bulgusu
+>    bu ikisinin birleşiminden çıkmıştı: **düzeltilmiş ölçümde tersi doğru**,
+>    50 mm adımlı tripod düzde %17 daha pahalı (42.9'a karşı 36.7 J/m).
 
-**2. Adil karşılaştırma 50 mm adımlı tripod.** Düz tripod (25 mm adım) engelde
-sürünüyor, ama adımı 50 mm'ye çıkarınca 45 mm basamakta 0.052 m/s'ye çıkıyor.
-Politikanın gerçek üstünlüğü buna karşı: 45 mm'de 2.1 kat, 60 mm'de 2.7 kat.
+**1. Refleksli politika tripod'u her engelde geçiyor, düzde aynı enerjide.**
+`ppo_kaldirma35_250k+refleks` düzde tripod'la aynı hız ve enerji (0.102 m/s,
+36.5 J/m; tripod 36.7), 45 mm basamakta 0.095 m/s (tripod 0.019, tripod:50
+0.087), 40 mm çukurda 0.099 (0.014 / 0.088), merdivende 0.097 (0.064 /
+0.090). 60 mm basamakta `ppo_refleks_1500k+refleks` en iyi: 0.091 m/s, 73 J/m
+(tripod:50 0.050 m/s, 137 J/m); `ppo_kaldirma35_250k+refleks` orada sınırda
+(rastgelede 0.075 ama temizde takılıyor).
 
-**3. Zemin becerisinin düzde bedeli var.** `ppo_lift50_3750k` düzde en hızlı
-(0.114 m/s) ama en pahalı (45.5 J/m); `tripod:50` 27.2 J/m ile en verimli.
-Kör politikanın düz verim ↔ zemin sağlamlığı ödünleşimi (§12.33), enerji
-tarafından da görünüyor. `ppo_kaldirma35_250k` beklendiği gibi ortada.
+**2. Refleksin zayıf yeri eğim.** Yokuşu ve yan eğimi önündeki "engel" sanıp
+ayağı yükseltiyor: `ppo_kaldirma35_250k+refleks` 10° yokuşta 47.3 J/m (düzde
+36.5), tripod 39.4. Engebe 40/60'ta da %14 pahalı (44.0'a karşı 38.7). Hız
+buralarda tripod'dan biraz yüksek. Sebep: engel yüksekliği yerçekimine göre
+ölçülüyor, düzgün bir eğim de 20° aşağı bakan ışının çarptığı yerde
+"yükselmiş zemin" gibi görünüyor.
 
-**4. Düz zeminde eğitilmiş politika engelde tripod'dan iyi değil.**
-`ppo_omni_250k` 45 mm basamakta 0.018 m/s — düz tripod'la aynı. Zemin
-becerisi zeminde eğitimle geliyor, kendiliğinden genellenmiyor.
+**3. Sensörsüz politikalarda ödünleşim sürüyor** (§12.33): `ppo_omni_250k`
+düzde ve eğimde en verimli (36.2 J/m; 20° yokuşta 46.5, tripod 49.7) ama
+engelde tripod kadar takılıyor; `ppo_lift50_3750k` engelde iyi (45 mm 0.107,
+çukur 0.107) ama düzde %31 pahalı (48.2 J/m).
 
-**5. Kaygan eğimde politikalar tırmanamıyor ama tutunuyor.** 15° μ0.3'te
-kimse çıkamıyor (sürtünme payı yok, §LEVELS["kaygan"]). Fark düşme biçiminde:
-tripod saniyede 0.77 m geri kayıp 3/3 devriliyor, politikalar 0.02-0.04 m/s
-ile neredeyse yerinde duruyor ve hiç devrilmiyor. Yürünebilir olan 10° μ0.3'te
-politikalar açıkça önde (0.071-0.077'ye karşı tripod 0.046).
+**4. Kaygan eğimde politikalar tutunuyor.** 10° μ0.3'te politikalar
+0.071-0.077 m/s ve 53-65 J/m, tripod 0.046 m/s ve 82.5 J/m. 15° μ0.3'te
+kimse çıkamıyor (sürtünme payı yok): tripod 0.77 m/s geri kayıp 3/3
+devriliyor, politikalar yerinde duruyor, hiç devrilmiyor.
 
-**6. Beklenmeyen: yüksek adım düzde daha ucuz.** `tripod:50` düz zeminde hem
-biraz daha hızlı hem belirgin daha verimli (27.2 J/m) — `tripod`'un 25 mm'lik
-varsayılanından (39.2 J/m) **%31 az enerji**. Ayak sürtmesinin azalması
-olabilir. `hexapod_gait`'in varsayılan adım yüksekliği (25 mm, S2) bu yüzden
-gözden geçirilmeli; ölçüm bunu tek başına kanıtlamaz, ayrı bir tarama gerekir.
+**5. Düzde herkes başa baş** (düz tripod tavanı, §12.28): hız 0.098-0.114,
+en iyi enerji tripod, `ppo_omni_250k` ve refleksli 35 mm'lik modelde (36-37
+J/m).
 
-**G7 için:** "politika tripod'u geçiyor" şartı hızda karşılanıyor (eğim,
-engebe, kaygan ayrı ayrı ölçüldü); düz zeminde enerjide karşılanmıyor.
+**G7 için:** refleksle "politika tripod'u geçiyor" şartı eğim, engebe ve
+kaygan zeminde hızda karşılanıyor, engellerde (basamak, çukur, merdiven,
+yayla) hem hızda hem enerjide açık ara; düzde enerji eşit. Eğim ve engebede
+enerjide geride (refleksin eğimi engel sanması). Sensörsüz en iyi seçenek
+zemine göre değişiyor.
 
 ## Dosyalar
 
@@ -99,10 +120,11 @@ tablolar ise **Görkem'in deneme zeminlerinde** ölçüldü. "engebe 60 mm"
 satırları aynı adı taşısa da aynı zemin değil; iki tablodaki sayıları yan
 yana koyup yorum çıkarmayın.
 
-Kalıcı çözüm: G7 eğitimi ve ölçümü S5 zeminlerine geçtiğinde
-`terrain_probe`'un kendi zemin fonksiyonları kaldırılmalı (Görkem'in planı,
-GOREVLER.md S5). O zamana kadar hangi tablonun hangi zeminle ölçüldüğü
-başlıkta yazmalı.
+G7 eğitimi 2026-09-28'den beri S5 zeminlerinde (`train.py --terrains s5`,
+`terrain_probe.TRAIN_SETS["s5"]`). `terrain_probe`'un kendi zeminleri
+kaldırılmadı: depodaki modeller onlarla eğitildi ve models/README tabloları
+onlarla ölçüldü, yeniden üretilebilsinler diye kalıyorlar. Hangi tablonun
+hangi zeminle ölçüldüğü başlıkta yazmalı.
 
 ## Ölçümün sınırları
 
