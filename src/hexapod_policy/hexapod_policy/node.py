@@ -34,7 +34,7 @@ from .mlp import MlpPolicy
 from .ranges import RangeCollector, range_sensors_from_config
 
 
-def main(argv: list[str] | None = None) -> int:
+def _run(argv: list[str] | None = None) -> int:
     import rclpy
     from geometry_msgs.msg import Twist
     from rclpy.node import Node
@@ -152,8 +152,12 @@ def main(argv: list[str] | None = None) -> int:
                 self.get_logger().warning(
                     "hız komutu politikanın eğitim aralığına kırpıldı", throttle_duration_sec=5.0)
 
-    rclpy.init(args=argv)
+    # rclpy'nin sinyal işleyicisi kapalı: Ctrl+C / SIGTERM'i main (run_node)
+    # karşılar; ikinci sinyal kapanışı yarıda kesmesin (hexapod_driver.stop_signals).
+    from rclpy.signals import SignalHandlerOptions
+
     try:
+        rclpy.init(args=argv, signal_handler_options=SignalHandlerOptions.NO)
         node = PolicyNode()
     except StartupError as exc:
         print(f"HATA: politika düğümü başlatılamadı: {exc}", file=sys.stderr)
@@ -174,6 +178,11 @@ def main(argv: list[str] | None = None) -> int:
         node.destroy_node()
         rclpy.try_shutdown()
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    from hexapod_driver.stop_signals import run_node
+    return run_node(_run, argv)
 
 
 if __name__ == "__main__":

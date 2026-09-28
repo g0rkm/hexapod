@@ -27,7 +27,7 @@ from __future__ import annotations
 import sys
 
 
-def main(argv: list[str] | None = None) -> int:
+def _run(argv: list[str] | None = None) -> int:
     import rclpy
     from rclpy.node import Node
     from sensor_msgs.msg import Imu, Range
@@ -157,8 +157,12 @@ def main(argv: list[str] | None = None) -> int:
             msg.linear_acceleration.z = float(-gz * 9.81)
             self._imu_pub.publish(msg)
 
-    rclpy.init(args=argv)
+    # rclpy'nin sinyal işleyicisi kapalı: Ctrl+C / SIGTERM'i main (run_node)
+    # karşılar; ikinci sinyal kapanışı yarıda kesmesin (hexapod_driver.stop_signals).
+    from rclpy.signals import SignalHandlerOptions
+
     try:
+        rclpy.init(args=argv, signal_handler_options=SignalHandlerOptions.NO)
         node = SensorsNode()
     except StartupError as exc:
         print(f"HATA: sensör düğümü başlatılamadı: {exc}", file=sys.stderr)
@@ -179,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
         node.destroy_node()
         rclpy.try_shutdown()
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    from hexapod_driver.stop_signals import run_node
+    return run_node(_run, argv)
 
 
 if __name__ == "__main__":
