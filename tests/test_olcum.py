@@ -242,6 +242,41 @@ def test_olc_temiz_kosu_ham_veriye_giriyor_ozete_girmiyor(gorev):
 
 
 # ---------------------------------------------------------------------------
+# Refleksli denetleyici ("<tanım>+refleks[:AÇI]")
+# ---------------------------------------------------------------------------
+
+
+def test_refleks_tanimi_cozuluyor():
+    assert olcum.denetleyici_coz("tripod:50") == ("tripod:50", None)
+    assert olcum.denetleyici_coz("m/model.zip+refleks") == ("m/model.zip", olcum.REFLEKS_ACI)
+    assert olcum.denetleyici_coz("m/model.zip+refleks:25") == ("m/model.zip", 25.0)
+    with pytest.raises(ValueError):
+        olcum.denetleyici_coz("m/model.zip+refleksler")
+
+
+def test_olc_refleks_ayarini_tekrarlara_gurultulu_temize_ideal_geciriyor(gorev):
+    """Tekrarlarda sensör gürültülü (gerçekçi), temiz ölçümde ideal: temiz sütun
+    rastgeleleştirmesiz olduğu gibi sensörü de kusursuz."""
+    cagrilar = []
+
+    def _fn(model, seconds, vx, vy, wz, seed, task, terrain_sdf, terrain_height,
+            sensor_kwargs=None):
+        cagrilar.append({"seed": seed, "sensor": sensor_kwargs})
+        return sonuc()
+
+    ayar = {"range_sensors": ("s",), "lift_reflex": object(), "range_noise": 0.05,
+            "range_drop": 0.1}
+    olcum.olc(object(), gorev, SahteZemin(), tohumlar=(1, 2), temiz=True,
+              evaluate_fn=_fn, sensor_kwargs=ayar)
+    tekrarlar = [c["sensor"] for c in cagrilar if c["seed"] != 0]
+    temiz = [c["sensor"] for c in cagrilar if c["seed"] == 0][0]
+    assert all(s == ayar for s in tekrarlar)
+    assert temiz["range_noise"] == 0.0 and temiz["range_drop"] == 0.0
+    assert temiz["range_sensors"] == ayar["range_sensors"]
+    assert ayar["range_noise"] == 0.05, "çağıranın sözlüğü değişmemeli"
+
+
+# ---------------------------------------------------------------------------
 # Kaygan zeminde geri kayma (yürüyüş değil)
 # ---------------------------------------------------------------------------
 

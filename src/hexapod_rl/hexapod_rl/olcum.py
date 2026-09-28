@@ -4,8 +4,19 @@
     python -m hexapod_rl.olcum tripod:50 models/ppo_refleks_1500k/model.zip --tohum 5
     python -m hexapod_rl.olcum tripod --zemin basamak --saniye 20 --csv olcum.csv
 
+    python -m hexapod_rl.olcum tripod models/ppo_kaldirma35_250k/model.zip+refleks --paralel 8
+
 Denetleyici tanımı terrain_probe.load ile aynı: "tripod", "tripod:50",
-"phase[:mm]", "<zip>", "<zip>:residual".
+"phase[:mm]", "<zip>", "<zip>:residual". Sonuna "+refleks" (ya da
+"+refleks:AÇI") eklenirse mesafe sensörlü kaldırma refleksi açık ölçülür
+(hexapod_policy.lift_reflex; train.py --reflex ile aynı DENEYSEL yerleşim:
+gövde kenarında ileri ve ±90°, AÇI derece aşağı, varsayılan REFLEKS_ACI).
+Yerleşim robot.yaml'da yok (D8); refleksli sonuçlar bu yerleşimin sonucudur.
+Tekrarlarda sensöre gürültü ve düşen okuma eklenir (--refleks-gurultu,
+--refleks-dusme), temiz ölçümde sensör idealdir.
+
+--paralel N: (denetleyici, zemin) çiftleri N süreçte aynı anda ölçülür (her
+süreç kendi Gazebo'sunu kurar); sonuç sırayla ölçülenle aynı.
 
 Ölçülenler (S6): ileri hız, enerji, devrilme sayısı, düşmeden gidilen mesafe.
 Enerji METRE BAŞINA veriliyor (J/m): yavaş ama verimli bir yürüyüşle hızlı
@@ -43,6 +54,30 @@ for _stream in (sys.stdout, sys.stderr):
 
 #: Varsayılan komut: ileri 0.1 m/s (eğitim ölçümlerinin ortası, EVAL_FORWARD).
 DEFAULT_COMMAND = (0.1, 0.0, 0.0)
+
+#: "+refleks" açısı verilmezse mesafe sensörlerinin aşağı bakışı (derece):
+#: refleksli modeller bununla eğitildi (train.py --reflex 20); D8'e öneri 20-25°.
+REFLEKS_ACI = 20.0
+
+
+def denetleyici_coz(spec: str) -> tuple[str, float | None]:
+    """"<tanım>+refleks[:AÇI]" -> (tanım, AÇI); refleks yoksa (spec, None)."""
+    tanim, ayrac, kalan = spec.partition("+refleks")
+    if not ayrac:
+        return spec, None
+    if kalan and not kalan.startswith(":"):
+        raise ValueError(f"refleks tanımı '+refleks' ya da '+refleks:AÇI' olmalı: {spec!r}")
+    return tanim, float(kalan[1:]) if kalan else REFLEKS_ACI
+
+
+def refleks_ayarlari(aci: float, gurultu: float = 0.0, dusme: float = 0.0) -> dict:
+    """HexapodEnv'in refleks argümanları: DENEYSEL yerleşim (train.py --reflex ile
+    aynı), gurultu/dusme ölçüme bağıl gürültü ve okumanın gelmeme olasılığı (0-1)."""
+    from hexapod_policy.lift_reflex import LiftReflex
+
+    from .reflex_probe import ring_sensors
+    return dict(range_sensors=ring_sensors((0.0, 90.0, -90.0), aci), lift_reflex=LiftReflex(),
+                range_noise=gurultu, range_drop=dusme)
 
 
 # ---------------------------------------------------------------------------
@@ -194,12 +229,14 @@ def csv_yaz(ozetler: list[Ozet], path: str | Path) -> Path:
 
 def olc(model, task, zemin, komut=DEFAULT_COMMAND, saniye: float = 10.0,
         tohumlar=(1, 2, 3), temiz: bool = True, denetleyici: str = "",
-        evaluate_fn=None) -> Ozet:
+        evaluate_fn=None, sensor_kwargs: dict | None = None) -> Ozet:
     """Bir denetleyiciyi bir zeminde N tohumla ölç.
 
     zemin: hexapod_terrain.Terrain (ya da None: düz). Tekrarlar rastgeleleştirme
     AÇIK koşar (yoksa tohumlar aynı sonucu verir, bkz. modül açıklaması);
     temiz=True ayrıca rastgeleleştirmesiz tek ölçüm ekler.
+    sensor_kwargs: mesafe sensörü + refleks (refleks_ayarlari); tekrarlarda
+    olduğu gibi, temiz ölçümde gürültüsüz ve düşmesiz kullanılır.
     evaluate_fn yalnız test için (gerçek ölçüm hexapod_rl.evaluate.evaluate).
     """
     from dataclasses import replace
@@ -215,17 +252,23 @@ def olc(model, task, zemin, komut=DEFAULT_COMMAND, saniye: float = 10.0,
     ad = zemin.label if zemin is not None else "düz"
     vx, vy, wz = komut
 
+    # Sensörsüz denetleyicide evaluate_fn'e sensör argümanı hiç gitmez.
+    sensor = {} if sensor_kwargs is None else {"sensor_kwargs": sensor_kwargs}
+    ideal = ({} if sensor_kwargs is None else
+             {"sensor_kwargs": {**sensor_kwargs, "range_noise": 0.0, "range_drop": 0.0}})
+
     rastgele_gorev = replace(task, randomization=Randomization())
     kosular = []
     for tohum in tohumlar:
         r = evaluate_fn(model, seconds=saniye, vx=vx, vy=vy, wz=wz, seed=tohum,
-                        task=rastgele_gorev, terrain_sdf=sdf, terrain_height=height)
+                        task=rastgele_gorev, terrain_sdf=sdf, terrain_height=height, **sensor)
         kosular.append({**r, "tohum": tohum, "rastgele": 1})
 
     temiz_sonuc = None
     if temiz:
         temiz_sonuc = {**evaluate_fn(model, seconds=saniye, vx=vx, vy=vy, wz=wz, seed=0,
-                                     task=task, terrain_sdf=sdf, terrain_height=height),
+                                     task=task, terrain_sdf=sdf, terrain_height=height,
+                                     **ideal),
                        "tohum": 0, "rastgele": 0}
 
     ozet = ozetle(ad, denetleyici or "denetleyici", komut, kosular, temiz_sonuc)
@@ -235,14 +278,44 @@ def olc(model, task, zemin, komut=DEFAULT_COMMAND, saniye: float = 10.0,
     return ozet
 
 
-def main(argv: list[str] | None = None) -> int:
+def zeminler(tur: str = "", tohum: int = 1) -> list:
+    """Ölçülen zeminler: bir türün seviyeleri ya da S6'nın sabit listesi."""
     from hexapod_terrain import sets
+    return sets.levels(tur, tohum) if tur else sets.evaluation_set(tohum)
 
-    from .terrain_probe import load
 
+_YUKLU: dict = {}   # süreç içinde yüklenmiş denetleyiciler (tanım -> (model, görev, açı))
+
+
+def hazirla(spec: str, gurultu: float = 0.0, dusme: float = 0.0):
+    """Denetleyici tanımı -> (model, görev, sensor_kwargs ya da None)."""
+    if spec not in _YUKLU:
+        from .terrain_probe import load
+        tanim, aci = denetleyici_coz(spec)
+        _YUKLU[spec] = (*load(tanim), aci)
+    model, task, aci = _YUKLU[spec]
+    return model, task, None if aci is None else refleks_ayarlari(aci, gurultu, dusme)
+
+
+def _is(is_: tuple) -> Ozet:
+    """Tek (denetleyici, zemin) ölçümü; paralel havuzda da koşar (argümanlar
+    düz veri: zemin, içinde fonksiyon taşıdığı için süreçte yeniden üretilir)."""
+    spec, tur, zemin_tohumu, i, komut, saniye, tohumlar, temiz, gurultu, dusme = is_
+    try:
+        import torch
+        torch.set_num_threads(1)   # paralel süreçler çekirdekleri paylaşsın
+    except ImportError:
+        pass
+    model, task, sensor = hazirla(spec, gurultu, dusme)
+    return olc(model, task, zeminler(tur, zemin_tohumu)[i], komut, saniye, tohumlar,
+               temiz=temiz, denetleyici=spec, sensor_kwargs=sensor)
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Yürüyüş ölçüm aracı (S6)")
     parser.add_argument("denetleyiciler", nargs="+",
-                        help='"tripod", "tripod:50", "phase[:mm]", "<zip>[:residual]"')
+                        help='"tripod", "tripod:50", "phase[:mm]", "<zip>[:residual]"; '
+                             'sonuna "+refleks[:AÇI]" (mesafe sensörlü kaldırma refleksi)')
     parser.add_argument("--zemin", default="", help="yalnız bu türün seviyeleri (ör. basamak)")
     parser.add_argument("--tohum", type=int, default=3, help="tekrar sayısı (varsayılan 3)")
     parser.add_argument("--saniye", type=float, default=10.0)
@@ -251,25 +324,44 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--wz", type=float, default=DEFAULT_COMMAND[2])
     parser.add_argument("--zemin-tohumu", type=int, default=1, help="engebenin tohumu")
     parser.add_argument("--temiz", action="store_true", help="rastgeleleştirmesiz ölçümü de al")
+    parser.add_argument("--paralel", type=int, default=1,
+                        help="aynı anda ölçülen (denetleyici, zemin) çifti; süreç sayısı")
+    parser.add_argument("--refleks-gurultu", type=float, default=5.0,
+                        help="+refleks: tekrarlarda mesafe ölçümüne bağıl gürültü, %%")
+    parser.add_argument("--refleks-dusme", type=float, default=10.0,
+                        help="+refleks: tekrarlarda okumanın gelmeme olasılığı, %%")
     parser.add_argument("--csv", type=Path, default=None)
     parser.add_argument("-o", "--out", type=Path, default=None, help="tabloyu dosyaya yaz")
     args = parser.parse_args(argv)
 
-    zeminler = (sets.levels(args.zemin, args.zemin_tohumu) if args.zemin
-                else sets.evaluation_set(args.zemin_tohumu))
+    for spec in args.denetleyiciler:
+        denetleyici_coz(spec)   # yazım hatası ölçüm başlamadan yakalansın
     komut = (args.vx, args.vy, args.wz)
     tohumlar = tuple(range(1, args.tohum + 1))
+    gurultu, dusme = args.refleks_gurultu / 100, args.refleks_dusme / 100
+    isler = [(spec, args.zemin, args.zemin_tohumu, i, komut, args.saniye, tohumlar, args.temiz,
+              gurultu, dusme)
+             for spec in args.denetleyiciler
+             for i in range(len(zeminler(args.zemin, args.zemin_tohumu)))]
 
     ozetler = []
-    for spec in args.denetleyiciler:
-        model, task = load(spec)
-        for zemin in zeminler:
-            ozet = olc(model, task, zemin, komut, args.saniye, tohumlar,
-                       temiz=args.temiz, denetleyici=spec)
+    if args.paralel > 1:
+        import multiprocessing as mp
+        # Her iş kendi sürecinde (Gazebo dünyaları süreçte birikmesin); sıra korunur.
+        havuz = mp.get_context("fork").Pool(args.paralel, maxtasksperchild=1)
+        sonuclar = havuz.imap(_is, isler, chunksize=1)
+    else:
+        havuz, sonuclar = None, map(_is, isler)
+    try:
+        for ozet in sonuclar:
             ozetler.append(ozet)
-            print(f"  {spec:<28} {ozet.zemin:<22} {_sayi(ozet.hiz_ort, ' m/s')} "
+            print(f"  {ozet.denetleyici:<28} {ozet.zemin:<22} {_sayi(ozet.hiz_ort, ' m/s')} "
                   f"{_sayi(ozet.enerji_ort_j_m, ' J/m', 1):>10}  {ozet.gecti}",
                   file=sys.stderr, flush=True)
+    finally:
+        if havuz is not None:
+            havuz.close()
+            havuz.join()
 
     metin = tablo(ozetler)
     print(metin)
@@ -283,7 +375,17 @@ def main(argv: list[str] | None = None) -> int:
                   f"zemin kaynağı: hexapod_terrain (S5) · "
                   f"komut vx={komut[0]:g} vy={komut[1]:g} wz={komut[2]:g} · "
                   f"{args.saniye:g} s · {len(tohumlar)} tohum, rastgeleleştirme açık"
-                  f"{' · temiz ölçüm ayrıca alındı' if args.temiz else ''}\n\n")
+                  f"{' · temiz ölçüm ayrıca alındı' if args.temiz else ''}\n"
+                  f"enerji: güç kontrol adımındaki bütün fizik adımlarının ortalaması "
+                  f"(2026-09-28 öncesi tablolar tek anlık örnekti, karşılaştırılamaz)\n")
+        acilar = sorted({a for a in (denetleyici_coz(s)[1] for s in args.denetleyiciler)
+                         if a is not None})
+        if acilar:
+            baslik += (f"+refleks: DENEYSEL mesafe sensörü yerleşimi (gövde kenarında ileri ve "
+                       f"±90°, {'/'.join(f'{a:g}' for a in acilar)}° aşağı; robot.yaml'da yok, "
+                       f"D8) · tekrarlarda %{args.refleks_gurultu:g} gürültü + "
+                       f"%{args.refleks_dusme:g} düşen okuma\n")
+        baslik += "\n"
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(baslik + metin + "\n", encoding="utf-8", newline="\n")
     if args.csv:

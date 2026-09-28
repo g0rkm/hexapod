@@ -59,11 +59,13 @@ def _yaw(q) -> float:
 def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123,
              noise: float = 0.0, task=None, terrain_sdf: str = "",
              terrain_height=None, vy: float = 0.0, wz: float = 0.0, env=None,
-             body_mass_scale: float = 1.0, perturbation=None) -> dict:
+             body_mass_scale: float = 1.0, perturbation=None,
+             sensor_kwargs: dict | None = None) -> dict:
     """env: yeniden kullanılacak bir HexapodEnv (eğitimde ara kayıt seçimi her
-    seferinde Gazebo kurmasın diye); verilirse task/terrain/kütle/bozulma yok
-    sayılır ve kapatılmaz. perturbation: task.Perturbation (dayanıklılık
-    taraması)."""
+    seferinde Gazebo kurmasın diye); verilirse task/terrain/kütle/bozulma/sensör
+    yok sayılır ve kapatılmaz. perturbation: task.Perturbation (dayanıklılık
+    taraması). sensor_kwargs: HexapodEnv'in mesafe sensörü ve refleks
+    argümanları (range_sensors, lift_reflex, range_noise, range_drop)."""
     import numpy as np
 
     from .env import HexapodEnv
@@ -71,7 +73,8 @@ def evaluate(model, seconds: float = 10.0, vx: float = 0.1, seed: int = 123,
     own = env is None
     if own:
         env = HexapodEnv(task=task, terrain_sdf=terrain_sdf, terrain_height=terrain_height,
-                         body_mass_scale=body_mass_scale, perturbation=perturbation)
+                         body_mass_scale=body_mass_scale, perturbation=perturbation,
+                         **(sensor_kwargs or {}))
     obs, _ = env.reset(seed=seed, options={"command": (vx, vy, wz)})
     if hasattr(model, "reset"):   # iç durumu olan denetleyici (baseline.TripodPolicy)
         model.reset()
