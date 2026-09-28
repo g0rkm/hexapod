@@ -82,6 +82,9 @@ sleep 5
 # Kalanlar (gz sunucusu SIGINT'te bazen kalıyor): bütün grup.
 kill -KILL -- -"$LAUNCH" 2>/dev/null
 [ -n "${POL:-}" ] && kill -KILL -- -"$POL" 2>/dev/null
+# `ros2 control` bu koşunun alan kimliği için bir ros2 arka plan süreci (daemon)
+# başlatıyor; kimlik her koşuda rastgele olduğu için birikip WSL'i açık tutuyordu.
+timeout 10 ros2 daemon stop >/dev/null 2>&1
 echo "--- politika düğümü durumları ($LOGS/policy.log)"
 grep -E "hazır|durum:|refleks:|HATA|Error|Traceback" "$LOGS/policy.log" 2>/dev/null \
     | sed 's/^\[[^]]*\] //' | cut -c1-160
