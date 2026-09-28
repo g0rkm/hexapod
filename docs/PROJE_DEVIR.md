@@ -9,7 +9,7 @@
 > Son güncelleme: **2026-09-28** (5. oturum, eski PC). Şu anki durum ve
 > depodaki modeller **§3.1**; bu oturumun işi **§3.8–3.9** (S5 + S6 ile
 > "bitti" ölçümü, güç ve tripod:50 ölçüm hataları, eğimde refleks, G7 kapandı,
-> refleks robot düğümünde), dersler 48–50; önceki oturum §3.3–3.7, dersler
+> refleks robot düğümünde, engebede refleks denemeleri), dersler 48–52; önceki oturum §3.3–3.7, dersler
 > 26–47. **Yazılım aşamasının bütün görevleri bitti.** Açık işler §13.2, plan
 > §14. · Testler: **Linux 468 geçti + 4 atlandı**, Windows 413 geçti + 13
 > atlandı (Gazebo/ROS/SB3 testleri Windows'ta atlanır)
@@ -610,6 +610,11 @@ Bu oturum eski PC'de (i5-10300H, 8 ortam) geçti. Tablo ve yorum:
   Düzde yedi komutta refleksle %98–107 (kör %100–107), sıfır komutta 0.0 mm.
   Geri yürürken "refleks: yön görülmüyor" (arkada sensör yok), kör davranış.
 - **Görkem'in ve Samet'in yazılım görevlerinin hepsi bitti** (G1–G8, S1–S7).
+- **Sonrasında (kullanıcı "dene" dedi): engebede refleksin enerjisi.** Sebep
+  bulundu (refleks geniş tepeleri engel sanıyor; 25 mm yetiyor), üç kural
+  denendi, hiçbiri engelde kayıpsız değil; varsayılan değişmedi (ders 51).
+  Bu deneylerde ölçüm havuzunun rastgele takılması bulundu ve giderildi
+  (`forkserver`, ders 52).
 
 ---
 
@@ -2018,6 +2023,28 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     anındaki takılmayı gizleyebilir; kapalı döngü, deterministik tek senaryo
     testi (tests/test_policy_sim.py) onu yakaladı. Bir kuralı değiştirirken
     ikisini de koş.
+51. **Tek ışınlı sensörle yumuşak tepeyi basamaktan kuralla ayırmak zor;
+    önce "ne kadar yeter"i ölç.** Refleksli politika engebede %12–14 fazla
+    enerji harcıyordu. Önce sabit kaldırmayla ölçüldü: S5 engebesinde 25 mm
+    yetiyor (39.0 J/m, tripod 38.7); refleks 40–60 mm'lik ama geniş tepeleri
+    engel sanıp 33–40 mm kaldırıyor. Üç kural denendi (models/README,
+    "Engebede refleks"): eşiği yükseltmek (engeller yavaşlıyor, yayla
+    çöküyor), yalnız yürüme yönündeki sensör (engebede fark yok, yan
+    sensörler yaylada ve çukurdan yana çıkışta işe yarıyormuş), keskin
+    yükselme / sıçrama (engebeyi çözüyor ama engel robot doğarken zaten
+    görüş alanındaysa hiç tetiklenmiyor; başlangıç kuralıyla bile 60 mm
+    basamak takılıyor). Hepsi engel becerisini engebe enerjisine satıyor;
+    varsayılan değişmedi. Yeni bir kural önermeden önce zor durumlarda (engel
+    başlangıçta görüşte, yandan yaklaşma, iniş) test et; S6'nın ileri
+    satırları yetmiyor.
+52. **Çok iş parçacıklı süreçten fork eden havuz rastgele takılır.**
+    `Pool(maxtasksperchild=1)` yeni işçileri yardımcı iş parçacığından fork
+    ediyor; 60 işlik deneylerin üçünde de bir iş takıldı (her seferinde farklı
+    iş, bütün iş parçacıkları futex'te, %0 işlemci, `pool.map` hiç bitmedi;
+    yeniden denenince geçti). Ölçüm araçlarının havuzu artık `forkserver`
+    (`hexapod_rl.paralel.job_pool`). Belirti: uzun süredir sürmesi gereken bir
+    deneyde işlemci kullanımı sıfıra düşmüşse süreç listesine bak
+    (`ps -eo pid,etime,pcpu,args`); takılan tek bir işçi kalmıştır.
 ---
 
 ## 13. Açık kalan işler
@@ -2059,8 +2086,10 @@ Bu oturumda bitenler §14'te. Açık kalanlar:
    eğimde ayakta duran robot adım başı ~0.06 kaybeder). v13 20° yokuşta
    yürüdü, zorladığına dair işaret yok; S5'in eğimlerinde bakılmalı,
    gerekirse zemin normaline göre ölçülür.
-3b. **Engebede refleksli politika enerjide geride** (%6–14, S6 engebe 40/60).
-   Engebe S5 eğitim setinde yok (eğitimi ~2 kat yavaşlatıyor, ders 42).
+3b. **Engebede refleksli politika enerjide geride** (%12–14, S6 engebe
+   40/60). Üç kural denendi, hepsi engel becerisinden kaybettirdi; varsayılan
+   değişmedi (ders 51, models/README "Engebede refleks"). Kalan yol: sensör
+   gözlemli RL (madde 8) ya da gerçek sensörle (D8) yeniden bakmak.
 4. **Uzun eğitimde deterministik davranışın kötüleşmesi** (ders 25, 28): en
    iyi ara kayıt otomatik seçiliyor; std'yi zamanla düşürmek denenmedi.
 5. **Hızlıda yön kayması:** `ppo_omni_250k` 0.15 m/s'de 10 s'de −4°.

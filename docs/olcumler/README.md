@@ -75,6 +75,9 @@ yokuşta 47.3 J/m); engel yüksekliği artık zeminin eğimi çıkarılarak
 ölçülüyor: 10° yokuş 39.3 (tripod 39.4), 20° yokuş 46.5 (49.7, hız da
 0.086'ya 0.076), yan eğim 37.5 (37.4). **Kalan zayıf yer engebe:** hız eşit
 ya da biraz yüksek, enerji %12–14 fazla (43.3/46.1'e karşı 38.7/40.5).
+Sebep: refleks geniş tepeleri engel sanıyor, oysa engebede 25 mm yetiyor. Üç
+kural denendi, hepsi engellerde kaybettirdi; varsayılan değişmedi
+(models/README, "Engebede refleks").
 `ppo_refleks_1500k` eski ("yercekimi") kipiyle eğitildi; yeni kipte 60 mm
 basamakta biraz geriledi (0.091 → 0.080 m/s).
 

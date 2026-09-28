@@ -47,6 +47,46 @@ python -m hexapod_rl.terrain_probe tripod models/ppo_omni_250k/model.zip
 python -m hexapod_rl.reflex_probe --model models/ppo_kaldirma35_250k/model.zip --pitch 20
 ```
 
+## Engebede refleks: denenen kurallar (2026-09-28)
+
+Soru: refleksli politika (`ppo_kaldirma35_250k`) engebede tripod'dan %12–14
+fazla enerji harcıyor (S6: 43.3/46.1'e karşı 38.7/40.5 J/m). Sebep ve çözüm?
+S6 zeminleri (S5), ileri 0.1 m/s (son satır sola 0.06), 10 s, 3 tohum
+rastgele; hücre: hız m/s · J/m, parantezde temiz koşu hızı. Düzeltilmiş güç
+ölçümüyle (ders 48). Refleks "egim" kipinde.
+
+| Zemin | sabit 25 mm | refleks (varsayılan) | eşik 30 mm | yalnız yöndeki sensör | sıçrama 30 + başlangıç |
+|---|---|---|---|---|---|
+| düz | 0.102 · 36.5 | 0.102 · 36.5 | 0.102 · 36.5 | 0.102 · 36.5 | 0.102 · 36.5 |
+| engebe 40 | 0.100 · **39.0** | 0.101 · 43.3 | 0.100 · 39.1 | 0.101 · 43.3 | 0.100 · 39.3 |
+| engebe 60 | 0.098 · **40.9** | 0.102 · 46.1 | 0.100 · 42.4 | 0.102 · 46.1 | 0.098 · 41.6 |
+| basamak 30 | 0.079 · 57.0 | 0.097 · 51.6 | 0.093 · 52.3 | 0.097 · 50.2 | 0.089 · 56.4 |
+| basamak 45 | 0.018, takılı | 0.098 · 57.2 (0.094) | 0.090 · 62.6 (0.075) | 0.097 · 55.0 (0.092) | 0.088 · 65.2 (0.078) |
+| basamak 60 | 0.018, takılı | 0.089 · 70.8 (0.050) | 0.080 · 87.0 (0.043) | 0.077 · 83.2 (0.050) | 0.057 · 170 (0.018) |
+| merdiven 6x35 | 0.048 · 112 | 0.099 · 56.9 | 0.098 · 57.2 | 0.099 · 56.9 | 0.093 · 61.3 |
+| çukur 40 | 0.025 · 265 | 0.099 · 54.1 | 0.098 · 52.4 | 0.098 · 52.6 | 0.098 · 52.9 |
+| yayla 50 | 0.046 · 107 | **0.086** · 64.8 | 0.056 · 90.2 | 0.046 · 106 | 0.059 · 86.6 |
+| çukur 40, sola | 0.014 · 335 | **0.060** · 89.5 | — | 0.047 · 113 | 0.049 · 101 |
+
+- **Engebede 25 mm yetiyor;** refleks yumuşak tepeleri (40–60 mm ama birkaç
+  on cm'ye yayılmış) engel sanıp ayağı 33–40 mm kaldırıyor, hızda yalnız
+  %1–4 kazandırıyor.
+- **Eşik 30 mm:** engebeyi çözüyor, ama 45/60 mm basamak temizde yavaşlıyor,
+  yayla 0.086 → 0.056.
+- **Yalnız yürüme yönündeki sensör** (ileri yürürken yan sensörler engel
+  kaydetmesin): engebede hiç fark yok (tümsekleri öndeki sensör görüyor);
+  yayla, 60 mm basamak ve çukurdan yana çıkış kötüleşiyor. Yan sensörler
+  oralarda işe yarıyor.
+- **Sıçrama** (okuma son 0.5 s'deki en düşüğünden 30 mm yüksekse): engebeyi
+  çözüyor; başlangıç kuralı olmadan basamak ve çukur kenarı robot doğarken
+  zaten görüldüğü için hiç tetiklenmiyor (çukurda takılıyor). Sıfırlandıktan
+  sonraki 0.5 s'de düz kuralı eklenince çukurlar kurtuluyor ama 60 mm basamak
+  temizde takılıyor, yayla kötü.
+- **Karar: varsayılan refleks değişmedi.** Engebedeki %10'luk enerji, engel
+  geçme yeteneğinin bedeli; ilke engeli geçmenin önce gelmesi. Engebeyi
+  basamaktan ayırmak tek ışınlı sensörle kuralla zor (PROJE_DEVIR ders 51);
+  sensör gözlemli RL (politika mesafeyi görür) açık iş.
+
 ## Mesafe sensörlü kaldırma refleksi (2026-09-27)
 
 Kör politika ayak kaldırmayı zemine göre seçemiyor (ders 33, 35). Soru: önüne
