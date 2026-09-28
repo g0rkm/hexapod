@@ -213,7 +213,12 @@ donanım bilgileri config'e sonradan girilir.
    +%20 güçle 45 mm engeller). Mesafe sensörlü kaldırma refleksiyle
    (`hexapod_policy.lift_reflex`, S7/D8'i bekliyor) düzde 25 mm'nin
    enerjisi + engelde 50 mm'den iyi geçiş; refleks açıkken eğitilen
-   `models/ppo_refleks_1500k` engelde en iyisi. Asıl zeminler S5'i bekliyor
+   `models/ppo_refleks_1500k` engelde en iyisi. **2026-09-28:** S5 zeminleri
+   eğitime bağlı (`--terrains s5`); S6 "bitti" ölçümü (docs/olcumler/) iki
+   ölçüm hatası düzeltilerek yapıldı (güç artık kontrol adımı ortalaması,
+   ders 48; tripod:50 kırpılıyordu, ders 49): `ppo_kaldirma35_250k` +
+   refleks ("egim" kipi, ders 50) tripod'u her zemin türünde geçiyor ya da
+   eşit; G7'yi kapatmak kullanıcı onayında
 7. 🔄 Pi 4'e aktarma: politika düğümü (`hexapod_policy`) ve sürücü düğümü
    (`hexapod_hardware`) yazıldı, simde çalışıyor; Pi'de denenmedi
 

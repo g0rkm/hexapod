@@ -6,12 +6,12 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-27** (4. oturum sonu). Şu anki durum ve depodaki
-> modeller **§3.1**; bu oturumun işleri §3.3–3.7 (her yöne politika, zeminli
-> eğitim, öğrenilmiş kaldırma, müfredat, mesafe sensörlü kaldırma refleksi,
-> robota geçiş dayanıklılığı), dersler 26–41, açık işler §13.2, plan §14.
-> · Testler: **Linux 396/396**, Windows 345 geçti + 13 atlandı (Gazebo/ROS/SB3
-> testleri Windows'ta atlanır)
+> Son güncelleme: **2026-09-28** (5. oturum, eski PC). Şu anki durum ve
+> depodaki modeller **§3.1**; bu oturumun işi **§3.8** (S5 + S6 ile "bitti"
+> ölçümü, güç ve tripod:50 ölçüm hataları, eğimde refleks), dersler 48–50;
+> önceki oturum §3.3–3.7, dersler 26–47. Açık işler §13.2, plan §14.
+> · Testler: **Linux 460 geçti + 4 atlandı**, Windows 407 geçti + 13 atlandı
+> (Gazebo/ROS/SB3 testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -153,6 +153,13 @@ Yeni PC'deki yollar (2026-09-26):
   `/mnt/c/Users/user/Desktop/hexapod`.
 - WSL dağıtımı `Ubuntu-26.04` (varsayılan), Linux kullanıcısı `user`:
   `~/hexapod_ws` = `/home/user/hexapod_ws`, `~/hexapod_venv`, `~/hexapod_runs`.
+
+Kullanıcı iki bilgisayar arasında gidip geliyor: 2026-09-28 oturumu yine
+**eski PC'de** geçti (depo `C:\Users\gorke\OneDrive\Masaüstü\hexapod`, WSL
+dağıtımı `Ubuntu`, Linux kullanıcısı `gorkem`, 8 iş parçacığı → `--envs 8`,
+~600 adım/s). Oturum başında CPU'ya bak (`(Get-CimInstance
+Win32_Processor).Name`), `git pull --rebase` ile öteki makinedeki işi al;
+yeni paket geldiyse o makinede `derle.sh`'yi yeniden koş.
 
 ### 0.5 Yeni PC kurulum sonucu (2026-09-26)
 
@@ -311,7 +318,7 @@ artık geçersiz ya da güncellendi:
 | 5 | Klasik yürüyüş (tripod) | ✅ Samet: `hexapod_gait` (S2), `hexapod_teleop` (S3) |
 | 6 | Gerçek robot sürücü düğümü (`hexapod_hardware`) | ✅ Samet (S4); yalnız dry-run, donanımda denenmedi |
 | 7 | RL ortamı (`hexapod_rl`) | ✅ (G6); tripod aynı ortamda ölçüldü |
-| 8 | PPO eğitimi | 🔄 (G7). Depodaki modeller ve ne için oldukları §3.1'de. Asıl zeminler S5'i, "bitti" ölçümü S6'yı bekliyor |
+| 8 | PPO eğitimi | 🔄 (G7). Depodaki modeller ve ne için oldukları §3.1'de. S6 "bitti" ölçümünde refleksli politika tripod'u geçiyor (§3.8); kapanış kullanıcı onayında |
 | 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu simde her yöne ve deneme zeminlerinde yürüdü; mesafe sensörlü refleks denetleyicide hazır, düğüme bağlanması S7/D8'i bekliyor |
 | 10 | Pi 4'e aktarma | ⛔ donanım vardiyası (D11) |
 
@@ -339,6 +346,12 @@ Eski modeller (`tork_v2_10M`, `ppo_v4_4M`, `ppo_v7_8M`, `ppo_res_250k`,
 `ppo_lift50_2250k`) 2026-09-27'de depodan kaldırıldı: yerlerini yukarıdakiler
 aldı, hiçbir kod ya da test kullanmıyordu. Ölçüm tabloları models/README'de
 duruyor, dosyalar git geçmişinde.
+
+**2026-09-28 güncellemesi (§3.8):** yukarıdaki tablodaki güç sayıları eski
+(hatalı) ölçümle; düzeltilmiş karşılaştırma docs/olcumler/tablo.md. Robota
+aday `ppo_kaldirma35_250k` + mesafe sensörlü refleks ("egim" kipi): S6'da
+tripod'u her zemin türünde hızda geçiyor ya da eşit, düzde ve eğimde enerjide
+eşit, engellerde 2–4 kat verimli.
 
 Ana bulgular:
 - **Düz zeminde tripod tavanı** (ders 28): RL düzde tripod'la başa baş;
@@ -517,6 +530,52 @@ Tablolar: models/README ("Dayanıklılık taraması"). Ayrıntı ders 37.
   ~2° doğruluk), D8 (sensör yerleşimi: ileri + ±90°, 20–25° aşağı), D9
   (yük altında servo gerilimi; robotta ilk politika denemesi 25 mm'lik
   modelle).
+
+### 3.8 S5 + S6 ile "bitti" ölçümü, iki ölçüm hatası, eğimde refleks (2026-09-28, eski PC)
+
+Bu oturum eski PC'de (i5-10300H, 8 ortam) geçti. Tablo ve yorum:
+[docs/olcumler/](olcumler/README.md).
+
+- **İki ölçüm hatası bulundu ve düzeltildi:**
+  - Güç tek anlık örnekti (ders 48): temizde gerçeğin yarısı, gecikmeye
+    göre 4 kata kadar oynuyor. Artık `SimState.mean_power`. Bütün eski
+    eğitimler bu hatalı enerji cezasıyla yapıldı; models/README'deki eski
+    güç sayıları geçersiz (hız ve geçti/geçemedi geçerli).
+  - `tripod:50` ~30 mm kaldırıyordu (ders 49, eylem kırpması). §3.4'teki
+    "50 mm adımlı tripod'la adil karşılaştırma" bu yüzden tripod'a haksızdı.
+  - Samet'in S6 tablosundaki "yüksek adım düzde %31 ucuz" bulgusu bu ikisinin
+    birleşimiydi; düzeltilmiş ölçümde 50 mm'lik tripod düzde %17 pahalı.
+- **S5 zeminleri eğitime bağlandı** (`--terrains s5`, `--curriculum s5`;
+  §7.8). Eski deneme zeminleri, depodaki modeller onlarla eğitildiği için
+  kalıyor.
+- **S5'te düzeltilmiş cezayla eğitim (v25) yarar getirmedi.**
+  `ppo_refleks_1500k`'dan, refleks açık, S5 zeminlerinde; ara kayıt skoru
+  her ölçümde düştü (250k 2.492 → 1M 2.293), eğitim ödülü yatay; 1M'de
+  durduruldu. Aynı ölçütle başlangıç modeli 2.438, `ppo_kaldirma35_250k`
+  (refleksle) **2.543**. Depoya alınmadı (`egitim_kayitlari/v25_s5_refleks`).
+- **Refleksin eğim zaafı giderildi** (ders 50): engel yüksekliği yerçekimine
+  göre ölçülünce yokuş da engel görünüyordu. Yeni varsayılan "egim" kipi
+  (yerçekimi yönünün 5 s'lik ortalaması zeminin eğimi sayılıyor):
+  `ppo_kaldirma35_250k+refleks` 10° yokuşta 47.3 → 39.3 J/m (tripod 39.4),
+  20° yokuşta 53.7 → 46.5 (tripod 49.7), yan eğimde 44.6 → 37.5 (37.4);
+  basamaklarda kayıp yok.
+- **G7 "bitti" ölçümü (S6, düzeltilmiş, refleks "egim"):**
+  `ppo_kaldirma35_250k+refleks` tripod'a göre:
+  - düz: aynı hız, aynı enerji (36.5'e 36.7 J/m),
+  - eğim: 10° ve yan eğimde enerji eşit, 20° yokuşta hem hızlı (0.086'ya
+    0.076 m/s) hem ucuz (46.5'e 49.7),
+  - kaygan 10° μ0.3: 0.072'ye 0.046 m/s, 53'e 82 J/m,
+  - engebe 40/60: hız eşit, enerji %6–14 fazla (43.3/46.1'e 38.7/40.5),
+  - engeller: 45 mm basamak 0.098'e 0.019 m/s, 60 mm basamak 0.089'a
+    0.019, 40 mm çukur 0.099'a 0.014, merdiven 0.099'a 0.064, yayla 0.086'ya
+    0.054; hepsinde enerji de 2–4 kat az.
+  Yani refleksli politika tripod'u her zemin türünde hızda geçiyor ya da
+  eşit; enerjide yalnız engebede geride. **G7'nin şartı (eğim, engebe,
+  kaygan ayrı ayrı ölçüldü, politika tripod'u geçiyor) refleksle
+  karşılanıyor.** Sensörsüz en iyi seçenek hâlâ zemine göre değişiyor
+  (düzde `ppo_omni_250k`, engelde `ppo_lift50_3750k`).
+- **Robota gidecek aday:** `ppo_kaldirma35_250k` + mesafe sensörlü refleks.
+  Refleksin düğüme bağlanması D8'i (sensör yeri ve açısı) bekliyor.
 
 ---
 
@@ -888,6 +947,10 @@ Python bağları, TestFixture).
 - **Servo modeli, her fizik adımında Python'da:**
   `tork = Kp·(hedef−konum) − Kd·hız`. Hareket yönünde
   `durma torku·(1−|hız|/yüksüz hız)`, frenlerken durma torkuyla sınırlı.
+- **Güç** (`SimState.mean_power`, 2026-09-28): Σ|τ·ω| kontrol adımının
+  bütün fizik adımlarında ortalanır; ödülün `power` terimi ve bütün W/J/m
+  ölçümleri bunu kullanır. Öncesinde son fizik adımının anlık değeriydi ve
+  yarı yarıya düşük, gecikmeye göre 4 kata kadar oynuyordu (ders 48).
 - Rastgeleleştirme düğmeleri: `set_servo(strength, stiffness)`,
   `latency_steps`, `push(force, seconds)`.
 - **Zemin (S5 için):** `terrain_sdf` (düz zemin yerine statik bir `<model>`
@@ -973,7 +1036,12 @@ taklit eder.
   gerekmez. `models/<ad>/gorev.json` de depoda.
 - `--terrains AD`: ortam başına zemin (`terrain_probe.TRAIN_SETS`; liste
   ortamlara sırayla dağıtılır, kütle çarpanları karıştırılır). Taklit de
-  aynı zeminlerde toplanabilir (`pretrain --terrains`).
+  aynı zeminlerde toplanabilir (`pretrain --terrains`). **`s5`**
+  (2026-09-28): S5'in üreteciyle 8 zemin (düz, çukur 55, basamak 55,
+  merdiven 6x45, yokuş 25°, kaygan 12° μ0.3, yayla 55, yan eğim 15°);
+  seviyeleri S6'nın ölçüm listesindekilerin aynısı değil (test denetliyor),
+  engebe yok (ders 42). `deneme`/`deneme2`: depodaki modellerin eğitildiği
+  eski zeminler.
 - `--curriculum AD` (2026-09-27): kolaydan zora müfredat
   (`terrain_probe.CURRICULA`; `HexapodEnv(terrain_levels=[üreteç, ...])`).
   Ortam başına bir zemin türü ve seviyeleri (ör. çukur 10 → 60 mm); her
@@ -1019,7 +1087,15 @@ taklit eder.
   ritim; gövde çerçevesinde ortalama vx/vy ve açılmış dönüş hızı (yana ve
   dönüş komutlarında komutla karşılaştırmak için).
 - `evaluate_set(model, komutlar, env=...)`: aynı ortamda birkaç komut.
-- `tripod`, Samet'in `TripodGait`'ini ölçer (`baseline.py`).
+- `tripod`, Samet'in `TripodGait`'ini ölçer (`baseline.py`). Tripod kendi
+  görev ayarıyla koşar (`policy.task`, eylem ölçeği ±90°); 0.5 rad'lık
+  eğitim ölçeğinde 30 mm'den yüksek adım kırpılıyordu (ders 49).
+- **S6 ölçüm aracı** (`olcum.py`, Samet; 2026-09-28'de genişletildi):
+  `python -m hexapod_rl.olcum tripod <zip> <zip>+refleks --tohum 3 --temiz
+  --paralel 8 -o docs/olcumler/tablo.md`. S5'in 15 ölçüm zemini, ileri 0.1
+  m/s, hız / J/m / devrilme; `+refleks` DENEYSEL yerleşimle refleksi açar
+  (tekrarlarda %5 gürültü + %10 düşen okuma). Tablo ve yorum:
+  docs/olcumler/.
 - Gürültü eylem biriminde: artık eylemde aynı eklem gürültüsü için ×2.5
   (0.1 mutlak = 0.25 artık = 0.05 rad).
 
@@ -1482,6 +1558,15 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-27 | **Mesafe sensörlü kaldırma refleksi** (`LiftReflex`) eğitimsiz bir kural olarak; mesafe sensörü simde yalnız `info`'da, gözleme girmedi | Kural düzde 25 mm'nin enerjisinde, engelde 50 mm'den iyi (ders 41); politikaya sensör gözlemi verip yeniden eğitmek gerekmeden ödünleşimi çözüyor. Sensör gözlemli RL denenmedi: yerleşim ve sensör davranışı (D8, S7) bilinmeden gözlemi sabitlemek erken |
 | 09-27 | v24'ün 1.5M'i `ppo_refleks_1500k` olarak depoya; `ppo_kaldirma35_250k` yerinde kalıyor | Refleksle engelde en iyi (60 mm basamak, engebe 60) ama düzde %8–17 pahalı; ikisi farklı kullanıma. En iyi ara kayıt refleksli ölçümle seçildi; 2M 60 mm basamakta daha iyi (0.99) ama çaprazda ve geride (kör) daha kötü, düzde daha pahalı |
 | 09-27 | Eski modeller (`tork_v2_10M`, `ppo_v4_4M`, `ppo_v7_8M`, `ppo_res_250k`, `ppo_lift50_2250k`) depodan kaldırıldı; `taklit_bc_v4` testler için kalıyor | Yerlerini `ppo_omni_250k`, `ppo_lift50_3750k`, `ppo_kaldirma35_250k`, `ppo_refleks_1500k` aldı; hiçbir kod ya da test kullanmıyordu. Tablolar models/README'de, dosyalar git geçmişinde |
+| 09-28 | **Güç kontrol adımı boyunca ortalanıyor** (`SimState.mean_power`); ödül ağırlığı (−0.05/W) değişmedi | Tek anlık örnek gecikmeye göre 4 kata kadar oynuyor, temizde gerçeğin yarısıydı (ders 48). Ağırlık aynı kaldı: gerçek güç ~2 kat, yani enerji cezası fiilen güçlendi; TÜBİTAK'taki "en az enerji" hedefiyle uyumlu, ilerleme terimleri (~2/adım) hâlâ baskın |
+| 09-28 | Tripod ölçümde kendi eylem ölçeğiyle (±90°, `baseline.ACTION_SCALE`) | 0.5 rad'lık ölçekte 50 mm adım kırpılıyordu, "tripod:50" ~30 mm kaldırıyordu (ders 49) |
+| 09-28 | S6 tablosu baştan ölçüldü ve eskisinin yerine kondu; eski güç tabloları (models/README) yeniden ölçülmedi, uyarı eklendi | Karar S6 tablosuyla veriliyor; tarihçe tablolarında hız ve geçti/geçemedi geçerli, yalnız güç sütunları yanlış |
+| 09-28 | S5 zeminleri yeni set adıyla (`s5`); eski deneme zeminleri silinmedi | Samet'in "iki satırlık geçiş" önerisi eski setlerin yerine yazmaktı; depodaki modellerin tarifleri ve tabloları o zeminlere bağlı, yeniden üretilebilmeli |
+| 09-28 | Eğitim/seçim zeminleri S6'nın ölçüm zeminlerinin aynısı değil (testle denetleniyor) | Tablo ezberi değil genellemeyi ölçsün |
+| 09-28 | v25 (S5 zeminleri + düzeltilmiş ceza, refleksle, `ppo_refleks_1500k`'dan) 1M'de durduruldu, depoya alınmadı | Ara skor her ölçümde düştü; aynı ölçütle `ppo_kaldirma35_250k` (refleksle) daha iyi (2.543'e 2.492) |
+| 09-28 | **Refleks engel yüksekliği "egim" kipinde** (yerçekimi yönünün 5 s'lik ortalaması zeminin eğimi); eski "yercekimi" ve "govde" seçenek olarak kalıyor | Yerçekimi kipi yokuşu engel sanıyordu (%20–30 fazla enerji), gövde kipi basamağa çıkarken takıldı (ders 50); egim ikisini de çözüyor, 8 tohumla doğrulandı |
+| 09-28 | Robota aday: `ppo_kaldirma35_250k` + refleks ("egim") | S6'da tripod'u her zemin türünde hızda geçiyor ya da eşit, düzde ve eğimde enerjide eşit, engelde 2–4 kat verimli; seçim ölçütünde en yüksek skor |
+| 09-28 | Refleksin robot düğümüne bağlanması D8'e kadar ertelendi | Sensörün gövdedeki yeri ve aşağı açısı robot.yaml'da yok (alanlar bile); şemayı ve değerleri D8 belirleyecek. S7'nin konuları (`/range0..2`) hazır |
 
 ---
 
@@ -1852,6 +1937,49 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     kod aynı sonucu veriyordu. Roll/pitch içeren montajla test edince ortaya
     çıktı. Bir dönüşümü test ederken, dönüşümün etkisiz kaldığı özel durumu
     seçmediğinden emin ol (mutasyon denemesi bunu gösterir).
+48. **Bir kontrol adımını tek anla temsil etme: güç yarı yarıya yanlıştı.**
+    Ödülün güç terimi ve bütün güç/J/m ölçümleri 2026-09-28'e kadar kontrol
+    adımının (20 ms, 10 fizik adımı) yalnız SON fizik adımındaki Σ|τ·ω|'dan
+    hesaplanıyordu. Servo hedefi adım başında (gecikme varsa L. fizik
+    adımında) sıçrıyor ve tork hemen ardından tepe yapıyor; tek örnek bu ana
+    göre nerede durduğuna bağlıydı. Belirti: S6 tablosunda 3 tohumun 2'sinde
+    25 mm'lik yürüyüşlerin gücü ikiye katlanıyordu; düğmeleri tek tek açınca
+    kaynak gecikme çıktı ve tekdüze değildi (tripod 0/4/8/12/16 ms'de
+    1.91/1.42/2.87/2.66/7.69 W). Açık döngü yürüyüşte sabit gecikme yalnız
+    faz kaymasıdır; gücü değiştiriyorsa ölçüm yanlıştır. Düzeltme
+    (`SimState.mean_power`, alt adım ortalaması) sonrası 0–16 ms'de hep 3.68
+    W. Eski temiz ölçümler gerçeğin yaklaşık yarısıydı (tripod 1.91 → 3.69
+    W, `ppo_omni_250k` 2.00 → 3.75, `ppo_kaldirma35_250k` 2.39 → 4.58,
+    `ppo_lift50_3750k` 3.99 → 5.59 W); sıralama korunuyor ama bütün
+    eğitimler bu yanlış enerji cezasıyla yapıldı. Ders: ödüldeki ve ölçümdeki
+    bir büyüklük, ölçüldüğü zaman ölçeğinde (burada fizik adımı) toplanmalı;
+    bir parametreye (gecikme) fiziksel olarak bağlı olmaması gereken bir
+    sonuç bağlıysa önce ölçümden şüphelen.
+49. **Karşılaştırma tabanını parametrelendirince sınırlarını da yeniden
+    denetle.** `TripodPolicy` (Samet'in tripod'unu RL ortamında koşturan
+    sarmalayıcı) mutlak eylem modunda, eylem ±0.5 rad'a kırpılıyor. 25 mm
+    adımda femur en çok 22.5° sapıyor (sınır 28.6°); bunun testi vardı.
+    Adım yüksekliği sonradan parametre olunca (`tripod:50`, "adil
+    karşılaştırma", §3.4) femur 49° istedi ve sessizce kırpıldı: "50 mm
+    adımlı tripod" aslında ~30 mm kaldırıyordu. §3.4'teki 0.548 zemin skoru
+    ve S6 tablosunun `tripod:50` sütunu bundan etkilendi. Düzeltme: tripod
+    kendi eylem ölçeğiyle (±90°, `baseline.ACTION_SCALE`) koşuyor; kırpılmama
+    testi 50 ve 60 mm'yi de kapsıyor. Ders: bir tabana yeni parametre
+    eklerken onun eski varsayımlarını taşıyan testleri de o parametrenin
+    aralığına genişlet.
+50. **Bir referansın iki uç hâli ayrı ayrı yanılır; zaman ölçeğiyle ayır.**
+    Refleks engel yüksekliğini IMU'nun yerçekimi yönüne göre ölçüyordu:
+    düzgün yokuş "yükselen zemin" göründü, ayak boşuna kalktı (10° yokuşta
+    %30 fazla enerji). Gövde düzlemine geçmek yokuşu çözdü ama S6 tablosunda
+    görünmeyen bir hata getirdi: basamağa çıkarken burun kalkınca basamağın
+    üstü alçak göründü, refleks kaldırmayı erken indirdi, kapalı döngü testte
+    robot yarı yolda kaldı (0.94 → 0.45 m). İkisini ayıran şey zaman ölçeği:
+    zeminin eğimi saniyelerce sürer, basamaktaki eğilme kısa. "egim" kipi
+    yerçekimi yönünün 5 s'lik ortalamasını eğim sayıyor, ikisini de
+    doğru yapıyor. Ders: rastgeleleştirmeli ortalama tablo (S6) bir geçiş
+    anındaki takılmayı gizleyebilir; kapalı döngü, deterministik tek senaryo
+    testi (tests/test_policy_sim.py) onu yakaladı. Bir kuralı değiştirirken
+    ikisini de koş.
 ---
 
 ## 13. Açık kalan işler
@@ -1879,16 +2007,24 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 
 Bu oturumda bitenler §14'te. Açık kalanlar:
 
-1. **Refleksi düğüme bağla** (S7 + D8 gelince): `node.py` mesafe konularına
-   (`sensor_msgs/Range`) abone olup `PolicyController.on_ranges`'i çağırır;
-   yerleşim robot.yaml'dan (§13.1). Sonra `reflex_probe` ve yerleşim
-   karşılaştırması gerçek yerleşimle yeniden koşulur; ROS'lu simde menzil
-   sensörüyle uçtan uca denenir.
-2. **Asıl zeminlerle eğitim** (S5): S5'in üreteci `TRAIN_SETS`/`CURRICULA`'ya.
+1. **Refleksi düğüme bağla** (S7 bitti, D8'i bekliyor): `node.py`
+   `/range0..2`'ye (`sensor_msgs/Range`, S7'nin düğümü; görmüyorsa
+   `max_range`) abone olup üç sensörden birer ölçüm gelince
+   `PolicyController.on_ranges`'i çağırır. Yerleşim robot.yaml'dan: şu an
+   yalnız `direction_deg` alanı var (null); gövdedeki yer (x, y, z) ve aşağı
+   bakış açısı alanları D8'le eklenecek, değerleri D8 girer. Sonra
+   `reflex_probe` ve S6 tablosu gerçek yerleşimle yeniden koşulur; ROS'lu
+   simde uçtan uca denenir.
+2. ~~Asıl zeminlerle eğitim (S5)~~ — yapıldı (§3.8): v25 yarar getirmedi.
+   Denenmemiş: müfredatla (`--curriculum s5`) ve `ppo_kaldirma35_250k`'dan
+   "egim" refleksiyle eğitim; düzeltilmiş enerji cezasıyla sıfırdan/taklitten
+   eğitim.
 3. **Eğimde `orientation` cezası** gövdeyi **dünyaya** göre düz istiyor (10°
    eğimde ayakta duran robot adım başı ~0.06 kaybeder). v13 20° yokuşta
    yürüdü, zorladığına dair işaret yok; S5'in eğimlerinde bakılmalı,
    gerekirse zemin normaline göre ölçülür.
+3b. **Engebede refleksli politika enerjide geride** (%6–14, S6 engebe 40/60).
+   Engebe S5 eğitim setinde yok (eğitimi ~2 kat yavaşlatıyor, ders 42).
 4. **Uzun eğitimde deterministik davranışın kötüleşmesi** (ders 25, 28): en
    iyi ara kayıt otomatik seçiliyor; std'yi zamanla düşürmek denenmedi.
 5. **Hızlıda yön kayması:** `ppo_omni_250k` 0.15 m/s'de 10 s'de −4°.
@@ -1905,12 +2041,9 @@ Bu oturumda bitenler §14'te. Açık kalanlar:
 
 ### 13.3 Yazılım (Samet)
 
-- **S5:** zemin üreteci. Entegrasyon notu GOREVLER.md'de: her zemin için
-  `terrain_sdf` (statik `<model>` parçası) **ve** `terrain_height(x, y)`.
-  Orijinin z=0'da olması artık gerekmiyor.
-- **S6:** ölçüm aracı. Çekirdeği `hexapod_rl.evaluate` + `baseline.TripodPolicy`
-  hazır; eksik olanlar zemin seçimi, N tekrar ve tablo.
-- **S7:** sensör sürücüleri (saf Python, dry-run testli).
+S1–S7'nin hepsi bitti (S5 `hexapod_terrain`, S6 `hexapod_rl.olcum`, S7
+`hexapod_sensors`; ayrıntı GOREVLER.md). Samet'in şu an açık yazılım görevi
+yok.
 
 ### 13.4 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)
 
@@ -1966,16 +2099,21 @@ zeminler (S5) ve ölçüm aracı (S6).
     denetleyicide; ders 41, §3.6) ve refleks açıkken eğitim
     (`ppo_refleks_1500k`).
 
-**Açık, S5/S6/S7 gelmeden yapılabilecek küçükler:** §13.2'deki 3–5, 9, 10.
+**2026-09-28'de yapılanlar (§3.8):** S5 eğitime bağlandı; S6 ölçümü iki
+ölçüm hatası düzeltilerek baştan; v25 (S5'te eğitim, yarar yok); refleksin
+eğim kipi. G7'nin "bitti" şartı refleksli politikayla karşılanıyor; G7'yi
+kapatmak kullanıcının onayında.
 
-**S7 + D8 gelince:** refleksi düğüme bağla (§13.2-1); `reflex_probe` ve
-yerleşim karşılaştırmasını gerçek yerleşimle tekrarla; ROS'lu simde menzil
-sensörüyle uçtan uca dene.
-
-**S5 gelince:** S5'in üretecini `TRAIN_SETS`/`CURRICULA`'ya yaz;
-`ppo_kaldirma35_250k` ve `ppo_refleks_1500k`'dan (refleksle) zeminli eğitim;
-S6 tablosu (tripod ve politika her zeminde) → G7 bitti → G8'i son
-politikayla tekrarla.
+**Sıradaki (öneri sırası):**
+1. G7 kapanırsa G8'i son adayla tekrarla: `ppo_kaldirma35_250k` +
+   refleks, ROS'lu simde (`tools/wsl/politika_ros_olcum.sh`) düzde ve
+   S5 zemin dünyalarında (`python -m hexapod_terrain dunya ...`). Refleks
+   düğüme bağlı olmadığı için ROS'lu simde kör davranış ölçülür.
+2. D8 gelince: refleksi düğüme bağla (§13.2-1), yerleşimi robot.yaml'dan al,
+   `reflex_probe` ve S6 tablosunu gerçek yerleşimle tekrarla.
+3. İstenirse G7'de iyileştirme: engebede enerji (§13.2-3b); "egim"
+   refleksiyle `ppo_kaldirma35_250k`'dan S5'te eğitim (v25'in tarifi ama
+   başlangıç ve kip farklı).
 
 **Yöntem notları (bu projede işe yarayanlar):**
 - Yeni bir ödül ya da ayar denemeden önce elle yazılmış iyi bir davranışı
@@ -2052,8 +2190,13 @@ modeller `models/`'da.
    git log --oneline | head -5
    python -m pytest -q
    ```
-   - Windows: 235 geçti, 9 atlandı. WSL: 286 geçti.
+   - Güncel sayılar belgenin başında (2026-09-28: Windows 407 geçti + 13
+     atlandı, WSL 460 geçti + 4 atlandı).
    - Samet yeni test eklediyse sayı artmış olabilir; düşmüşse incele.
+   - Yeni paket geldiyse (ör. `hexapod_terrain`, `hexapod_sensors`) önce
+     `bash tools/wsl/derle.sh`.
+   - Hangi bilgisayardasın? Eski PC (i5-10300H, WSL `Ubuntu`, `--envs 8`) ya
+     da yeni PC (Ryzen 7700X, `Ubuntu-26.04`, `--envs 16`); §0.4.
 4. `git status`'ta beklenmeyen değişiklik varsa kullanıcının ya da Samet'in
    olabilir; dokunmadan incele (§12, madde 7–8).
 5. GOREVLER.md'de Samet'in ilerlemesine bak (S5, S6, S7). S5 geldiyse zeminli
