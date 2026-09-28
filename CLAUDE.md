@@ -111,6 +111,7 @@ src/hexapod_rl/           RL: süreç içi Gazebo (sim), ortam (env, task), takl
 src/hexapod_policy/       politika düğümü: torch'suz (numpy) MLP, /imu + /cmd_vel -> komut
                           + mesafe sensörlü ayak kaldırma refleksi (lift_reflex)
 src/hexapod_terrain/      RL/ölçüm zeminleri: eğim, basamak, merdiven, engebe, çukur (SDF + yükseklik), saf Python
+                          ölçüm aracı: hexapod_rl.olcum (zeminlerde hız/enerji/devrilme tablosu)
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
 tools/hwcheck.py          I2C tarama + config karşılaştırma

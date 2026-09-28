@@ -101,12 +101,13 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | S3 | Tripod yürüyüş simülasyonda | Samet | S1 ✅, S2 ✅, G5 ✅ | G6, S6, (vardiya) | ✅ |
 | S4 | Gerçek robot sürücü düğümü (ROS 2, dry-run) | Samet | S1 ✅, G5 ✅ | G8, (vardiya) | ✅ |
 | S5 | Zemin / dünya üreteci | Samet | S1 ✅, G5 ✅ | G7, S6 | ✅ |
-| S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3 ✅, S5 ✅ | G7 | ⬜ |
+| S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3 ✅, S5 ✅ | G7 | ✅ |
 | S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
 
 **Şu an başlanabilecekler:**
 - **Görkem:** G6 bitti (2026-09-26). G7'de S5 gelmeden yapılabilecekler bitti (2026-09-27): her yöne politika, zeminli eğitim (kendi deneme zeminleriyle), öğrenilmiş ayak kaldırma, müfredat, dayanıklılık taraması, mesafe sensörlü kaldırma refleksi (denetleyicide hazır). **S5 geldi (2026-09-27)**: sıradaki, asıl zeminlerle eğitim ve "bitti" ölçümü (S6); S7 + D8 gelince refleksin düğüme bağlanması. Ayrıntı: docs/PROJE_DEVIR.md §3.1, §14.
-- **Samet:** S1-S5 bitti (S5: 2026-09-27, `hexapod_terrain`). Sıradaki: S6 (ölçüm aracı — artık engeli yok) ya da S7. **S7 artık G7'nin de önünde:** mesafe sensörlü kaldırma refleksi gerçek mesafe ölçümlerini bekliyor (S7'deki not).
+- **Samet:** S1-S6 bitti (S6: 2026-09-28, `hexapod_rl.olcum` + docs/olcumler/). Sıradaki: **S7, tek kalan görev.** **S7 G7'nin de önünde:** mesafe sensörlü kaldırma refleksi gerçek mesafe ölçümlerini bekliyor (S7'deki not).
+- **Görkem için (2026-09-28, S6 bitti):** G7'nin "bitti" ölçümü hazır: `python -m hexapod_rl.olcum <model> --tohum 3 --temiz -o docs/olcumler/tablo.md`. İlk tablo depoda (5 denetleyici × 15 zemin). Şartın hız tarafı karşılanıyor, düz zeminde enerji tarafı karşılanmıyor (ayrıntı: docs/olcumler/). Tekrarlar rastgeleleştirme açık koşuyor; kapalıyken tohumlar aynı sonucu veriyor (ölçüldü).
 - **Görkem için (2026-09-27, S5 bitti):** asıl zeminler hazır, `terrain_probe`'un deneme zeminlerinin yerine geçebilir; geçiş iki satır (bkz. S5 bölümü). Senin dosyalarına dokunmadım. `hexapod_terrain.sets.LEVELS[tür]` senin `CURRICULA` biçiminle uyumlu (seviye üreteçleri, kolaydan zora) — müfredatına doğrudan girer. Engebenin fizik maliyeti ölçüldü: kutu sayısı hızı belirliyor, paralel eğitimde en yavaş ortam hepsini bekletir (S5 bölümü).
 - Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S4'ün ROS düğümü) tekrar çalıştırılmalı.
 - **Samet için (2026-09-26):** ROS'lu sim artık varsayılan olarak tork servo modelinde (`servo:=torque`; eskisi `servo:=velocity`). Tripod'un orada ölçülen hızı %84'ten %98'e çıktı (0.08 komutta 0.079 m/s); S2/S3 notlarındaki "ROS'lu simde ayaklar kayar" uyarısı artık eski modele ait. Günlükteki "out of limits" uyarıları eklem hız sınırında torkun kesilmesinden (beklenen). Ayrıntı: docs/ARAYUZ.md madde 4.
@@ -282,10 +283,28 @@ cases = [(z.label, z.sdf, z.height, (0.1, 0.0, 0.0)) for z in sets.evaluation_se
 - Üretimde bulunan iki hata: inen basamakta yükselen kutu yanlış taraftaydı; engebede robot düz bir karede ama 50-70 mm duvarlarla çevrili doğuyordu (önizleme resmi gösterdi) — artık düzlükten tam engebeye 0.5 m'lik rampa var.
 - Yapılmadı: gerçek yükseklik haritası (`<heightmap>`) kullanılmadı. Gazebo onu ara değerle (bilinear) okuduğu için `height` ile birebir tutarlılık garanti edilemiyor; dik yanlı kutularda bu garanti var. Zorluk hücreler arası FARKLA ayarlanıyor (`smooth`).
 
-#### S6 — Yürüyüş ölçüm aracı ⬜
+#### S6 — Yürüyüş ölçüm aracı ✅
 - **Bekler:** S3 ✅, S5 ✅ · **Açar:** G7
 - Bir yürüyüş denetleyicisini (tripod ya da RL politikası) seçilen zeminlerde N kez koşturup ölçen betik: ileri hız, enerji (Σ |tork × açısal hız|), devrilme sayısı, düşmeden gidilen mesafe. Sonuçlar bir tabloya.
-- **Bitti sayılır:** tripod'un her zemindeki ölçümü tablo olarak depoda; RL için aynı komutla çalışıyor.
+- **Bitti sayılır:** tripod'un her zemindeki ölçümü tablo olarak depoda; RL için aynı komutla çalışıyor. ✅
+
+**Yapıldı (2026-09-28): `hexapod_rl.olcum`** (Görkem'in `evaluate`'i üstüne; onun dosyalarına dokunulmadı).
+
+```bash
+python -m hexapod_rl.olcum tripod:50 models/ppo_refleks_1500k/model.zip --tohum 3 --temiz     --csv docs/olcumler/o.csv -o docs/olcumler/tablo.md
+```
+
+- Ölçtükleri: hız, **metre başına enerji (J/m)**, devrilme (kaç tekrarda), düşmeden gidilen en az mesafe, yön sapması. J/m seçildi çünkü toplam enerji yavaş yürüyüşü haksız ödüllendirir.
+- **Tekrarlar rastgeleleştirme AÇIK koşuyor.** Ölçüldü: kapalıyken süreç içi Gazebo deterministik, üç tohum da birebir aynı sonucu veriyor (0.0869 m/s) — tekrar bilgi taşımıyor. Açıkken tohumlar farklılaşıyor; tabloda ortalamanın yanında `3/3` sütunu var (ders 32: sınır durumlarda tek ölçüm yanıltıcı). `--temiz` rastgeleleştirmesiz ölçümü de ekler, ortalamaya karıştırmaz.
+- Tablo + ham CSV: **[docs/olcumler/](docs/olcumler/)**, okuma kılavuzu ve sonuç yorumu orada.
+- Testli (`tests/test_olcum.py`, 24 test): enerji hesabı, özetleme, devrilme sayımı, tablo/CSV biçimi, geri kayma işareti. Gazebo yerine sahte ölçüm enjekte ediliyor, Windows'ta da koşuyor. Dört mutasyonla testlerin yakaladığı doğrulandı.
+- Ölçüm süresi: 5 denetleyici × 15 zemin × 4 koşu ≈ 11 dakika.
+
+**S5'te düzeltme (ölçüm ortaya çıkardı):** kaygan zemin seviyeleri yanlıştı. 15° μ0.3'te robot yürümüyor, yokuş aşağı **kayıyor** (−0.69 m/s); tablo bunu "hız" diye gösteriyordu. Kayma sürtünme katsayısı eğimin tanjantına yaklaşınca başlıyor (tan15°=0.268, μ=0.3: pay yok). Ölçülerek yeniden dizildi (10° μ0.5 → 10° μ0.3 → 15° μ0.4 → 15° μ0.3) ve ölçüm setine yürünebilir bir kaygan zemin eklendi; tablo artık geri kaymayı ayrıca işaretliyor.
+
+**Sonuçların özeti (G7 için):** düz zeminde hepsi başa baş; 45 mm basamakta politika 0.107 m/s'ye karşı 50 mm adımlı tripod 0.052 (2.1 kat), düz tripod 0.019 (5.6 kat); 40 mm çukurda 7.6 kat. Zemin becerisinin düzde bedeli enerjide görünüyor (45.5'e karşı 27.2 J/m). Düz zeminde eğitilmiş `ppo_omni_250k` engelde tripod'dan iyi değil. **"Politika tripod'u geçiyor" şartı hızda karşılanıyor, düz zeminde enerjide karşılanmıyor.**
+
+**Samet'ten not (S2'ye dönük):** 50 mm adımlı tripod düz zeminde 25 mm'likten hem biraz hızlı hem **%31 daha az enerji** harcıyor (27.2'ye karşı 39.2 J/m). `hexapod_gait`'in varsayılan 25 mm adım yüksekliği gözden geçirilmeli; tek ölçüm kanıt değil, adım yüksekliği taraması gerekir.
 - **Görkem'den not (2026-09-26):** ölçümün çekirdeği hazır, üstüne kurulabilir: `hexapod_rl.evaluate.evaluate(model, seconds, vx, seed, noise, task)` hız, yön sapması, adım başı ödül, ortalama mekanik güç (W, Σ|τ·ω|), devrilme, ritim uyumu veriyor; `model` bir SB3 modeli ya da `hexapod_rl.baseline.TripodPolicy()` (senin tripod'un, aynı arayüzle). Eksik olan: zemin seçimi (S5'in `terrain_sdf`'i `HexapodEnv`'e geçirilmeli), N tekrar ve tablo. Politikayı ROS'suz koşturduğu için hızlı (~10x gerçek zaman).
 
 #### S7 — Sensör sürücüleri (saf Python) ⬜

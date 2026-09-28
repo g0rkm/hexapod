@@ -22,6 +22,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | RL (PPO) | 🔄 en iyi: tripod + öğrenilmiş düzeltme, her yöne ([models/ppo_omni_250k](models/README.md)); düz zeminde tripod'la başa baş, eğim/basamakta ve gürültüde önde; zeminli eğitim S5'i bekliyor |
 | Politika düğümü | ✅ [hexapod_policy](src/hexapod_policy): torch'suz (numpy), ROS'lu Gazebo'da yürüdü |
 | Zeminler (eğim, basamak, engebe...) | ✅ [hexapod_terrain](src/hexapod_terrain): parametreli ve tohumlu, Gazebo'da doğrulandı ([örnekler](docs/zeminler/)) |
+| Yürüyüş ölçümü | ✅ `hexapod_rl.olcum`: tripod ve politikalar 15 zeminde karşılaştırıldı ([tablo](docs/olcumler/)) |
 | Pi 4'e aktarma | ⛔ |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.
@@ -353,6 +354,28 @@ python -m hexapod_rl.terrain_probe tripod models/ppo_lift50_3750k/model.zip   # 
 python -m hexapod_rl.robustness tripod models/ppo_omni_250k/model.zip         # kalibrasyon ofseti, eğik IMU, gecikme, zayıf servo
 python -m hexapod_rl.reflex_probe --pitch 20 25                               # mesafe sensörlü kaldırma refleksi (DENEYSEL yerleşim)
 ```
+
+## Yürüyüş ölçümü (S6)
+
+Bir denetleyiciyi (tripod ya da politika) S5'in zeminlerinde N kez koşturup
+karşılaştırma tablosu çıkarır: hız, metre başına enerji, devrilme, düşmeden
+gidilen mesafe.
+
+```bash
+python -m hexapod_rl.olcum tripod:50 models/ppo_refleks_1500k/model.zip --tohum 3
+```
+
+```bash
+python -m hexapod_rl.olcum tripod --zemin basamak --saniye 20 --csv o.csv -o tablo.md
+```
+
+Tekrarlar **rastgeleleştirme açık** koşar: süreç içi Gazebo deterministik
+olduğu için kapalıyken farklı tohumlar birebir aynı sonucu verir (ölçüldü),
+tekrar bilgi taşımaz. Tabloda ortalamanın yanında kaç tekrarda devrilmeden
+tamamlandığı da var (`3/3`); sınırdaki engellerde tek ölçüm yanıltıcı
+(PROJE_DEVIR §12.32). `--temiz` rastgeleleştirmesiz ölçümü de ekler.
+
+Son tablo: [docs/olcumler/](docs/olcumler/).
 
 ## ROS 2 kurulumu (WSL)
 

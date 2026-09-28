@@ -1824,6 +1824,20 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     (yükseklik haritası + yan kesit) ilk bakışta gösterdi. Düzlükten tam
     engebeye 0.5 m rampa eklendi.
 
+44. **Deterministik simülasyonda tekrar, ancak rastgeleleştirme açıkken
+    bilgi taşır.** Süreç içi Gazebo deterministik: rastgeleleştirme kapalıyken
+    üç tohum da birebir aynı sonucu verdi (0.0869 m/s, ölçüldü 2026-09-28).
+    "N tohumla ölçtüm" demek tek başına güvence değil; tohumun neyi
+    değiştirdiğini önce doğrula. S6'nın ölçüm aracı bu yüzden tekrarları
+    rastgeleleştirme açık koşuyor.
+45. **Bir ölçüt, ölçtüğünü sandığın şeyi ölçmeyebilir.** S6'nın ilk
+    tablosunda kaygan eğim satırı "−0.689 m/s, 6.5 m" diyordu: robot
+    yürümüyor, yokuş aşağı kayıyordu; "hız" ve "J/m" orada yürüyüş
+    başarısını değil kaymayı ölçüyordu. Sayı saçma görünmeseydi (negatif
+    hız) fark edilmeyebilirdi. Ölçütün geçersizleştiği durumları ayrıca
+    işaretle (tabloda "geri kaydı") ve ölçüm setine ölçütün geçerli olduğu
+    bir seviye koy (10° μ0.3 yürünebiliyor, denetleyicileri ayırıyor).
+    Kayma, sürtünme katsayısı eğimin tanjantına yaklaşınca başlıyor.
 ---
 
 ## 13. Açık kalan işler
