@@ -165,6 +165,7 @@ class HexapodSim:
         self._push: tuple[float, float, float] | None = None
         self._push_left = 0
         self._k = 0                                 # kontrol adımı içindeki fizik adımı
+        self._power_sum, self._power_n = 0.0, 0     # kontrol adımında Σ|τ·ω|, fizik adımı başına
 
         self._dir = Path(workdir) if workdir else Path(tempfile.mkdtemp(prefix="hexapod_rl_"))
         self._dir.mkdir(parents=True, exist_ok=True)
@@ -270,6 +271,7 @@ class HexapodSim:
         self._state = None
         self._left = iterations
         self._k = 0
+        self._power_sum, self._power_n = 0.0, 0
         self._server.run(True, iterations, False)
         if self._state is None:
             raise RuntimeError("simülasyon adımı durum üretmedi")
@@ -288,6 +290,7 @@ class HexapodSim:
             self._push_left -= 1
         kp, kd = self._kp * self._stiffness, self._kd
         tau_s, w0 = self._tau * self._strength, self._vmax
+        power = 0.0
         for i, joint in enumerate(self._joints):
             q = joint.position(ecm)
             w = joint.velocity(ecm)
@@ -298,7 +301,12 @@ class HexapodSim:
             limit = tau_s * max(0.0, 1.0 - abs(w[0]) / w0) if tau * w[0] > 0 else tau_s
             tau = max(-limit, min(limit, tau))
             self._effort[i] = tau
+            power += abs(tau * w[0])
             joint.set_force(ecm, [tau])
+        # Güç her fizik adımında toplanır: kontrol adımının sonundaki tek örnek,
+        # hedefin değiştiği ana (gecikme) göre 4 katına kadar yanılıyordu (ders 48).
+        self._power_sum += power
+        self._power_n += 1
         self._iter += 1
 
     def _post(self, info, ecm) -> None:
@@ -349,6 +357,7 @@ class HexapodSim:
             base_lin_vel=_vec(lin), base_ang_vel=_vec(ang),
             foot_pos=tuple(feet), foot_contact=tuple(contact),
             ground_z=self.height(pose.pos().x(), pose.pos().y()),
+            mean_power=self._power_sum / self._power_n if self._power_n else 0.0,
         )
 
     # -- dünya ------------------------------------------------------------------

@@ -102,16 +102,15 @@ def test_yanlis_hedef_sayisi_reddedilir(sim):
         sim.step([0.0] * 17)
 
 
-def test_simulasyon_yurumeye_izin_veriyor(sim):
-    """Açık döngü tripod (IK ile ayak yörüngesi) beklenen hızın en az %70'ine ulaşmalı.
+STEP_MM, LIFT_MM, GAIT_HZ, REACH_MM, HEIGHT_MM = 30.0, 25.0, 1.5, 130.0, 100.0
 
-    Bu test, hız komutlu servo modelinde ayakların kaydığını (beklenenin
-    %12'si) yakalardı; o model yüzünden iki PPO eğitimi boşa gitti. Yürüyüş
-    Samet'in işi (S2); buradaki yalnızca fiziği doğrulayan en basit yörünge.
-    """
+
+def open_loop_tripod():
+    """Açık döngü tripod: adım saati (0..1) -> 18 eklem hedefi (IK ile ayak yörüngesi).
+    Yürüyüş Samet'in işi (S2); bu yalnızca fiziği doğrulayan en basit yörünge."""
     from hexapod_rl.task import tripod_groups
 
-    step_mm, lift_mm, hz, reach, height = 30.0, 25.0, 1.5, 130.0, 100.0
+    step_mm, lift_mm, reach, height = STEP_MM, LIFT_MM, REACH_MM, HEIGHT_MM
     kin = HexapodKinematics.from_config(RobotConfig.load(REAL_CONFIG))
     group_a, _ = tripod_groups({leg: m.yaw for leg, m in kin.mounts.items()})
     home = {leg: (m.x + reach * math.cos(m.yaw), m.y + reach * math.sin(m.yaw), -height)
@@ -130,16 +129,52 @@ def test_simulasyon_yurumeye_izin_veriyor(sim):
         ang = kin.inverse(feet)
         return [math.radians(v) for leg in range(6) for v in ang[leg].as_dict().values()]
 
+    return targets
+
+
+def test_simulasyon_yurumeye_izin_veriyor(sim):
+    """Açık döngü tripod beklenen hızın en az %70'ine ulaşmalı.
+
+    Bu test, hız komutlu servo modelinde ayakların kaydığını (beklenenin
+    %12'si) yakalardı; o model yüzünden iki PPO eğitimi boşa gitti.
+    """
+    targets = open_loop_tripod()
     sim.reset()
     s = run(sim, targets(0.0), 1.0)
     x0, phase = s.base_pos[0], 0.0
     for _ in range(int(round(4.0 / sim.dt))):
-        phase = (phase + hz * sim.dt) % 1.0
+        phase = (phase + GAIT_HZ * sim.dt) % 1.0
         s = sim.step(targets(phase))
     speed = (s.base_pos[0] - x0) / 4.0
-    expected = step_mm / 1000 / (0.5 / hz)
+    expected = STEP_MM / 1000 / (0.5 / GAIT_HZ)
     assert speed > 0.7 * expected, f"{speed:.3f} m/s, beklenen {expected:.3f}"
-    assert abs(s.base_pos[2] - height / 1000) < 0.005
+    assert abs(s.base_pos[2] - HEIGHT_MM / 1000) < 0.005
+
+
+def test_guc_kontrol_adimi_ortalamasi_gecikmeden_bagimsiz(sim):
+    """Açık döngü yürüyüşte komut gecikmesi yalnız bir faz kaymasıdır, harcanan
+    gücü değiştirmemeli. Ödülün güç terimi 2026-09-28'e kadar kontrol adımının
+    SON fizik adımındaki tork x hızdan hesaplanıyordu: örnek, hedefin değiştiği
+    ana göre kayınca aynı yürüyüş 16 ms gecikmede 4 kat "güç" gösteriyordu
+    (ders 48). mean_power bütün fizik adımlarının ortalaması."""
+    targets = open_loop_tripod()
+    mean, instant = [], []
+    for latency in (0, 8):                                # 0 ve 16 ms
+        sim.reset()
+        sim.latency_steps = latency
+        run(sim, targets(0.0), 1.0)
+        phase, m, i, n = 0.0, 0.0, 0.0, int(round(2.0 / sim.dt))
+        for _ in range(n):
+            phase = (phase + GAIT_HZ * sim.dt) % 1.0
+            s = sim.step(targets(phase))
+            m += s.mean_power
+            i += sum(abs(t * v) for t, v in zip(s.joint_effort, s.joint_vel))
+        mean.append(m / n)
+        instant.append(i / n)
+    sim.latency_steps = 0
+    assert mean[1] == pytest.approx(mean[0], rel=0.05), mean
+    assert max(instant) > 1.5 * min(instant), instant     # eski ölçüm: örnekleme kayması
+    assert mean[0] > 0.5                                  # yürüyüş iş yapıyor (W)
 
 
 # --- alan rastgeleleştirme düğmeleri (G7) ----------------------------------------

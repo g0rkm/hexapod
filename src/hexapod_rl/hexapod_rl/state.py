@@ -23,6 +23,10 @@ class SimState:
     foot_pos: tuple[Vec3, ...]  # m, dünya, ayak küresinin alt ucu (6)
     foot_contact: tuple[bool, ...]  # yalnız simülasyon; politika gözlemine girmemeli
     ground_z: float = 0.0       # m, gövde merkezinin altındaki zemin yüksekliği (yalnız sim)
+    # W, Σ|tork x açısal hız| kontrol adımının bütün fizik adımlarında ortalaması
+    # (yalnız sim; ödülün güç terimi). joint_effort/joint_vel yalnız SON fizik
+    # adımını gösterir, onlardan hesaplanan güç tek anlık bir örnektir (ders 48).
+    mean_power: float | None = None
 
     def height_above_ground(self) -> float:
         """Gövdenin altındaki zeminden yüksekliği (düz zeminde base_pos z'si)."""

@@ -430,8 +430,11 @@ def reward(state: SimState, action, prev_action, command: tuple[float, float, fl
         "yaw_rate": math.exp(-((command[2] - twz) ** 2) / cfg.yaw_rate_sigma ** 2),
         "orientation": g[0] ** 2 + g[1] ** 2,
         "height": (state.height_above_ground() - cfg.stand_height_mm / 1000.0) ** 2,
-        "power": sum(abs(t * v) for t, v in zip(state.joint_effort, state.joint_vel)
-                     if math.isfinite(v)),
+        # Kontrol adımı boyunca ortalama (sim); yoksa (elle kurulmuş durum) son
+        # fizik adımının anlık değeri. 2026-09-28'e kadar hep anlık değerdi (ders 48).
+        "power": (state.mean_power if state.mean_power is not None else
+                  sum(abs(t * v) for t, v in zip(state.joint_effort, state.joint_vel)
+                      if math.isfinite(v))),
         "action_rate": sum((a - b) ** 2 for a, b in zip(action, prev_action)),
         "fall": 1.0 if fell else 0.0,
     }

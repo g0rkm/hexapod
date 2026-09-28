@@ -81,6 +81,15 @@ def test_cezalar_isaretli():
         assert terms[k] < 0, k
 
 
+def test_guc_terimi_kontrol_adimi_ortalamasini_kullanir():
+    """Sim durumu mean_power taşıyorsa güç odur (bütün fizik adımlarının
+    ortalaması); son fizik adımının anlık tork x hızı değil (ders 48)."""
+    cfg = TaskConfig()
+    s = SimState(**{**state(vel=[1.0] * 18, effort=[-0.5] * 18).__dict__, "mean_power": 2.5})
+    _, terms = reward(s, [0.0] * 18, [0.0] * 18, (0.0, 0.0, 0.0), cfg, False)
+    assert terms["power"] == pytest.approx(cfg.w["power"] * 2.5)
+
+
 def test_devrilme():
     cfg = TaskConfig()
     assert not fallen(state(z=0.1), cfg)
