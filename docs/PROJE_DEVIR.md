@@ -7,11 +7,12 @@
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
 > Son güncelleme: **2026-09-28** (5. oturum, eski PC). Şu anki durum ve
-> depodaki modeller **§3.1**; bu oturumun işi **§3.8** (S5 + S6 ile "bitti"
-> ölçümü, güç ve tripod:50 ölçüm hataları, eğimde refleks), dersler 48–50;
-> önceki oturum §3.3–3.7, dersler 26–47. Açık işler §13.2, plan §14.
-> · Testler: **Linux 460 geçti + 4 atlandı**, Windows 407 geçti + 13 atlandı
-> (Gazebo/ROS/SB3 testleri Windows'ta atlanır)
+> depodaki modeller **§3.1**; bu oturumun işi **§3.8–3.9** (S5 + S6 ile
+> "bitti" ölçümü, güç ve tripod:50 ölçüm hataları, eğimde refleks, G7 kapandı,
+> refleks robot düğümünde), dersler 48–50; önceki oturum §3.3–3.7, dersler
+> 26–47. **Yazılım aşamasının bütün görevleri bitti.** Açık işler §13.2, plan
+> §14. · Testler: **Linux 468 geçti + 4 atlandı**, Windows 413 geçti + 13
+> atlandı (Gazebo/ROS/SB3 testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -318,8 +319,8 @@ artık geçersiz ya da güncellendi:
 | 5 | Klasik yürüyüş (tripod) | ✅ Samet: `hexapod_gait` (S2), `hexapod_teleop` (S3) |
 | 6 | Gerçek robot sürücü düğümü (`hexapod_hardware`) | ✅ Samet (S4); yalnız dry-run, donanımda denenmedi |
 | 7 | RL ortamı (`hexapod_rl`) | ✅ (G6); tripod aynı ortamda ölçüldü |
-| 8 | PPO eğitimi | 🔄 (G7). Depodaki modeller ve ne için oldukları §3.1'de. S6 "bitti" ölçümünde refleksli politika tripod'u geçiyor (§3.8); kapanış kullanıcı onayında |
-| 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu simde her yöne ve deneme zeminlerinde yürüdü; mesafe sensörlü refleks denetleyicide hazır, düğüme bağlanması S7/D8'i bekliyor |
+| 8 | PPO eğitimi | ✅ (G7, 2026-09-28). Depodaki modeller §3.1'de. S6 "bitti" ölçümünde refleksli politika tripod'u geçiyor (§3.8) |
+| 9 | Politika düğümü (`hexapod_policy`, torch'suz) | ✅ (G8). ROS'lu simde her yöne ve S5 zeminlerinde; mesafe sensörlü refleks düğüme bağlı (`-p reflex:=true`), yerleşim değerleri D8'i bekliyor (§3.9) |
 | 10 | Pi 4'e aktarma | ⛔ donanım vardiyası (D11) |
 
 **Görev dağılımı:** [GOREVLER.md](../GOREVLER.md).
@@ -575,7 +576,40 @@ Bu oturum eski PC'de (i5-10300H, 8 ortam) geçti. Tablo ve yorum:
   karşılanıyor.** Sensörsüz en iyi seçenek hâlâ zemine göre değişiyor
   (düzde `ppo_omni_250k`, engelde `ppo_lift50_3750k`).
 - **Robota gidecek aday:** `ppo_kaldirma35_250k` + mesafe sensörlü refleks.
-  Refleksin düğüme bağlanması D8'i (sensör yeri ve açısı) bekliyor.
+  G7 kullanıcının onayıyla kapandı.
+
+### 3.9 Refleks robot düğümünde, G8 son adayla (2026-09-28)
+
+- **Politika düğümü refleksi açıyor:** `ros2 run hexapod_policy policy
+  --ros-args -p policy:=<npz> -p reflex:=true`. `/range<kimlik>`
+  (`sensor_msgs/Range`, S7'nin sensör düğümü) dinlenir; her sensörden birer
+  ölçüm gelince denetleyiciye verilir (`hexapod_policy.ranges.RangeCollector`).
+  Yerleşim robot.yaml'dan (`hexapod_policy.ranges.range_sensors_from_config`):
+  cihaz başına `position_m` [x, y, z], `direction_deg`, `pitch_deg` ve ortak
+  `max_range_m` (1.2, sürücü de kullanıyor). **Yerleşim alanları null (D8);
+  o zamana dek `reflex:=true` ile düğüm eksik alanı söyleyip çıkış kodu 2 ile
+  çıkar.** Refleks durumu günlükte ("refleks: görüyor / mesafe bayat / yön
+  görülmüyor").
+- **ROS'lu simde uçtan uca:** simde mesafe sensörü yok; ölçüm aracı
+  (`tools/politika_ros_olcum.py --mesafe CONFIG --zemin TÜR:SEVİYE`) gz
+  pozundan ve zeminin yüksekliğinden ölçümü hesaplayıp `/range<kimlik>`
+  yayınlıyor. Kısayol: `REFLEKS=1 ZEMIN=basamak:3 KOMUTLAR="0.1,0,0" SURE=12
+  bash tools/wsl/politika_ros_olcum.sh models/ppo_kaldirma35_250k/policy.npz`.
+  REFLEKS=1, DENEYSEL yerleşimi robot.yaml'ın geçici bir KOPYASINA yazar
+  (`python -m hexapod_rl.deneysel_yerlesim`); depodaki robot.yaml'a
+  dokunulmaz.
+- **G8 tekrarı, `ppo_kaldirma35_250k`, ROS'lu sim, gerçek düğüm** (12 s, ileri
+  0.1 m/s; S5 dünyaları):
+
+  | Zemin | kör | refleksli |
+  |---|---|---|
+  | 45 mm basamak | 0.93 m (%71) | 1.06 m (%85) |
+  | 60 mm basamak | 0.18 m, takıldı | 0.95 m, üstünde (gövde z 100 → 159 mm) |
+  | merdiven 6×35 | 0.91 m (%74) | 1.09 m (%89) |
+
+  Düzde yedi komutta refleksle %98–107 (kör %100–107), sıfır komutta 0.0 mm.
+  Geri yürürken "refleks: yön görülmüyor" (arkada sensör yok), kör davranış.
+- **Görkem'in ve Samet'in yazılım görevlerinin hepsi bitti** (G1–G8, S1–S7).
 
 ---
 
@@ -1225,9 +1259,10 @@ Aktarma: `python -m hexapod_rl.export models/<ad>/model.zip` (görev ayarı
   ROS'suz, `ppo_kaldirma35_250k`, 10 s): düzde refleks 25 mm (politika 35),
   ikisi ~1.0 m; 45 mm basamak politika 0.70 m, refleks 0.94 m; 60 mm
   basamak politika 0.07 m takılı, refleks 0.48 m (ön kısmı üstte).
-  **Düğüme bağlanmadı:** mesafe konuları S7'nin, yerleşim D8'in
-  (robot.yaml'da alan yok: `direction_deg` dışında yer ve aşağı açı
-  gerekecek); o zaman `node.py` konulara abone olup `on_ranges`'i çağırır.
+  **Düğüme bağlandı (2026-09-28, §3.9):** `-p reflex:=true`, `/range<kimlik>`
+  dinlenir, yerleşim robot.yaml'dan (`hexapod_policy.ranges`); değerler D8'e
+  kadar null, düğüm eksik alanı söyleyip çıkar. Engel yüksekliği "egim"
+  kipinde (ders 50).
 - Çıkarım: PC'de tick başına 44 µs; Pi 4 için <0.5 ms tahmini.
 - **ROS'lu simde her yön politikası** (`ppo_omni_250k`, 2026-09-26; tork
   servo modeli, hız gz poz yayınından sim zamanıyla, hareketin orta %80'i,
@@ -1566,7 +1601,10 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-28 | v25 (S5 zeminleri + düzeltilmiş ceza, refleksle, `ppo_refleks_1500k`'dan) 1M'de durduruldu, depoya alınmadı | Ara skor her ölçümde düştü; aynı ölçütle `ppo_kaldirma35_250k` (refleksle) daha iyi (2.543'e 2.492) |
 | 09-28 | **Refleks engel yüksekliği "egim" kipinde** (yerçekimi yönünün 5 s'lik ortalaması zeminin eğimi); eski "yercekimi" ve "govde" seçenek olarak kalıyor | Yerçekimi kipi yokuşu engel sanıyordu (%20–30 fazla enerji), gövde kipi basamağa çıkarken takıldı (ders 50); egim ikisini de çözüyor, 8 tohumla doğrulandı |
 | 09-28 | Robota aday: `ppo_kaldirma35_250k` + refleks ("egim") | S6'da tripod'u her zemin türünde hızda geçiyor ya da eşit, düzde ve eğimde enerjide eşit, engelde 2–4 kat verimli; seçim ölçütünde en yüksek skor |
-| 09-28 | Refleksin robot düğümüne bağlanması D8'e kadar ertelendi | Sensörün gövdedeki yeri ve aşağı açısı robot.yaml'da yok (alanlar bile); şemayı ve değerleri D8 belirleyecek. S7'nin konuları (`/range0..2`) hazır |
+| 09-28 | G7 kapandı | Kullanıcı "devam et" dedi (G7'yi kapatma sorusundan sonra); şart refleksli politikayla karşılanıyor |
+| 09-28 | **Refleks robot düğümüne bağlandı; yerleşim alanları robot.yaml'da null** (`position_m`, `pitch_deg`, ortak `max_range_m` 1.2) | Yazılım D8'i beklemesin; değer uydurulmaz, düğüm eksik alanı söyleyip çıkar. Simde uçtan uca deneme DENEYSEL yerleşimli config KOPYASIYLA (`hexapod_rl.deneysel_yerlesim`) |
+| 09-28 | Refleks varsayılan kapalı (`-p reflex:=true` ile açılır) | Mevcut kullanım değişmesin; sensör yoksa ya da yerleşim bilinmiyorsa düğüm yine çalışsın |
+| 09-28 | Eksik mesafe seti eski değerle doldurulmuyor (`RangeCollector`) | Bir sensör susarsa ölçüm bayatlar, refleks kör davranışa döner; eski değerle çalışmak engeli yanlış yerde görmek olur |
 
 ---
 
@@ -1999,22 +2037,20 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 - `body.total_mass_kg`: terazi (D7). Simülasyon CAD tahmini kullanıyor:
   2.13 kg.
 - `sensors.imu.*`: adres ve montaj yönü (D8).
-- `sensors.range_finders.devices[*]`: XSHUT GPIO, adres, bakış yönü. Kaldırma
-  refleksi için ayrıca her sensörün gövdedeki yeri (x, y, z) ve aşağı bakış
-  açısı gerekecek; bu alanlar henüz yok, D8 ekleyecek (öneri GOREVLER D8).
+- `sensors.range_finders.devices[*]`: `xshut_gpio`, `address`,
+  `direction_deg`, `position_m` [x, y, z], `pitch_deg` (son ikisi 2026-09-28'de
+  eklendi, refleks için; alanların tanımı dosyada). Öneri GOREVLER D8.
 
 ### 13.2 Yazılım (Görkem, G7)
 
 Bu oturumda bitenler §14'te. Açık kalanlar:
 
-1. **Refleksi düğüme bağla** (S7 bitti, D8'i bekliyor): `node.py`
-   `/range0..2`'ye (`sensor_msgs/Range`, S7'nin düğümü; görmüyorsa
-   `max_range`) abone olup üç sensörden birer ölçüm gelince
-   `PolicyController.on_ranges`'i çağırır. Yerleşim robot.yaml'dan: şu an
-   yalnız `direction_deg` alanı var (null); gövdedeki yer (x, y, z) ve aşağı
-   bakış açısı alanları D8'le eklenecek, değerleri D8 girer. Sonra
-   `reflex_probe` ve S6 tablosu gerçek yerleşimle yeniden koşulur; ROS'lu
-   simde uçtan uca denenir.
+1. ~~Refleksi düğüme bağla~~ — yapıldı (§3.9). D8 yerleşim değerlerini
+   girince: `reflex_probe` ve S6 tablosu gerçek yerleşimle yeniden koşulur
+   (`hexapod_rl.olcum` ve `train --reflex` şimdilik DENEYSEL
+   `ring_sensors`'ı kullanıyor, robot.yaml'dan okumuyor; o zaman
+   robot.yaml'dan okuyacak hâle getirilmeli); gerçek sensörün gürültüsü ve
+   hızı ölçülüp eğitimdeki %5 / %10 varsayımıyla karşılaştırılır.
 2. ~~Asıl zeminlerle eğitim (S5)~~ — yapıldı (§3.8): v25 yarar getirmedi.
    Denenmemiş: müfredatla (`--curriculum s5`) ve `ppo_kaldirma35_250k`'dan
    "egim" refleksiyle eğitim; düzeltilmiş enerji cezasıyla sıfırdan/taklitten
@@ -2099,21 +2135,22 @@ zeminler (S5) ve ölçüm aracı (S6).
     denetleyicide; ders 41, §3.6) ve refleks açıkken eğitim
     (`ppo_refleks_1500k`).
 
-**2026-09-28'de yapılanlar (§3.8):** S5 eğitime bağlandı; S6 ölçümü iki
-ölçüm hatası düzeltilerek baştan; v25 (S5'te eğitim, yarar yok); refleksin
-eğim kipi. G7'nin "bitti" şartı refleksli politikayla karşılanıyor; G7'yi
-kapatmak kullanıcının onayında.
+**2026-09-28'de yapılanlar (§3.8, §3.9):** S5 eğitime bağlandı; S6 ölçümü
+iki ölçüm hatası düzeltilerek baştan; v25 (S5'te eğitim, yarar yok);
+refleksin eğim kipi; **G7 kapandı** (kullanıcı onayı); refleks robot
+düğümüne bağlandı ve G8 son adayla ROS'lu simde tekrarlandı. **Yazılım
+aşamasının bütün görevleri bitti.**
 
 **Sıradaki (öneri sırası):**
-1. G7 kapanırsa G8'i son adayla tekrarla: `ppo_kaldirma35_250k` +
-   refleks, ROS'lu simde (`tools/wsl/politika_ros_olcum.sh`) düzde ve
-   S5 zemin dünyalarında (`python -m hexapod_terrain dunya ...`). Refleks
-   düğüme bağlı olmadığı için ROS'lu simde kör davranış ölçülür.
-2. D8 gelince: refleksi düğüme bağla (§13.2-1), yerleşimi robot.yaml'dan al,
-   `reflex_probe` ve S6 tablosunu gerçek yerleşimle tekrarla.
-3. İstenirse G7'de iyileştirme: engebede enerji (§13.2-3b); "egim"
-   refleksiyle `ppo_kaldirma35_250k`'dan S5'te eğitim (v25'in tarifi ama
-   başlangıç ve kip farklı).
+1. Donanım vardiyası (GOREVLER D1–D12; başlama kararı ekibin). Yazılım
+   tarafında hazır olanlar: D5 için `map_channels.py` → robot.yaml, D6
+   `calibrate.py`, D8 için sensör düğümü + `-p reflex:=true`, D9 için sürücü
+   düğümü, D11 için torch'suz politika düğümü.
+2. D8 gelince: yerleşim değerleri robot.yaml'a; `olcum`/`train --reflex`'in
+   DENEYSEL yerleşim yerine robot.yaml'ı okuması (§13.2-1); `reflex_probe` ve
+   S6 tablosu gerçek yerleşimle.
+3. İstenirse simde iyileştirme (donanımı beklemeden): engebede enerji
+   (§13.2-3b); "egim" refleksiyle `ppo_kaldirma35_250k`'dan S5'te eğitim.
 
 **Yöntem notları (bu projede işe yarayanlar):**
 - Yeni bir ödül ya da ayar denemeden önce elle yazılmış iyi bir davranışı

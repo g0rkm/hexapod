@@ -206,7 +206,7 @@ donanım bilgileri config'e sonradan girilir.
 4. ✅ Gazebo dünyası + eklem komut arayüzü (`hexapod_gazebo`, docs/ARAYUZ.md)
 5. ✅ Klasik yürüyüş (tripod) — çekirdek (`hexapod_gait`) + ROS düğümü
    (`hexapod_teleop`), Gazebo'da doğrulandı
-6. 🔄 RL ortamı (✅) + PPO eğitimi: düz zeminde en iyi `models/ppo_omni_250k`
+6. ✅ RL ortamı + PPO eğitimi (G7 2026-09-28'de kapandı): düz zeminde en iyi `models/ppo_omni_250k`
    (tripod + öğrenilmiş düzeltme, her yöne); zeminde `models/ppo_lift50_3750k`
    (taban 50 mm ayak kaldırma, deneme zeminlerinde eğitildi, 60 mm engeller);
    arada `models/ppo_kaldirma35_250k` (öğrenilmiş kaldırma ~35 mm: düzde
@@ -218,9 +218,12 @@ donanım bilgileri config'e sonradan girilir.
    ölçüm hatası düzeltilerek yapıldı (güç artık kontrol adımı ortalaması,
    ders 48; tripod:50 kırpılıyordu, ders 49): `ppo_kaldirma35_250k` +
    refleks ("egim" kipi, ders 50) tripod'u her zemin türünde geçiyor ya da
-   eşit; G7'yi kapatmak kullanıcı onayında
-7. 🔄 Pi 4'e aktarma: politika düğümü (`hexapod_policy`) ve sürücü düğümü
-   (`hexapod_hardware`) yazıldı, simde çalışıyor; Pi'de denenmedi
+   eşit
+7. 🔄 Pi 4'e aktarma: politika düğümü (`hexapod_policy`; mesafe sensörlü
+   refleks `-p reflex:=true`, yerleşim robot.yaml'da null, D8), sensör
+   düğümü (`hexapod_sensors`) ve sürücü düğümü (`hexapod_hardware`)
+   yazıldı, simde çalışıyor; Pi'de denenmedi. **Yazılım aşamasının bütün
+   görevleri bitti (2026-09-28); sırada donanım vardiyası.**
 
 Gerçekçi beklenti: RL politikası eğitimde gördüğü zorluk türlerine karşı
 sağlam olur, "her koşula" değil. Eğitim senaryoları neyi kapsarsa sistem
