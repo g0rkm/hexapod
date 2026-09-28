@@ -346,9 +346,9 @@ def main(argv: list[str] | None = None) -> int:
 
     ozetler = []
     if args.paralel > 1:
-        import multiprocessing as mp
+        from .paralel import job_pool
         # Her iş kendi sürecinde (Gazebo dünyaları süreçte birikmesin); sıra korunur.
-        havuz = mp.get_context("fork").Pool(args.paralel, maxtasksperchild=1)
+        havuz = job_pool(args.paralel)
         sonuclar = havuz.imap(_is, isler, chunksize=1)
     else:
         havuz, sonuclar = None, map(_is, isler)

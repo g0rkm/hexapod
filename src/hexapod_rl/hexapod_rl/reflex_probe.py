@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import math
-import multiprocessing as mp
 from dataclasses import replace
 
 DEFAULT_MODEL = "models/ppo_kaldirma35_250k/model.zip"
@@ -129,7 +128,9 @@ def table(model_spec: str, modes, noise: float, drop: float, every: int,
           workers: int = 16, offset_deg: float = 0.0) -> str:
     jobs = [(model_spec, m, ti, s, noise, drop, every, 10.0, offset_deg) for m in modes
             for ti in range(len(TERRAINS)) for s in SEEDS]
-    with mp.get_context("fork").Pool(workers, maxtasksperchild=1) as pool:
+    from .paralel import job_pool
+
+    with job_pool(workers) as pool:
         out = pool.map(_job, jobs, chunksize=1)
     res: dict = {}
     for (_, m, ti, *_), r in out:

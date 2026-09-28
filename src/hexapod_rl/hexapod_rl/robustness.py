@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import math
-import multiprocessing as mp
 from pathlib import Path
 
 #: (ad, tür, büyüklük). tür: "yok", "ofset" (σ, derece), "imu" (θ, derece),
@@ -98,7 +97,9 @@ def run(specs, seconds: float = 10.0, seeds: int = 3, workers: int = 16) -> str:
     """Tarama tablosu (Markdown)."""
     jobs = [(s, ti, ci, seed, seconds) for s in specs for ti in range(len(TERRAINS))
             for ci, (_, kind, _) in enumerate(CASES) for seed in seeds_for(kind, seeds)]
-    with mp.get_context("fork").Pool(workers, maxtasksperchild=1) as pool:
+    from .paralel import job_pool
+
+    with job_pool(workers) as pool:
         out = pool.map(_job, jobs, chunksize=1)
     res: dict = {}
     for s, ti, ci, dist, fell in out:
