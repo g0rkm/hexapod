@@ -31,8 +31,9 @@ düzeltmesidir; bunun için robotun kinematiği (kin) verilmelidir.
 
 Mesafe sensörlü kaldırma refleksi (isteğe bağlı; lift_reflex, 2026-09-27):
 range_sensors (yerleşim) + reflex verilirse her salınımın başında taban
-tripod'un ayak kaldırmasını refleks seçer (on_ranges ile gelen mesafeler +
-IMU). Mesafe gelmiyor ya da bayatsa (range_timeout_s) ya da yürüyüş yönüne
+tripod'un ayak kaldırmasını refleks seçer (on_ranges ile gelen mesafeler;
+engel yüksekliği LiftReflex.reference'a göre, varsayılan gövde düzlemi).
+Mesafe gelmiyor ya da bayatsa (range_timeout_s) ya da yürüyüş yönüne
 hiçbir sensör bakmıyorsa (lift_reflex.covers) refleks devre dışı, politika
 kör davranışına döner: kaldırma çıkışı varsa onun seçtiği, yoksa
 tabanın sabit kaldırması (reflex_status). Yerleşim robot.yaml'dan (D8)
@@ -46,7 +47,7 @@ from typing import Sequence
 
 import numpy as np
 
-from .lift_reflex import LiftReflex, RangeSensor, covers, obstacle_height
+from .lift_reflex import LiftReflex, RangeSensor, covers
 from .mlp import MlpPolicy
 from .tripod import PhaseTripod
 
@@ -211,10 +212,9 @@ class PolicyController:
             self._reflex_lift = None
             return None
         if self._ranges_new or self._reflex_lift is None:
-            g = gravity_in_base(self._imu[0])
             stand = self.policy.contract.base_gait["height_mm"] / 1000.0
-            heights = [obstacle_height(s, d, g, stand)
-                       for s, d in zip(self.range_sensors, self._ranges)]
+            heights = self.reflex.heights(self.range_sensors, self._ranges,
+                                          gravity_in_base(self._imu[0]), stand, now)
             self._reflex_lift = self.reflex.update(now, heights)
             self._ranges_new = False
         self.reflex_status = "görüyor"

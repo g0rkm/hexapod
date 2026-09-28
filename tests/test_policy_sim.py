@@ -145,12 +145,15 @@ def test_her_yon_politikasi_robottaki_koduyla_yurur(tmp_path, command):
     assert state.base_pos[2] > 0.08
 
 
-def test_refleksli_denetleyici_45_mm_basamagi_cikar(tmp_path):
+@pytest.mark.parametrize("reference", ["yercekimi", "egim"])
+def test_refleksli_denetleyici_45_mm_basamagi_cikar(tmp_path, reference):
     """Robottaki yol, ROS'suz: ppo_kaldirma35_250k/policy.npz + mesafe sensörlü
     refleks (DENEYSEL yerleşim) -> denetleyici -> Gazebo, 45 mm basamak. Mesafe
     rangefinder.read ile simden (robotta sürücüden gelecek). Refleks basamağı
     görüp kaldırmayı yükseltmeli ve robot basamağın üstüne çıkmalı; refleks
-    olmadan (yalnız politika, ~35 mm) de ölçülüp karşılaştırılır."""
+    olmadan (yalnız politika, ~35 mm) de ölçülüp karşılaştırılır. "govde"
+    kipi burada basamağa çıkarken burun kalkınca kaldırmayı erken indirip
+    yarı yolda kalıyordu (0.45 m, ders 50); "egim" onu bu geçişte yakalamalı."""
     from hexapod_kinematics import HexapodKinematics
     from hexapod_policy.lift_reflex import LiftReflex, RangeSensor
     from hexapod_rl import rangefinder
@@ -169,7 +172,8 @@ def test_refleksli_denetleyici_45_mm_basamagi_cikar(tmp_path):
     for use_reflex in (False, True):
         sim = HexapodSim(model, workdir=tmp_path / f"sim{int(use_reflex)}", terrain_sdf=sdf,
                          terrain_height=height)
-        kw = dict(range_sensors=sensors, reflex=LiftReflex()) if use_reflex else {}
+        kw = (dict(range_sensors=sensors, reflex=LiftReflex(reference=reference))
+              if use_reflex else {})
         c = PolicyController(MlpPolicy.load(npz), limits,
                              kin=HexapodKinematics.from_config(config), **kw)
         state = sim.reset()

@@ -381,9 +381,11 @@ def main(argv: list[str] | None = None) -> int:
         acilar = sorted({a for a in (denetleyici_coz(s)[1] for s in args.denetleyiciler)
                          if a is not None})
         if acilar:
+            from hexapod_policy.lift_reflex import LiftReflex
             baslik += (f"+refleks: DENEYSEL mesafe sensörü yerleşimi (gövde kenarında ileri ve "
                        f"±90°, {'/'.join(f'{a:g}' for a in acilar)}° aşağı; robot.yaml'da yok, "
-                       f"D8) · tekrarlarda %{args.refleks_gurultu:g} gürültü + "
+                       f"D8) · engel yüksekliği '{LiftReflex().reference}' kipinde · "
+                       f"tekrarlarda %{args.refleks_gurultu:g} gürültü + "
                        f"%{args.refleks_dusme:g} düşen okuma\n")
         baslik += "\n"
         args.out.parent.mkdir(parents=True, exist_ok=True)

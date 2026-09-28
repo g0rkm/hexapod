@@ -50,7 +50,7 @@ from hexapod_gazebo.pose import standing_pose
 from hexapod_kinematics import HexapodKinematics
 from hexapod_policy.tripod import PhaseTripod
 
-from hexapod_policy.lift_reflex import LiftReflex, covers, obstacle_height
+from hexapod_policy.lift_reflex import LiftReflex, covers
 
 from . import rangefinder
 from .rangefinder import RangeSensor
@@ -291,11 +291,9 @@ class HexapodEnv(gym.Env):
                       for sensor, d in zip(self.range_sensors, ranges)]
         self.ranges = ranges
         if self.lift_reflex is not None:
-            g = s.gravity_in_base()
-            stand = self.task.stand_height_mm / 1000.0
+            stand, t = self.task.stand_height_mm / 1000.0, self._steps * self.dt
             self._reflex_lift = self.lift_reflex.update(
-                self._steps * self.dt,
-                [obstacle_height(sensor, d, g, stand) for sensor, d in zip(self.range_sensors, ranges)])
+                t, self.lift_reflex.heights(self.range_sensors, ranges, s.gravity_in_base(), stand, t))
         return list(self.ranges)
 
     # -- müfredat ----------------------------------------------------------------

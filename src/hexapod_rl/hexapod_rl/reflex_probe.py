@@ -63,7 +63,7 @@ def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
     TERRAINS[terrain] yerine. Dönen yol komut yönünde (m)."""
     import numpy as np
 
-    from hexapod_policy.lift_reflex import LiftReflex, covers, obstacle_height
+    from hexapod_policy.lift_reflex import LiftReflex, covers
 
     from . import terrain_probe as tp
     from .env import HexapodEnv
@@ -92,15 +92,16 @@ def run_case(model_spec: str, mode, terrain: int, seed: int, noise: float = 0.0,
         lifts, power, n, fell = [], 0.0, 0, False
         for k in range(int(round(seconds / env.dt))):
             if reflex and k % every == 0:
-                g = env._state.gravity_in_base()
-                heights = []
+                ds = []
                 for s, d in zip(sensors, info["ranges_m"]):
                     if rng.uniform() < drop:
                         d = s.max_m                       # okuma gelmedi: "görmüyor"
                     elif d < s.max_m:
                         d *= 1.0 + rng.normal(0.0, noise)
-                    heights.append(obstacle_height(s, d, g, task.stand_height_mm / 1000.0))
-                lift = lift_reflex.update(k * env.dt, heights)
+                    ds.append(d)
+                lift = lift_reflex.update(k * env.dt, lift_reflex.heights(
+                    sensors, ds, env._state.gravity_in_base(), task.stand_height_mm / 1000.0,
+                    k * env.dt))
             action, _ = model.predict(obs, deterministic=True)
             action = np.array(action)
             if not reflex or covers(sensors, command[0], command[1]):
