@@ -116,3 +116,93 @@ class DryRunBackend:
     def close(self) -> None:
         pass
 
+
+# ---------------------------------------------------------------------------
+# GPIO: VL53L0X'lerin XSHUT pinleri için (S7)
+# ---------------------------------------------------------------------------
+# Üç VL53L0X de 0x29 adresinde doğar. Ayırmanın tek yolu, hepsini XSHUT ile
+# kapalı tutup birini uyandırıp ona yeni adres vermek, sonra sıradakine
+# geçmek (bkz. hexapod_sensors.rangefinders). Bunun için çıkış pini gerekiyor.
+
+
+class GpioBackend(Protocol):
+    def setup_output(self, pin: int, value: bool) -> None: ...
+
+    def write(self, pin: int, value: bool) -> None: ...
+
+    def close(self) -> None: ...
+
+
+class LgpioBackend:
+    """Gerçek GPIO (Raspberry Pi). lgpio gerektirir (pip install lgpio).
+
+    Pi 5'te RPi.GPIO çalışmıyor; lgpio Pi 4 ve 5'te de çalışan, Raspberry Pi
+    OS ve Ubuntu depolarında bulunan kütüphane.
+    """
+
+    def __init__(self, chip: int = 0):
+        try:
+            import lgpio  # type: ignore[import-not-found]
+        except ImportError as exc:  # pragma: no cover - donanıma özel
+            raise BackendError(
+                "lgpio kurulu değil. Raspberry Pi üzerinde: pip install lgpio\n"
+                "Donanımsız geliştirme için DryRunGpio kullanın."
+            ) from exc
+        self._lgpio = lgpio
+        try:
+            self._handle = lgpio.gpiochip_open(chip)
+        except Exception as exc:  # pragma: no cover - donanıma özel
+            raise BackendError(f"GPIO yongası {chip} açılamadı: {exc}") from exc
+        self._claimed: set[int] = set()
+
+    def setup_output(self, pin: int, value: bool) -> None:
+        try:
+            self._lgpio.gpio_claim_output(self._handle, pin, int(value))
+        except Exception as exc:  # pragma: no cover - donanıma özel
+            raise BackendError(f"GPIO {pin} çıkış olarak ayarlanamadı: {exc}") from exc
+        self._claimed.add(pin)
+
+    def write(self, pin: int, value: bool) -> None:
+        if pin not in self._claimed:
+            raise BackendError(f"GPIO {pin} önce setup_output ile ayarlanmalı")
+        try:
+            self._lgpio.gpio_write(self._handle, pin, int(value))
+        except Exception as exc:  # pragma: no cover - donanıma özel
+            raise BackendError(f"GPIO {pin} yazılamadı: {exc}") from exc
+
+    def close(self) -> None:
+        for pin in list(self._claimed):  # pragma: no cover - donanıma özel
+            try:
+                self._lgpio.gpio_free(self._handle, pin)
+            except Exception:
+                pass
+        self._claimed.clear()
+        try:  # pragma: no cover - donanıma özel
+            self._lgpio.gpiochip_close(self._handle)
+        except Exception:
+            pass
+
+
+class DryRunGpio:
+    """Donanımsız GPIO. Pin durumlarını ve sırayı kaydeder.
+
+    Sıra önemli: XSHUT'larla adresleme "hepsini kapat, birini aç, adres ver"
+    düzenine dayanır; testler bu sırayı denetler.
+    """
+
+    def __init__(self, verbose: bool = False):
+        self.values: dict[int, bool] = {}
+        self.history: list[tuple[int, bool]] = []
+        self.verbose = verbose
+
+    def setup_output(self, pin: int, value: bool) -> None:
+        self.write(pin, value)
+
+    def write(self, pin: int, value: bool) -> None:
+        self.values[pin] = bool(value)
+        self.history.append((pin, bool(value)))
+        if self.verbose:
+            print(f"[dry-run] GPIO {pin} <- {int(bool(value))}")
+
+    def close(self) -> None:
+        pass

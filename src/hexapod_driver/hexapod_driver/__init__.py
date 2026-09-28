@@ -5,7 +5,7 @@ Katman sırası (proje brifi §4):
     Servo sürücü katmanı   <- burası
 """
 
-from .backends import DryRunBackend, SMBusBackend
+from .backends import DryRunBackend, DryRunGpio, LgpioBackend, SMBusBackend
 from .calibration import Calibration, JointCalibration
 from .config import JOINT_NAMES, JointSpec, LegSpec, RobotConfig, Value
 from .errors import (
@@ -30,6 +30,8 @@ __all__ = [
     "PCA9685",
     "DryRunBackend",
     "SMBusBackend",
+    "DryRunGpio",
+    "LgpioBackend",
     "HexapodError",
     "ConfigError",
     "MissingValue",
