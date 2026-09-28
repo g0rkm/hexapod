@@ -152,7 +152,8 @@ def main(argv: list[str] | None = None) -> int:
     task = task_from_flags(args.residual, randomize=args.randomize)
     if args.model == "tripod":
         from .baseline import TripodPolicy
-        model = TripodPolicy()
+        model = TripodPolicy(task)
+        task = model.task   # tripod'un eylem ölçeği (baseline.ACTION_SCALE)
     else:
         model = PPO.load(Path(args.model), device="cpu")
         trained = find_task(args.model)   # eğitimin gorev.json'ı: eylem modu, taban yürüyüş

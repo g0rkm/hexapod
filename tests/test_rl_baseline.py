@@ -21,17 +21,31 @@ def test_gozlemden_hiz_komutunu_okur():
 
 
 def test_tripod_eylemleri_kirpilmadan_sigar():
-    """Eğitimdeki hız aralığında tripod eylem sınırlarını ([-1, 1]) aşmamalı,
-    yoksa ortam kırpar ve ölçülen tripod Samet'inkinden farklı olur."""
-    policy = TripodPolicy(TaskConfig())
+    """Eğitimdeki hız aralığında ve ölçülen adım yüksekliklerinde tripod eylem
+    sınırlarını ([-1, 1]) aşmamalı, yoksa ortam kırpar ve ölçülen tripod
+    Samet'inkinden farklı olur. 2026-09-28'e kadar yalnız 25 mm denetleniyordu;
+    50 mm'de femur eğitimin 0.5 rad'lık ölçeğini aşıyor, "tripod:50" ~30 mm
+    kaldırıyordu (ders 49)."""
     obs = [0.0] * 29
-    for vx in (0.05, 0.15):
-        policy.reset()
-        obs[_COMMAND] = [vx, 0.0, 0.0]
-        for _ in range(100):                 # 2 s, 3 adım döngüsü
-            action, _ = policy.predict(obs)
-            assert len(action) == 18
-            assert max(abs(a) for a in action) <= 1.0
+    for step in (None, 50.0, 60.0):
+        policy = TripodPolicy(TaskConfig(), step_height_mm=step)
+        for vx in (0.05, 0.15):
+            policy.reset()
+            obs[_COMMAND] = [vx, 0.0, 0.0]
+            for _ in range(100):                 # 2 s, 3 adım döngüsü
+                action, _ = policy.predict(obs)
+                assert len(action) == 18
+                assert max(abs(a) for a in action) <= 1.0, (step, vx)
+
+
+def test_tripod_kendi_eylem_olcegiyle_olculur():
+    """Ölçüm araçları tripod'u policy.task ile koşmalı (eylem ölçeği aynı olsun)."""
+    from hexapod_rl.baseline import ACTION_SCALE
+    from hexapod_rl.terrain_probe import load
+
+    policy, task = load("tripod:50")
+    assert task is policy.task and task.action_scale == ACTION_SCALE
+    assert TripodPolicy(TaskConfig(stand_height_mm=90.0)).task.stand_height_mm == 90.0
 
 
 def test_adim_yuksekligi_verilebilir():

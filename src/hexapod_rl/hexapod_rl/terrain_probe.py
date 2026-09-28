@@ -356,7 +356,8 @@ def load(spec: str):
     if spec.startswith("tripod"):   # "tripod" ya da "tripod:50" (adım yüksekliği, mm)
         from .baseline import TripodPolicy
         _, _, h = spec.partition(":")
-        return TripodPolicy(step_height_mm=float(h) if h else None), TaskConfig()
+        policy = TripodPolicy(step_height_mm=float(h) if h else None)
+        return policy, policy.task   # kendi eylem ölçeğiyle (baseline.ACTION_SCALE)
     if spec.startswith("phase"):
         _, _, lift = spec.partition(":")
         task = TaskConfig(action_mode="residual")
