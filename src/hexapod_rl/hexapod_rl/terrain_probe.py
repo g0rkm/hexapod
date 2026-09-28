@@ -13,6 +13,13 @@ Bu S5'in (Samet, zemin üreteci) yerine geçmez: G7'nin zeminli eğitimi ve
 oluşturmak için (PROJE_DEVIR §14, madde 5) ve zeminli eğitim altyapısının
 ilk denemesi için (TRAIN_SETS, train.py --terrains); her biri terrain_sdf +
 terrain_height çifti (sim.py), S5'in üreteci de aynı biçimde vermeli.
+
+S5 geldi (2026-09-28): "s5" adlı eğitim seti, müfredat ve ara kayıt ölçümü
+hexapod_terrain'in üreteçlerini kullanır (TRAIN_SETS/EVAL_CASES/CURRICULA
+["s5"]). Buradaki eski deneme zeminleri ("deneme", "deneme2") depodaki
+modellerin eğitildiği ve models/README tablolarının ölçüldüğü zeminler
+oldukları için yeniden üretilebilsinler diye kalıyor; aynı adlı S5 zemininden
+farklılar (docs/olcumler/README).
 """
 
 from __future__ import annotations
@@ -20,6 +27,9 @@ from __future__ import annotations
 import argparse
 import math
 from functools import partial
+
+from hexapod_terrain import sets as s5_sets
+from hexapod_terrain import terrain as s5
 
 #: Zemin kutularının kalınlığı ve yatay boyu (m); robot 10 s'de ~1-1.5 m gider.
 _THICK, _SIZE = 0.2, 8.0
@@ -240,6 +250,24 @@ TRAIN_SETS = {
         ("engebe 50 mm", lambda: rough(0.050, seed=13)),
         ("engebe 60 mm", lambda: rough(0.060, seed=14)),
     ),
+    # S5'in zeminleri (hexapod_terrain, 2026-09-28): G7'nin asıl eğitimi. 8'lik
+    # liste: eski PC 8 ortamla eğitir, 16 ortamda liste iki kez döner. Seviyeler
+    # S6'nın ölçüm listesindekilerin (sets.evaluation_set) AYNISI DEĞİL, arası
+    # ya da biraz ötesi: ölçüm, eğitimde görülen zeminin ezberini değil
+    # genellemeyi göstersin. Engebe yok: kutu sayısı en yavaş ortamı ~2 kat
+    # yavaşlatıyor ve paralel eğitim onu bekliyor (ders 42); S6 tablosunda da
+    # engebe 40/60'ta bütün denetleyiciler 3/3 geçiyor, zemin görmemiş
+    # politikalar dahil. Düz zemin tek ortam (1/8), deneme setlerindeki oranda.
+    "s5": (
+        ("düz", lambda: s5.flat()),
+        ("çukur 55 mm", lambda: s5.pit(0.055)),
+        ("basamak 55 mm", lambda: s5.step(0.055)),
+        ("merdiven 6x45 mm", lambda: s5.stairs(0.045, 0.28)),
+        ("yokuş yukarı 25°", lambda: s5.slope(-25.0)),
+        ("kaygan yokuş 12° μ0.3", lambda: s5.slope(-12.0, mu=0.3)),
+        ("yayla 55 mm", lambda: s5.plateau(0.055)),
+        ("yan eğim 15°", lambda: s5.slope(15.0, "y")),
+    ),
 }
 
 
@@ -261,6 +289,16 @@ EVAL_CASES = {
         ("kaygan yokuş 20 μ0.4", lambda: slope(-20.0, mu=0.4), (0.10, 0.0, 0.0)),
         ("engebe 40 ileri", lambda: rough(0.040, seed=101), (0.10, 0.0, 0.0)),
         ("engebe 60 yana", lambda: rough(0.060, seed=102), (0.0, 0.06, 0.0)),
+    ),
+    # Seçim de S6'nın ölçüm zeminlerine bakmasın (ara kayıt seçimi ölçüm setine
+    # ayarlanırsa tablo iyimser olur): ara seviyeler ve öteki yönler.
+    "s5": (
+        ("basamak 50 ileri", lambda: s5.step(0.050), (0.10, 0.0, 0.0)),
+        ("merdiven 6x40 ileri", lambda: s5.stairs(0.040, 0.25), (0.10, 0.0, 0.0)),
+        ("çukur 50 yana", lambda: s5.pit(0.050), (0.0, 0.06, 0.0)),
+        ("çukur 60 geri", lambda: s5.pit(0.060), (-0.10, 0.0, 0.0)),
+        ("yayla 45 ileri", lambda: s5.plateau(0.045), (0.10, 0.0, 0.0)),
+        ("kaygan yokuş 12 μ0.3", lambda: s5.slope(-12.0, mu=0.3), (0.10, 0.0, 0.0)),
     ),
 }
 
@@ -291,6 +329,11 @@ CURRICULA = {
         ("çukur", _PITS),
         ("eğim y", tuple(partial(slope, d, "y") for d in (5.0, 10.0, 15.0, 20.0))),
     ),
+    # S5'in seviyeleri (hexapod_terrain.sets.LEVELS, kolaydan zora); türler ve
+    # oranlar TRAIN_SETS["s5"] gibi (engebe yok, düz 1/8).
+    "s5": (("düz", None),) + tuple(
+        (kind, s5_sets.LEVELS[kind])
+        for kind in ("çukur", "basamak", "merdiven", "eğim", "kaygan", "yayla", "yan eğim")),
 }
 
 

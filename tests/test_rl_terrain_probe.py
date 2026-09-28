@@ -154,6 +154,50 @@ def test_mufredat_kolaydan_zora_ve_dagilim():
         curriculum_levels("yok", 4)
 
 
+def test_s5_egitim_seti_olcum_zeminlerinin_aynisini_icermiyor():
+    """G7'nin asıl eğitimi S5 zeminlerinde; eğitim ve ara kayıt seçimi S6'nın
+    ölçüm listesindeki zeminlerin aynısını görmemeli (düz zemin hariç), yoksa
+    tablo genellemeyi değil ezberi ölçer."""
+    from hexapod_terrain import sets
+
+    from hexapod_rl.terrain_probe import EVAL_CASES, TRAIN_SETS, eval_cases, training_terrains
+
+    olcum = [z.params for z in sets.evaluation_set() if z.params["kind"] != "flat"]
+    egitim = [make() for _, make in TRAIN_SETS["s5"]]
+    secim = [make() for _, make, _ in EVAL_CASES["s5"]]
+    assert len(egitim) == 8                                    # eski PC 8 ortam; 16'da iki kez
+    for z in egitim + secim:
+        sdf, height = z                                        # Terrain (sdf, height) diye açılır
+        assert sdf.startswith("<model") and callable(height), z.label
+        assert z.params not in olcum, f"{z.label} S6'nın ölçüm zemini"
+    kinds = {z.params["kind"] for z in egitim}
+    assert {"flat", "pit", "step", "stairs", "slope", "plateau"} <= kinds
+    assert "rough" not in kinds                                # eğitimi yavaşlatır (ders 42)
+    assert any(z.params.get("mu") for z in egitim)             # kaygan
+    items = training_terrains("s5", 16)
+    assert [lb for lb, _, _ in items[:8]] == [lb for lb, _, _ in items[8:]]
+    assert len(eval_cases("s5")) == len(EVAL_CASES["s5"])
+
+
+def test_s5_mufredati_seviyeleri_kolaydan_zora():
+    from collections import Counter
+
+    from hexapod_terrain import sets
+
+    from hexapod_rl.terrain_probe import CURRICULA, curriculum_levels
+
+    for label, levels in CURRICULA["s5"]:
+        if levels is None:
+            assert label == "düz"
+            continue
+        assert levels is sets.LEVELS[label]                    # S5'in sırası, kopya değil
+        for make in levels:
+            sdf, height = make()                               # env.set_level böyle çağırır
+            assert sdf.startswith("<model") and callable(height), label
+    counts = Counter(label for label, _ in curriculum_levels("s5", 16))
+    assert counts["düz"] == 2 and "engebe" not in counts and len(counts) == 8
+
+
 def test_basamak_dondurulebilir():
     """angle_deg ile basamak yürüyüş yönüne döner; SDF'teki kutu da aynı yerde."""
     _, h0 = step(0.045)

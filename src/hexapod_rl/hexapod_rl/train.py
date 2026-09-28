@@ -24,8 +24,9 @@ taklit de --omni ile yapılmalı.
 
 --terrains AD: ortam başına zemin (terrain_probe.TRAIN_SETS[AD]; liste
 ortamlara sırayla dağıtılır, kütle çarpanları karıştırılır). Zemin ortamın
-ömrü boyunca sabit (dünya kurulurken yazılıyor). S5 gelince onun üreteci
-aynı biçimde (terrain_sdf, terrain_height) bir liste verecek.
+ömrü boyunca sabit (dünya kurulurken yazılıyor). "s5": S5'in zeminleri
+(hexapod_terrain; G7'nin asıl eğitimi), "deneme"/"deneme2": depodaki
+modellerin eğitildiği eski deneme zeminleri.
 
 --curriculum AD: kolaydan zora müfredat (terrain_probe.CURRICULA[AD]; ortam
 başına bir zemin türü ve seviyeleri, env.HexapodEnv terrain_levels). Her
@@ -209,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--omni", action="store_true",
                         help="her yöne komut (task.OMNI_COMMANDS)")
     parser.add_argument("--terrains", default=None,
-                        help="ortam başına zemin seti (terrain_probe.TRAIN_SETS; S5 gelince onunki)")
+                        help="ortam başına zemin seti (terrain_probe.TRAIN_SETS; s5 = S5'in zeminleri)")
     parser.add_argument("--curriculum", default=None,
                         help="kolaydan zora zemin müfredatı (terrain_probe.CURRICULA)")
     parser.add_argument("--reflex", type=float, default=None, metavar="AÇI",
