@@ -1840,6 +1840,18 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     işaretle (tabloda "geri kaydı") ve ölçüm setine ölçütün geçerli olduğu
     bir seviye koy (10° μ0.3 yürünebiliyor, denetleyicileri ayırıyor).
     Kayma, sürtünme katsayısı eğimin tanjantına yaklaşınca başlıyor.
+46. **Aynı büyüklüğü iki yoldan veriyorsan ikisini de çevir.** S7'nin sensör
+    düğümü IMU'nun yerçekimi vektörünü gövde çerçevesine çeviriyordu ama
+    quaternion'u ham bırakıyordu; politika yönelimi QUATERNION'dan okuyor
+    (`controller.on_imu`), ivmeden değil. IMU dönük takılıysa robot eğikliğini
+    yanlış okurdu ve hata "politika kötü" diye aranırdı. Tüketicinin hangi
+    alanı okuduğunu koda bakarak doğrula; "IMU yayınlıyorum" yetmez.
+47. **Simetrik bir dönüşü simetrik veriyle test etme.** Yukarıdaki hatayı ilk
+    yazdığım test yakalamadı: montaj olarak yalnız yaw (dikey eksen) dönüşü
+    seçmiştim, o da yerçekimi yönünü hiç değiştirmiyor, yani hatalı ve doğru
+    kod aynı sonucu veriyordu. Roll/pitch içeren montajla test edince ortaya
+    çıktı. Bir dönüşümü test ederken, dönüşümün etkisiz kaldığı özel durumu
+    seçmediğinden emin ol (mutasyon denemesi bunu gösterir).
 ---
 
 ## 13. Açık kalan işler
@@ -1911,6 +1923,13 @@ Bu oturumda bitenler §14'te. Açık kalanlar:
 5. `python3 tools/calibrate.py` ile 18 eklemin merkez/yön/span/limitleri.
 6. Güç bağlantısını kontrol et: servo hattı Pi'den ayrı mı, topraklar ortak
    mı, sigorta nerede.
+7. **S7'den devredilenler (D8):** sensör sürücüleri donanımda hiç
+   denenmedi. (a) VL53L0X ince ayar dizisi yok: fabrika varsayılanlarıyla
+   ölçer (~1.2 m menzil); yetmezse `Vl53l0x(tuning=...)` ile ST'nin dizisi
+   verilir, sürücü mantığı değişmez. (b) `pip install lgpio` gerekli.
+   (c) Üç sensörün sırayla okunması 25 Hz'i tutuyor mu, ölçülmeli.
+   (d) `xshut_gpio`, `address`, `direction_deg`, `mount_rotation_deg`
+   robot.yaml'da girilecek; kod bunları uydurmuyor. Ayrıntı: GOREVLER.md S7.
 7. **S4'ten devredilenler:** sürücü düğümü donanımda hiç denenmedi. Ayrıntılı
    liste: GOREVLER.md, "S4'ten devredilen, robotta doğrulanacaklar".
 

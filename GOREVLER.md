@@ -102,11 +102,11 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | S4 | Gerçek robot sürücü düğümü (ROS 2, dry-run) | Samet | S1 ✅, G5 ✅ | G8, (vardiya) | ✅ |
 | S5 | Zemin / dünya üreteci | Samet | S1 ✅, G5 ✅ | G7, S6 | ✅ |
 | S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3 ✅, S5 ✅ | G7 | ✅ |
-| S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
+| S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ✅ |
 
 **Şu an başlanabilecekler:**
 - **Görkem:** G6 bitti (2026-09-26). G7'de S5 gelmeden yapılabilecekler bitti (2026-09-27): her yöne politika, zeminli eğitim (kendi deneme zeminleriyle), öğrenilmiş ayak kaldırma, müfredat, dayanıklılık taraması, mesafe sensörlü kaldırma refleksi (denetleyicide hazır). **S5 geldi (2026-09-27)**: sıradaki, asıl zeminlerle eğitim ve "bitti" ölçümü (S6); S7 + D8 gelince refleksin düğüme bağlanması. Ayrıntı: docs/PROJE_DEVIR.md §3.1, §14.
-- **Samet:** S1-S6 bitti (S6: 2026-09-28, `hexapod_rl.olcum` + docs/olcumler/). Sıradaki: **S7, tek kalan görev.** **S7 G7'nin de önünde:** mesafe sensörlü kaldırma refleksi gerçek mesafe ölçümlerini bekliyor (S7'deki not).
+- **Samet:** S1-S7 bitti (S7: 2026-09-28, `hexapod_sensors`). **Samet'in yazılım görevlerinin hepsi tamamlandı.** Kalan tek yazılım görevi G7 (Görkem). Sensörler için not: mesafe sensörlü kaldırma refleksi gerçek mesafe ölçümlerini bekliyor (S7'deki not).
 - **Görkem için (2026-09-28, S6 bitti):** G7'nin "bitti" ölçümü hazır: `python -m hexapod_rl.olcum <model> --tohum 3 --temiz -o docs/olcumler/tablo.md`. İlk tablo depoda (5 denetleyici × 15 zemin). Şartın hız tarafı karşılanıyor, düz zeminde enerji tarafı karşılanmıyor (ayrıntı: docs/olcumler/). Tekrarlar rastgeleleştirme açık koşuyor; kapalıyken tohumlar aynı sonucu veriyor (ölçüldü).
 - **Görkem için (2026-09-27, S5 bitti):** asıl zeminler hazır, `terrain_probe`'un deneme zeminlerinin yerine geçebilir; geçiş iki satır (bkz. S5 bölümü). Senin dosyalarına dokunmadım. `hexapod_terrain.sets.LEVELS[tür]` senin `CURRICULA` biçiminle uyumlu (seviye üreteçleri, kolaydan zora) — müfredatına doğrudan girer. Engebenin fizik maliyeti ölçüldü: kutu sayısı hızı belirliyor, paralel eğitimde en yavaş ortam hepsini bekletir (S5 bölümü).
 - Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S4'ün ROS düğümü) tekrar çalıştırılmalı.
@@ -307,10 +307,36 @@ python -m hexapod_rl.olcum tripod:50 models/ppo_refleks_1500k/model.zip --tohum 
 **Samet'ten not (S2'ye dönük):** 50 mm adımlı tripod düz zeminde 25 mm'likten hem biraz hızlı hem **%31 daha az enerji** harcıyor (27.2'ye karşı 39.2 J/m). `hexapod_gait`'in varsayılan 25 mm adım yüksekliği gözden geçirilmeli; tek ölçüm kanıt değil, adım yüksekliği taraması gerekir.
 - **Görkem'den not (2026-09-26):** ölçümün çekirdeği hazır, üstüne kurulabilir: `hexapod_rl.evaluate.evaluate(model, seconds, vx, seed, noise, task)` hız, yön sapması, adım başı ödül, ortalama mekanik güç (W, Σ|τ·ω|), devrilme, ritim uyumu veriyor; `model` bir SB3 modeli ya da `hexapod_rl.baseline.TripodPolicy()` (senin tripod'un, aynı arayüzle). Eksik olan: zemin seçimi (S5'in `terrain_sdf`'i `HexapodEnv`'e geçirilmeli), N tekrar ve tablo. Politikayı ROS'suz koşturduğu için hızlı (~10x gerçek zaman).
 
-#### S7 — Sensör sürücüleri (saf Python) ⬜
+#### S7 — Sensör sürücüleri (saf Python) ✅
 - **Bekler:** — · **Açar:** donanım vardiyası (D8, D11)
 - `hexapod_driver` ile aynı desende, donanımsız test edilebilir: VL53L0X'leri XSHUT ile sırayla uyandırıp yeniden adresleme (üçü de 0x29'da doğar; BNO055 de 0x29'da olabilir, çakışmaya dikkat), BNO055'ten yönelim ve ivme okuma. `DryRunBackend` ile testler. Gerçek donanımda denemesi vardiyada.
-- **Bitti sayılır:** veri sayfalarına göre yazmaç düzeyinde testler robotsuz geçiyor.
+- **Bitti sayılır:** veri sayfalarına göre yazmaç düzeyinde testler robotsuz geçiyor. ✅
+
+**Yapıldı (2026-09-28): yeni paket `hexapod_sensors`** — çekirdek saf Python, ROS sarmalayıcısı ayrı (hexapod_driver deseni).
+
+| Dosya | İş |
+|---|---|
+| `vl53l0x.py` | tek mesafe sensörü: kimlik, adres değiştirme, sürekli ölçüm, mesafe okuma |
+| `rangefinders.py` | üç sensörü XSHUT ile ayırıp adresleme, topluca okuma |
+| `bno055.py` | IMU: yerçekimi yönü, açısal hız, yönelim, kalibrasyon durumu |
+| `mount.py` | sensör çerçevesi -> gövde çerçevesi (vektör ve quaternion) |
+| `fake.py` | veri sayfasına göre davranan taklit cihazlar |
+| `node.py` | `/range0..2` (sensor_msgs/Range) + `/imu` yayınlar |
+
+- **`hexapod_driver`'a iki ekleme:** `read_block_data` (çok baytlı ölçüm tek işlemde okunmazsa yarısı eski yarısı yeni çıkar) ve GPIO arka uçları (`LgpioBackend`, `DryRunGpio`) — XSHUT için; projede hiç GPIO kodu yoktu.
+- **Üç sensör de 0x29'da doğuyor:** hepsi XSHUT ile kapatılır, biri açılır, kimliği doğrulanır, yeni adresi verilir, sonra sıradakine geçilir. Adresler güç kesilene kadar kalıcı; her açılışta dizi yeniden koşar.
+- **Adres çakışması reddediliyor:** BNO055 0x29'da olabilir, VL53L0X'ler de orada doğar. Çakışma donanımda "sensör bozuk" gibi görünür; kurulumda yakalanıyor (iki sensöre aynı adres, IMU ile aynı adres, hedef olarak fabrika adresi, aynı XSHUT pini).
+- **"Görmüyor" ile "0 metre" ayrı:** menzil dışında sensör 8190 gibi bir işaret değeri döner; bu mesafe sayılmaz (refleksin şartı, Görkem'in notu). Sürücü None, düğüm menzil değeri yayınlar.
+- Testli (`tests/test_sensors.py`, 53 test): kimlik, adresleme, XSHUT sırası, ölçüm durum makinesi, çakışmalar, IMU okuma/kalibrasyon/montaj. `DryRunBackend` yetmezdi (her okumaya 0 döner, testler kendi kendini onaylardı); taklit cihazlar kimlik yazmacını, adres değişimini ve XSHUT'ta veri yolundan kaybolmayı gerçek çipler gibi yapıyor.
+- ROS'lu canlı deneme (WSL, dry-run): eksik kablolamada temiz hata + çıkış kodu 2 (hangi alan eksik söyleniyor), sahte kablolamayla `/range0..2` ve `/imu` **25.0 Hz**'de yayında (refleksin istediği en az hız).
+
+**Bulunan hata (canlı denemede):** politika yönelimi `/imu`'nun **quaternion**'undan okuyor (`controller.on_imu`), ivmeden değil. İlk sürümde montaj dönüşü yalnız vektörlere uygulanıyordu; IMU dönük takılıysa robot eğikliğini yanlış okurdu ve hata "politika kötü" gibi görünürdü. Quaternion da gövde çerçevesine çevriliyor (`mount.quaternion_to_base`, gövde->dünya = (sensör->dünya)·Mᵀ).
+
+**DONANIMDA DENENMEDİ.** Yazmaç düzeyinde doğrulandı, gerçek sensörle hiç çalışmadı. D8'de bakılacaklar:
+1. **VL53L0X ince ayar dizisi yok.** ST'nin resmi başlatma dizisi ~80 sihirli yazmaç yazımı; donanımsız doğrulanamayacağı için ezberden yazılmadı (sessizce yanlış ölçen sürücü riski). Sensör fabrika varsayılanlarıyla da ölçer (~33 ms bütçe, ~1.2 m menzil). Menzil/doğruluk yetmezse bakılacak ilk yer: `Vl53l0x(tuning=...)` — dizi veri olarak dışarıdan verilir, sürücü mantığı değişmez.
+2. `lgpio` kurulu olmalı (`pip install lgpio`); Pi 5'te RPi.GPIO çalışmıyor.
+3. Ölçüm hızı gerçek donanımda ölçülmeli: sürekli modda sensör ~33 ms'de bir ölçer, üç sensör sırayla okunuyor; refleks 25 Hz istiyor.
+4. `direction_deg`, `xshut_gpio`, `address`, `mount_rotation_deg` hâlâ null — D8'in kararı; kod uydurmuyor, `MissingValue` fırlatıyor.
 - **Görkem'den not (2026-09-27):** mesafe sensörleri artık kullanılacak: `hexapod_policy.lift_reflex` engel görünce ayak kaldırmayı yükseltiyor (simde düz verim ↔ zemin ödünleşimini çözüyor, PROJE_DEVIR ders 41). Refleksin istediği: her sensörden mesafe (m; menzil dışıysa menzil) en az ~25 Hz (simde iki kontrol adımında bir okumayla denendi), okunamayan ölçümün "görmüyor" diye ayırt edilebilmesi. ROS tarafında standart `sensor_msgs/Range` yeterli.
 
 ---

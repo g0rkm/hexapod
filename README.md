@@ -23,6 +23,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Politika düğümü | ✅ [hexapod_policy](src/hexapod_policy): torch'suz (numpy), ROS'lu Gazebo'da yürüdü |
 | Zeminler (eğim, basamak, engebe...) | ✅ [hexapod_terrain](src/hexapod_terrain): parametreli ve tohumlu, Gazebo'da doğrulandı ([örnekler](docs/zeminler/)) |
 | Yürüyüş ölçümü | ✅ `hexapod_rl.olcum`: tripod ve politikalar 15 zeminde karşılaştırıldı ([tablo](docs/olcumler/)) |
+| Sensör sürücüleri | ✅ [hexapod_sensors](src/hexapod_sensors): VL53L0X x3 + BNO055, yazmaç düzeyinde testli; **donanımda denenmedi** (D8) |
 | Pi 4'e aktarma | ⛔ |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.
@@ -326,6 +327,27 @@ Her yöne model geri (`x: -0.1`), yana (`linear: {y: 0.06}`) ve dönüş (`angul
 
 Politika yalnızca eğitildiği komutları yürür (hangi model ne için: `models/README.md`). Komut kesilirse,
 IMU gelmezse ya da robot devrilirse ayakta duruşa geçer.
+
+## Sensörler (S7)
+
+Üç VL53L0X mesafe sensörü ve BNO055 IMU. Düğüm `/range0..2` (sensor_msgs/Range)
+ve `/imu` yayınlar; politika düğümü ikisini de kullanıyor (kaldırma refleksi
+mesafeyi, yönelim IMU'yu).
+
+```bash
+ros2 run hexapod_sensors sensors --ros-args -p dry_run:=true
+```
+
+Robotta `dry_run` verilmez. Kablolama (`xshut_gpio`, `address`) ve IMU montajı
+(`mount_rotation_deg`) `config/robot.yaml`'da girilmeden düğüm **bilerek**
+başlamaz ve eksik alanı söyler — bunlar D8'in kararı.
+
+Üç sensör de fabrika adresinde (0x29) doğduğu için XSHUT pinleriyle teker teker
+uyandırılıp ayrı adres verilir. BNO055 de 0x29'da olabilir; çakışma kurulumda
+reddedilir.
+
+**Donanımda denenmedi:** sürücüler taklit cihazlarla yazmaç düzeyinde
+doğrulandı. Bilinenler ve ilk çalıştırmada bakılacaklar: GOREVLER.md S7.
 
 ## RL eğitimi (WSL)
 
