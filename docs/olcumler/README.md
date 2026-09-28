@@ -63,18 +63,20 @@ Komut ileri 0.1 m/s, 10 s, 3 tohum, rastgeleleştirme açık. Tablo:
 
 **1. Refleksli politika tripod'u her engelde geçiyor, düzde aynı enerjide.**
 `ppo_kaldirma35_250k+refleks` düzde tripod'la aynı hız ve enerji (0.102 m/s,
-36.5 J/m; tripod 36.7), 45 mm basamakta 0.095 m/s (tripod 0.019, tripod:50
-0.087), 40 mm çukurda 0.099 (0.014 / 0.088), merdivende 0.097 (0.064 /
-0.090). 60 mm basamakta `ppo_refleks_1500k+refleks` en iyi: 0.091 m/s, 73 J/m
-(tripod:50 0.050 m/s, 137 J/m); `ppo_kaldirma35_250k+refleks` orada sınırda
-(rastgelede 0.075 ama temizde takılıyor).
+36.5 J/m; tripod 36.7), 45 mm basamakta 0.098 m/s (tripod 0.019, tripod:50
+0.087), 60 mm basamakta 0.089 m/s ve 70.8 J/m (tripod:50 0.050 m/s, 137
+J/m), 40 mm çukurda 0.099 (0.014 / 0.088), merdivende 0.099 (0.064 / 0.090),
+yaylada 0.086 (0.054 / 0.087). Engellerde enerji tripod'un 2–4'te biri.
+60 mm basamak sınırda: 8 tohumun 6'sında geçiliyor.
 
-**2. Refleksin zayıf yeri eğim.** Yokuşu ve yan eğimi önündeki "engel" sanıp
-ayağı yükseltiyor: `ppo_kaldirma35_250k+refleks` 10° yokuşta 47.3 J/m (düzde
-36.5), tripod 39.4. Engebe 40/60'ta da %14 pahalı (44.0'a karşı 38.7). Hız
-buralarda tripod'dan biraz yüksek. Sebep: engel yüksekliği yerçekimine göre
-ölçülüyor, düzgün bir eğim de 20° aşağı bakan ışının çarptığı yerde
-"yükselmiş zemin" gibi görünüyor.
+**2. Eğimde refleks artık tripod kadar verimli** ("egim" kipi, PROJE_DEVIR
+ders 50). İlk ölçümde refleks yokuşu "engel" sanıp ayağı kaldırıyordu (10°
+yokuşta 47.3 J/m); engel yüksekliği artık zeminin eğimi çıkarılarak
+ölçülüyor: 10° yokuş 39.3 (tripod 39.4), 20° yokuş 46.5 (49.7, hız da
+0.086'ya 0.076), yan eğim 37.5 (37.4). **Kalan zayıf yer engebe:** hız eşit
+ya da biraz yüksek, enerji %12–14 fazla (43.3/46.1'e karşı 38.7/40.5).
+`ppo_refleks_1500k` eski ("yercekimi") kipiyle eğitildi; yeni kipte 60 mm
+basamakta biraz geriledi (0.091 → 0.080 m/s).
 
 **3. Sensörsüz politikalarda ödünleşim sürüyor** (§12.33): `ppo_omni_250k`
 düzde ve eğimde en verimli (36.2 J/m; 20° yokuşta 46.5, tripod 49.7) ama
@@ -90,11 +92,11 @@ devriliyor, politikalar yerinde duruyor, hiç devrilmiyor.
 en iyi enerji tripod, `ppo_omni_250k` ve refleksli 35 mm'lik modelde (36-37
 J/m).
 
-**G7 için:** refleksle "politika tripod'u geçiyor" şartı eğim, engebe ve
-kaygan zeminde hızda karşılanıyor, engellerde (basamak, çukur, merdiven,
-yayla) hem hızda hem enerjide açık ara; düzde enerji eşit. Eğim ve engebede
-enerjide geride (refleksin eğimi engel sanması). Sensörsüz en iyi seçenek
-zemine göre değişiyor.
+**G7 için:** `ppo_kaldirma35_250k+refleks` tripod'u eğim, engebe ve kaygan
+zeminde (ayrı ayrı ölçüldü) hızda geçiyor ya da eşit; enerjide düzde ve
+eğimde eşit, kaygan yokuşta ve engellerde açık ara önde, engebede %12–14
+geride. Sensörsüz en iyi seçenek zemine göre değişiyor (düzde
+`ppo_omni_250k`, engelde `ppo_lift50_3750k`).
 
 ## Dosyalar
 
