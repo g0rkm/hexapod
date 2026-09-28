@@ -22,7 +22,7 @@ rclpy = pytest.importorskip("rclpy", reason="rclpy yok (ROS 2 Lyrical kaynaklı 
 pytest.importorskip("stable_baselines3", reason="SB3 yok (tools/wsl/rl_kurulum.sh)")
 
 from geometry_msgs.msg import Twist  # noqa: E402
-from sensor_msgs.msg import Imu  # noqa: E402
+from sensor_msgs.msg import Imu, Range  # noqa: E402
 from std_msgs.msg import Float64MultiArray  # noqa: E402
 
 from hexapod_description.interface import COMMAND_TOPIC, IMU_TOPIC  # noqa: E402
@@ -120,3 +120,63 @@ def test_dugum_ayakta_bekler_komutla_yurur_temiz_kapanir(ros, policy_file):
         code, err = stop(proc)
     assert code == 0, err
     assert "Traceback" not in err
+
+
+REFLEX_POLICY = REPO / "models" / "ppo_kaldirma35_250k" / "policy.npz"   # robota aday (artık eylem)
+
+
+def test_refleks_yerlesimi_bilinmiyorsa_eksik_alani_soyleyip_cikar():
+    """Depodaki robot.yaml'da yerleşim D8'e kadar null: -p reflex:=true ile düğüm
+    başlamamalı, neyin eksik olduğunu söylemeli (değer uydurulmaz)."""
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(
+        [str(SRC / p) for p in PACKAGES] + [os.environ.get("PYTHONPATH", "")])}
+    proc = subprocess.run([sys.executable, "-m", "hexapod_policy.node", "--ros-args",
+                           "-p", f"policy:={REFLEX_POLICY}", "-p", "reflex:=true",
+                           "-p", f"config:={REPO / 'config' / 'robot.yaml'}"],
+                          capture_output=True, text=True, timeout=60, env=env)
+    if proc.returncode == 0:
+        pytest.skip("robot.yaml'da yerleşim girilmiş (D8 sonrası)")
+    assert proc.returncode == 2, proc.stderr
+    assert "sensors.range_finders" in proc.stderr and "Traceback" not in proc.stderr
+
+
+def test_refleksli_dugum_mesafe_konularini_dinler(ros, tmp_path):
+    """-p reflex:=true + DENEYSEL yerleşimli config kopyası: /range0..2'den gelen
+    ölçümle refleks "görüyor"; mesafe kesilince "mesafe bayat" (kör davranış)."""
+    from hexapod_rl.deneysel_yerlesim import experimental_config
+
+    cfg = experimental_config(tmp_path / "robot.yaml")
+    proc = start("-p", f"policy:={REFLEX_POLICY}", "-p", "reflex:=true", "-p", f"config:={cfg}")
+    try:
+        imu_pub = ros.create_publisher(Imu, IMU_TOPIC, 10)
+        cmd_pub = ros.create_publisher(Twist, "/cmd_vel", 10)
+        range_pubs = [ros.create_publisher(Range, f"/range{i}", 10) for i in range(3)]
+        got: list[list[float]] = []
+        ros.create_subscription(Float64MultiArray, COMMAND_TOPIC, lambda m: got.append(list(m.data)), 10)
+        assert spin_until(ros, lambda: all(p.get_subscription_count() >= 1 for p in range_pubs),
+                          STARTUP_S), "düğüm /range0..2'yi dinlemiyor"
+
+        imu = Imu()
+        imu.orientation.w = 1.0
+        twist = Twist()
+        twist.linear.x = 0.1
+        near = Range()
+        near.max_range, near.range = 1.2, 0.25          # önde yakın bir engel
+
+        def feed(with_ranges=True):
+            imu_pub.publish(imu)
+            cmd_pub.publish(twist)
+            if with_ranges:
+                for p in range_pubs:
+                    p.publish(near)
+
+        n0 = len(got)
+        assert spin_until(ros, lambda: len(got) > n0 + 50, 10.0, feed), "düğüm yayınlamadı"
+        spin_until(ros, lambda: False, 1.0, lambda: feed(with_ranges=False))   # mesafe kesildi
+        assert proc.poll() is None, "düğüm çöktü"
+    finally:
+        code, err = stop(proc)
+    assert code == 0, err
+    assert "Traceback" not in err
+    assert "/range0, /range1, /range2" in err, err
+    assert "refleks: görüyor" in err and "refleks: mesafe bayat" in err, err

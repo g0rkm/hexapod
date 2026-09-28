@@ -12,6 +12,12 @@
 #     WORLD=/yol/dunya.sdf WORLD_NAME=zemin KOMUTLAR="0.1,0,0" SURE=15 \
 #         bash tools/wsl/politika_ros_olcum.sh models/ppo_lift50_3750k/policy.npz
 #     (deneme zemini dünyası: terrain_probe.world_sdf(...))
+#     ZEMIN=basamak:3 KOMUTLAR="0.1,0,0" SURE=12 bash tools/wsl/politika_ros_olcum.sh ...
+#     (S5 zemini: dünya dosyası hexapod_terrain ile üretilir, WORLD gerekmez)
+#     REFLEKS=1 ZEMIN=basamak:3 ... : politika düğümü -p reflex:=true ile,
+#     DENEYSEL yerleşimli bir config KOPYASIYLA (hexapod_rl.deneysel_yerlesim;
+#     depodaki robot.yaml'a dokunulmaz) başlar; ölçüm aracı simdeki pozdan
+#     /range<kimlik> yayınlar (robottaki sensör düğümünün yerine).
 #     Komutlar robot sıfırlanmadan art arda koşar: zeminde her komutu ayrı
 #     çalıştırın (PROJE_DEVIR ders 38).
 #
@@ -31,6 +37,23 @@ export ROS_DOMAIN_ID=${OLCUM_DOMAIN_ID:-$((20 + RANDOM % 80))}
 export GZ_PARTITION=politika_olcum_$$
 LOGS=$(mktemp -d)
 
+# S5 zemini: dünya dosyasını üret (dünya adı = zemin türü).
+if [ -n "${ZEMIN:-}" ]; then
+    python3 -m hexapod_terrain dunya "${ZEMIN%%:*}" "${ZEMIN#*:}" -o "$LOGS/dunya.sdf" >/dev/null \
+        || { echo "HATA: zemin üretilemedi: $ZEMIN" >&2; exit 1; }
+    WORLD="$LOGS/dunya.sdf"
+    WORLD_NAME="${ZEMIN%%:*}"
+fi
+# Refleks: DENEYSEL yerleşimli config kopyası (robotta kullanılmaz).
+POLICY_ARGS=()
+OLCUM_ARGS=()
+if [ -n "${REFLEKS:-}" ]; then
+    CFG="$LOGS/robot_deneysel.yaml"
+    python3 -m hexapod_rl.deneysel_yerlesim "$CFG" >/dev/null || exit 1
+    POLICY_ARGS=(-p reflex:=true -p config:="$CFG")
+    OLCUM_ARGS=(--mesafe "$CFG" ${ZEMIN:+--zemin "$ZEMIN"})
+fi
+
 # Sim ve düğüm kendi süreç gruplarında (setsid): kapatırken bütün grup gider.
 setsid ros2 launch hexapod_gazebo sim.launch.py gui:=false ${WORLD:+world:=$WORLD} \
     >"$LOGS/sim.log" 2>&1 &
@@ -45,11 +68,11 @@ for _ in $(seq 1 60); do
 done
 if [ "$ok" = 1 ]; then
     setsid ros2 run hexapod_policy policy --ros-args -p policy:="$POLICY" -p use_sim_time:=true \
-        >"$LOGS/policy.log" 2>&1 &
+        "${POLICY_ARGS[@]}" >"$LOGS/policy.log" 2>&1 &
     POL=$!
     sleep 3
     python3 "$REPO/tools/politika_ros_olcum.py" --world "${WORLD_NAME:-flat}" \
-        --seconds "${SURE:-8}" ${KOMUTLAR:+--commands "$KOMUTLAR"}
+        --seconds "${SURE:-8}" ${KOMUTLAR:+--commands "$KOMUTLAR"} "${OLCUM_ARGS[@]}"
     kill -INT -- -"$POL" 2>/dev/null
 else
     echo "HATA: kontrolcüler 2 dakikada açılmadı; günlük: $LOGS/sim.log" >&2
@@ -60,5 +83,6 @@ sleep 5
 kill -KILL -- -"$LAUNCH" 2>/dev/null
 [ -n "${POL:-}" ] && kill -KILL -- -"$POL" 2>/dev/null
 echo "--- politika düğümü durumları ($LOGS/policy.log)"
-grep -E "hazır|durum:|Error|Traceback" "$LOGS/policy.log" 2>/dev/null | sed 's/^\[[^]]*\] //' | cut -c1-140
+grep -E "hazır|durum:|refleks:|HATA|Error|Traceback" "$LOGS/policy.log" 2>/dev/null \
+    | sed 's/^\[[^]]*\] //' | cut -c1-160
 [ "$ok" = 1 ]

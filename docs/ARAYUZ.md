@@ -7,7 +7,8 @@ Simülasyon, gerçek robot, tripod yürüyüşü ve RL politikası **aynı konul
 | Gazebo + ros2_control | G5 (Görkem) | komutu dinler, eklemleri sürer |
 | Gerçek robot sürücü düğümü | S4 (Samet) | komutu dinler, `ServoBus.set_angle`'a taşır |
 | Tripod yürüyüş düğümü | S3 (Samet) | komut yayınlar |
-| RL politika düğümü | G8 (Görkem) | komut yayınlar (`hexapod_policy`; `/imu` + `/cmd_vel` dinler) |
+| RL politika düğümü | G8 (Görkem) | komut yayınlar (`hexapod_policy`; `/imu` + `/cmd_vel` dinler; `-p reflex:=true` ile `/range<kimlik>` de) |
+| Sensör düğümü | S7 (Samet) | `/imu` ve `/range<kimlik>` yayınlar (`hexapod_sensors`; robotta) |
 
 Sözleşmenin kodu: [`hexapod_description/interface.py`](../src/hexapod_description/hexapod_description/interface.py). Sabitleri ve dönüşümleri **oradan import edin**, kendi kodunuzda tekrar yazmayın. Testleri: `tests/test_interface.py`.
 
@@ -18,6 +19,7 @@ Sözleşmenin kodu: [`hexapod_description/interface.py`](../src/hexapod_descript
 | `/leg_controller/commands` | `std_msgs/msg/Float64MultiArray` | → robot | 18 eklem hedefi, **radyan**, aşağıdaki sırayla |
 | `/joint_states` | `sensor_msgs/msg/JointState` | robot → | ad listesiyle; sıra garanti değil, adla eşleyin |
 | `/imu` | `sensor_msgs/msg/Imu` | robot → | çerçeve `imu_link` = `base_link` yönelimi |
+| `/range{i}` | `sensor_msgs/msg/Range` | robot → | mesafe sensörü i (robot.yaml `sensors.range_finders.devices[*].id`), m; görmüyorsa `range = max_range` (REP-117'deki +inf da kabul); kaldırma refleksi için. ROS'lu simde sensör yok: `tools/politika_ros_olcum.py --mesafe` pozdan hesaplayıp yayınlar |
 | `/leg{i}/foot_contact` | `ros_gz_interfaces/msg/Contacts` | sim → | **yalnız simülasyon**, i = 0..5 |
 | `/clock` | `rosgraph_msgs/msg/Clock` | sim → | simülasyonda `use_sim_time: true` |
 
