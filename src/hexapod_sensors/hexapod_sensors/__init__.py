@@ -16,8 +16,12 @@ gerçek sensörle hiç çalıştırılmadı. Donanımda ayağa kaldırma D8'in i
 bilinen riskler README ve modül açıklamalarında.
 """
 
+from .rangefinders import RangeFinders, RangeFinderSpec, check_addresses, specs_from_config
 from .vl53l0x import Vl53l0x
 
-__all__ = ["Vl53l0x"]
+__all__ = [
+    "RangeFinders", "RangeFinderSpec", "check_addresses", "specs_from_config",
+    "Vl53l0x",
+]
 
 __version__ = "0.1.0"
