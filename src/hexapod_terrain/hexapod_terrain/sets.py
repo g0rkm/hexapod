@@ -32,10 +32,16 @@ LEVELS: dict[str, tuple] = {
         lambda seed=0: t.slope(10.0, "y"),
         lambda seed=0: t.slope(20.0, "y"),
     ),
+    # Ölçüldü (2026-09-28, tripod:50, 10 s): kayma, sürtünme katsayısı eğimin
+    # tanjantına yaklaşınca başlıyor. 10° μ0.5 -> +0.084 m/s (rahat),
+    # 10° μ0.3 -> +0.051 (yürüyor, yavaşlıyor), 15° μ0.4 -> +0.017 (zar zor),
+    # 15° μ0.3 -> -0.600 (tan15°=0.268, μ payı yok: robot kayıyor, yürüme yok).
+    # Sonuncusu bilerek listede: "kimsenin çıkamadığı" ucu gösteriyor.
     "kaygan": (
         lambda seed=0: t.slope(-10.0, mu=0.5),
+        lambda seed=0: t.slope(-10.0, mu=0.3),
+        lambda seed=0: t.slope(-15.0, mu=0.4),
         lambda seed=0: t.slope(-15.0, mu=0.3),
-        lambda seed=0: t.slope(-20.0, mu=0.3),
     ),
     "basamak": (
         lambda seed=0: t.step(0.015),
@@ -108,13 +114,18 @@ def difficulty(step_index: int, seed: int = 0) -> list[Terrain]:
 def evaluation_set(seed: int = 0) -> list[Terrain]:
     """S6'nın tablosu ve G7'nin "bitti" ölçümü için sabit zemin listesi.
 
-    Her türden temsili seviyeler; sabit kalmalı ki farklı politikaların
-    ölçümleri karşılaştırılabilsin.
+    Her türden temsili seviyeler. **Bu liste değişirse depodaki eski ölçüm
+    tabloları (docs/olcumler/) yeni ölçümlerle karşılaştırılamaz**; zemin
+    eklemek/çıkarmak gerekirse tabloları da yeniden üretin. Yeni bir zorluk
+    denemek için bunu değiştirmeyin, levels()/level() kullanın.
     """
     return [
         t.flat(),
         t.slope(-10.0), t.slope(-20.0), t.slope(10.0),
         t.slope(10.0, "y"),
+        # İkisi birden: μ0.3'lü 10° yürünebiliyor (denetleyicileri ayırır),
+        # 15°'de kimse tutunamıyor (sınırı gösterir). Bkz. LEVELS["kaygan"].
+        t.slope(-10.0, mu=0.3),
         t.slope(-15.0, mu=0.3),
         t.step(0.030), t.step(0.045), t.step(0.060),
         t.stairs(0.035, 0.25),
