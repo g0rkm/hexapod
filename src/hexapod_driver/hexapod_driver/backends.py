@@ -22,6 +22,8 @@ class I2CBackend(Protocol):
 
     def read_byte_data(self, addr: int, reg: int) -> int: ...
 
+    def read_block_data(self, addr: int, reg: int, length: int) -> list[int]: ...
+
     def close(self) -> None: ...
 
 
@@ -63,6 +65,21 @@ class SMBusBackend:
         except OSError as exc:  # pragma: no cover - donanıma özel
             raise BackendError(f"I2C okuma hatası (0x{addr:02x} reg 0x{reg:02x}): {exc}") from exc
 
+    def read_block_data(self, addr: int, reg: int, length: int) -> list[int]:
+        """reg'den başlayarak length bayt oku (tek işlemde).
+
+        Bayt bayt okumak YETMEZ: çok baytlı bir ölçüm (VL53L0X mesafesi 16 bit,
+        BNO055 quaternion'u 8 bayt) okumalar arasında güncellenirse yarısı eski
+        yarısı yeni bir değer çıkar ("yırtılma"). Bu yüzden tek I2C işlemi.
+        """
+        if not 1 <= length <= 32:
+            raise BackendError(f"blok okuma uzunluğu 1-32 olmalı, {length} verildi")
+        try:
+            return [int(v) for v in self._bus.read_i2c_block_data(addr, reg, length)]
+        except OSError as exc:  # pragma: no cover - donanıma özel
+            raise BackendError(
+                f"I2C blok okuma hatası (0x{addr:02x} reg 0x{reg:02x}): {exc}") from exc
+
     def close(self) -> None:
         try:
             self._bus.close()
@@ -93,5 +110,9 @@ class DryRunBackend:
     def read_byte_data(self, addr: int, reg: int) -> int:
         return self.registers.get((addr, reg), 0)
 
+    def read_block_data(self, addr: int, reg: int, length: int) -> list[int]:
+        return [self.registers.get((addr, reg + i), 0) for i in range(length)]
+
     def close(self) -> None:
         pass
+
