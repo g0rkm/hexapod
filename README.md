@@ -21,6 +21,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Gerçek robot sürücü düğümü | ✅ dry-run'da çalışıyor ([hexapod_hardware](src/hexapod_hardware)); gerçek donanımda denenmedi, kablolama bekliyor |
 | RL (PPO) | 🔄 en iyi: tripod + öğrenilmiş düzeltme, her yöne ([models/ppo_omni_250k](models/README.md)); düz zeminde tripod'la başa baş, eğim/basamakta ve gürültüde önde; zeminli eğitim S5'i bekliyor |
 | Politika düğümü | ✅ [hexapod_policy](src/hexapod_policy): torch'suz (numpy), ROS'lu Gazebo'da yürüdü |
+| Zeminler (eğim, basamak, engebe...) | ✅ [hexapod_terrain](src/hexapod_terrain): parametreli ve tohumlu, Gazebo'da doğrulandı ([örnekler](docs/zeminler/)) |
 | Pi 4'e aktarma | ⛔ |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.
@@ -63,6 +64,9 @@ src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
     controller.py     #   ROS'suz çekirdek: komutu doğrular, ServoBus.set_angles ile hep-ya-da-hiç gönderir
     node.py           #   ince rclpy kabuğu (ros2 run hexapod_hardware driver)
   hexapod_policy/     # eğitilmiş RL politikasını çalıştıran düğüm (Pi'de torch'suz)
+  hexapod_terrain/    # RL ve ölçüm zeminleri: SDF + yüzey yüksekliği (saf Python)
+    terrain.py        #   eğim, basamak, merdiven, engebe, çukur, yayla, kaygan
+    sets.py           #   zorluk seviyeleri, müfredat, S6'nın ölçüm listesi
     mlp.py            #   numpy MLP + politikanın eğitim sözleşmesi (.npz)
     controller.py     #   ROS'suz çekirdek: IMU + hız komutu -> gözlem -> eklem hedefi, güvenlik
     node.py           #   ince rclpy kabuğu (ros2 run hexapod_policy policy)

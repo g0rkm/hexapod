@@ -1806,6 +1806,23 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     (σ2–4°, ders 37) de engelde sabit 50 mm'den iyi: engelde payı açtığı
     için 35 mm'lik modelin kırılganlığı kalkıyor. Değerler robot.yaml'a
     yazılmadı: yerleşim D8'in kararı, sim yalnız öneri.
+42. **Zemin karmaşıklığı doğrudan eğitim hızı demek.** Engebe, dik yanlı
+    kutulardan kuruluyor (SDF ile yükseklik fonksiyonunun birebir tutması
+    için); kutu sayısı süreç içi Gazebo'yu yavaşlatıyor: 716 kutu 3.05x,
+    393 kutu 2.03x, 184 kutu 1.59x (düz zemine göre, ölçüldü 2026-09-27).
+    Kazanç ~300-400 kutudan sonra azalıyor. Önemlisi: paralel eğitimde
+    ortamlar adım başına birbirini beklediği için **en yavaş ortam hızı
+    belirler** — tek engebeli ortam bütün eğitimi yavaşlatır. Zemin
+    koridorunu bölüm süresinin gerektirdiği kadar tut (20 s'de robot ~2 m
+    gider). Yükseklikleri kademelendirip komşu kutuları birleştirmek denendi:
+    8 kademede bile kazanç %23, zemin gözle kabalaşıyor; bırakıldı.
+43. **Üretilen zemini bir kez de gözle gör.** `hexapod_terrain` engebesinde
+    robot düz bir karede doğuyordu ama karenin hemen kenarında yarım genlikte
+    (50-70 mm) duvarlar oluşuyordu: robot "engebeye yürüyerek giren" değil,
+    "duvarla çevrili çukurda doğan" bir şeydi. Testler bunu yakalamadı
+    (SDF ile yükseklik tutarlıydı, genlik doğruydu); önizleme resmi
+    (yükseklik haritası + yan kesit) ilk bakışta gösterdi. Düzlükten tam
+    engebeye 0.5 m rampa eklendi.
 
 ---
 

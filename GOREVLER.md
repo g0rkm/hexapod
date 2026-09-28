@@ -100,13 +100,14 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 | S2 | Tripod yürüyüş çekirdeği (saf Python) | Samet | G2 ✅ | S3 | ✅ |
 | S3 | Tripod yürüyüş simülasyonda | Samet | S1 ✅, S2 ✅, G5 ✅ | G6, S6, (vardiya) | ✅ |
 | S4 | Gerçek robot sürücü düğümü (ROS 2, dry-run) | Samet | S1 ✅, G5 ✅ | G8, (vardiya) | ✅ |
-| S5 | Zemin / dünya üreteci | Samet | S1, G5 | G7, S6 | ⏸ |
-| S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3, S5 | G7 | ⏸ |
+| S5 | Zemin / dünya üreteci | Samet | S1 ✅, G5 ✅ | G7, S6 | ✅ |
+| S6 | Yürüyüş ölçüm aracı (hız, enerji, devrilme) | Samet | S3 ✅, S5 ✅ | G7 | ⬜ |
 | S7 | Sensör sürücüleri (saf Python, dry-run testli) | Samet | — | (vardiya) | ⬜ |
 
 **Şu an başlanabilecekler:**
-- **Görkem:** G6 bitti (2026-09-26). G7'de S5 gelmeden yapılabilecekler bitti (2026-09-27): her yöne politika, zeminli eğitim (kendi deneme zeminleriyle), öğrenilmiş ayak kaldırma, müfredat, dayanıklılık taraması, mesafe sensörlü kaldırma refleksi (denetleyicide hazır). Sıradaki: S5 gelince asıl zeminlerle eğitim ve "bitti" ölçümü (S6); S7 + D8 gelince refleksin düğüme bağlanması. Ayrıntı: docs/PROJE_DEVIR.md §3.1, §14.
-- **Samet:** S1, S2, S3, S4 bitti (2026-09-25). Sıradaki: S5 (zemin üreteci) ya da S7 (sensör sürücüleri) — ikisi de kimseyi beklemiyor. S6 (ölçüm aracı) yalnızca S5'i bekliyor. S7 artık G7'nin de önünde: mesafe sensörlü kaldırma refleksi mesafe ölçümlerini bekliyor (S7'deki not).
+- **Görkem:** G6 bitti (2026-09-26). G7'de S5 gelmeden yapılabilecekler bitti (2026-09-27): her yöne politika, zeminli eğitim (kendi deneme zeminleriyle), öğrenilmiş ayak kaldırma, müfredat, dayanıklılık taraması, mesafe sensörlü kaldırma refleksi (denetleyicide hazır). **S5 geldi (2026-09-27)**: sıradaki, asıl zeminlerle eğitim ve "bitti" ölçümü (S6); S7 + D8 gelince refleksin düğüme bağlanması. Ayrıntı: docs/PROJE_DEVIR.md §3.1, §14.
+- **Samet:** S1-S5 bitti (S5: 2026-09-27, `hexapod_terrain`). Sıradaki: S6 (ölçüm aracı — artık engeli yok) ya da S7. **S7 artık G7'nin de önünde:** mesafe sensörlü kaldırma refleksi gerçek mesafe ölçümlerini bekliyor (S7'deki not).
+- **Görkem için (2026-09-27, S5 bitti):** asıl zeminler hazır, `terrain_probe`'un deneme zeminlerinin yerine geçebilir; geçiş iki satır (bkz. S5 bölümü). Senin dosyalarına dokunmadım. `hexapod_terrain.sets.LEVELS[tür]` senin `CURRICULA` biçiminle uyumlu (seviye üreteçleri, kolaydan zora) — müfredatına doğrudan girer. Engebenin fizik maliyeti ölçüldü: kutu sayısı hızı belirliyor, paralel eğitimde en yavaş ortam hepsini bekletir (S5 bölümü).
 - Derleme: `bash tools/wsl/derle.sh`. Yeni paket eklendiğinde (ör. S4'ün ROS düğümü) tekrar çalıştırılmalı.
 - **Samet için (2026-09-26):** ROS'lu sim artık varsayılan olarak tork servo modelinde (`servo:=torque`; eskisi `servo:=velocity`). Tripod'un orada ölçülen hızı %84'ten %98'e çıktı (0.08 komutta 0.079 m/s); S2/S3 notlarındaki "ROS'lu simde ayaklar kayar" uyarısı artık eski modele ait. Günlükteki "out of limits" uyarıları eklem hız sınırında torkun kesilmesinden (beklenen). Ayrıntı: docs/ARAYUZ.md madde 4.
 
@@ -249,8 +250,8 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 - Ölçüm notu: `/joint_states` yayın hızı `ros2 topic hz` ile ortalama 38.8 Hz çıktı (düğümün zamanlayıcısı 50 Hz). Ölçüm WSL'de üç düğüm çalışırken CLI ile yapıldı; hız kaybının araçtan mı makineden mi düğümden mi geldiği ayrıştırılmadı. Pi'de I2C yazma süresi de ayrıca ölçülmeli (18 blok yazma ~13 ms tahmin, 20 ms'lik bütçeye yakın): donanım vardiyasında D9'da bakılacak.
 - **Bitti sayılır:** dry-run'da 18 eklem doğru kanala doğru darbeyi yazıyor (test); simülasyonla aynı komut arayüzü. ✅
 
-#### S5 — Zemin / dünya üreteci ⏸
-- **Bekler:** S1, G5 · **Açar:** G7, S6
+#### S5 — Zemin / dünya üreteci ✅
+- **Bekler:** S1 ✅, G5 ✅ · **Açar:** G7, S6
 - RL eğitimi ve ölçüm için Gazebo dünyaları: eğim (açı ayarlı), engebe (yükseklik haritası, pürüzlülük ayarlı), basamak, kaygan zemin (sürtünme ayarlı). Parametreyle ve rastgele tohumla üretilebilir olmalı; aynı tohum aynı dünyayı verir.
 - **Bitti sayılır:** her zemin türü parametreyle üretiliyor ve robot o dünyada doğuyor; birkaç örnek dünyanın görüntüsü depoda.
 - **Görkem'den entegrasyon notu (2026-09-26):** RL eğitimi ROS'lu simi değil süreç içi Gazebo'yu (`hexapod_rl.sim.HexapodSim`) kullanıyor. Zemin oraya `HexapodSim(model, terrain_sdf=...)` ile girer: düz zeminin (`_FLAT_GROUND`) yerine geçen, `<model>...</model>` biçiminde, `<static>true</static>` bir SDF parçası (dünya dosyasının tamamı değil). Böylece üreteç iki simde de kullanılabilir: ROS'lu sim için aynı parçayı bir dünya dosyasına gömmek yeterli. Sürtünme zeminin `<collision><surface><friction>`'ında; "kaygan zemin" ve G7'nin sürtünme rastgeleleştirmesi buradan gelir. Sürtünme ölçüldü: düz zeminde mu 1.0–0.15 arası yürüyüşü etkilemiyor, 0.05'te %8 yavaşlatıyor; kaygan zemin ancak eğimle anlamlı.
@@ -259,8 +260,30 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
   - Önerilen arayüz: `terrain.slope(deg, seed) -> (sdf, height)`, `terrain.rough(height_m, seed) -> (sdf, height)`...; `height` saf Python bir fonksiyon (ya da `__call__`'lı nesne), gz'siz test edilebilir. Yükseklik haritalı zeminde `height` aynı ızgaradan (bilineer) okunmalı ki fizikteki yüzeyle aynı olsun.
   - Örnek (eğimli kutu, üst yüzü orijinden geçer): `tests/test_rl_env.py` içindeki `_box_ground`.
 
-#### S6 — Yürüyüş ölçüm aracı ⏸
-- **Bekler:** S3, S5 · **Açar:** G7
+**Yapıldı (2026-09-27): yeni paket `hexapod_terrain`** — saf Python (gz, ROS, numpy gerekmez), testleri Windows'ta da koşar.
+
+- **Zemin türleri:** düz, eğim, yan eğim, kaygan (eğim + sürtünme), basamak (inen/çıkan), merdiven, engebe, çukur, yayla. Hepsi parametreli; engebe tohumlu (aynı tohum → birebir aynı SDF metni).
+- **Sözleşme birebir uyuyor:** her zemin `Terrain` nesnesi, `sdf, height = terrain.slope(-20.0)` diye çözülüyor. `height` saf Python, `sdf` `<static>true</static>` ve `name="ground"`.
+- **Seviyeler ve setler (`hexapod_terrain.sets`):** `levels(tür)` kolaydan zora; `difficulty(n)` müfredat basamağı (her basamakta bir zorluk eklenir, düz zemin hep listede — ders 33/34); `evaluation_set()` S6'nın sabit ölçüm listesi (14 zemin).
+- **Araç:** `python -m hexapod_terrain liste | dunya <tür> <seviye> -o d.sdf | onizleme`. Dünya dosyası ROS'lu simde açılır (`sim.launch.py world:=...`).
+- **Örnek görüntüler:** [docs/zeminler/](docs/zeminler/) — 9 PNG, her türün en zor seviyesi (yükseklik haritası + yan kesit).
+
+**Görkem için: geçiş tek satır, senin dosyalarına dokunmadım** (aynı dosyalarda çakışmayalım diye). Uyumu senin hattında çalıştırarak doğruladım: `HexapodEnv(terrain_sdf=..., terrain_height=...)` 100 adım koştu, gövde 0.100 m, 6/6 ayak teması.
+
+```python
+from hexapod_terrain import sets
+terrains = [(z.label, z.sdf, z.height) for z in sets.difficulty(n, seed)]   # training_terrains yerine
+cases = [(z.label, z.sdf, z.height, (0.1, 0.0, 0.0)) for z in sets.evaluation_set(seed)]  # EVAL_CASES yerine
+```
+
+- **Fizik maliyeti ölçüldü (önemli):** engebe kutu sayısı simülasyonu yavaşlatıyor — 716 kutu 3.05x, 393 kutu 2.03x, 315 kutu 1.88x, 184 kutu 1.59x (düz zemine göre, tek ortam). Kazanç ~300-400 kutudan sonra azalıyor. Varsayılan koridor bu yüzden 5.0 x 2.0 m / 15 cm hücre = 393 kutu (20 s'lik bölümde robot ~2 m gider, bol bol yeter). **Paralel eğitimde ortamlar adım başına birbirini beklediği için en yavaş ortam hızı belirler: tek engebeli ortam bile toplam hızı düşürür.** Uzun ölçümde (S6) `length` büyütülebilir, maliyet bilerek kabul edilir.
+- **Gazebo'da doğrulandı:** 14 ölçüm zemininin hepsinde robot doğdu, ayakta durdu, 6/6 ayak temas etti, gövde-zemin açıklığı her zeminde 0.100-0.106 m (istenen 100 mm). Yayla gibi orijini z=0'da olmayan zeminde de doğru (doğuş 0.197, gövde 0.150, zemin 0.050).
+- **Testli (`tests/test_terrain.py`, 86 test):** en önemlisi SDF ↔ `height` tutarlılığı — üretilen SDF geri okunup her zeminin her yerinde `height()` ile karşılaştırılıyor (ayrışırsa eğitim sessizce bozulur). Ayrıca tohum tekrarlanabilirliği, parametrelerin etkisi, seviyelerin zorlaşması, dünya dosyasının Gazebo'nun beklediği biçimde olması. Üç hata kasten geri konup testlerin yakaladığı doğrulandı.
+- Üretimde bulunan iki hata: inen basamakta yükselen kutu yanlış taraftaydı; engebede robot düz bir karede ama 50-70 mm duvarlarla çevrili doğuyordu (önizleme resmi gösterdi) — artık düzlükten tam engebeye 0.5 m'lik rampa var.
+- Yapılmadı: gerçek yükseklik haritası (`<heightmap>`) kullanılmadı. Gazebo onu ara değerle (bilinear) okuduğu için `height` ile birebir tutarlılık garanti edilemiyor; dik yanlı kutularda bu garanti var. Zorluk hücreler arası FARKLA ayarlanıyor (`smooth`).
+
+#### S6 — Yürüyüş ölçüm aracı ⬜
+- **Bekler:** S3 ✅, S5 ✅ · **Açar:** G7
 - Bir yürüyüş denetleyicisini (tripod ya da RL politikası) seçilen zeminlerde N kez koşturup ölçen betik: ileri hız, enerji (Σ |tork × açısal hız|), devrilme sayısı, düşmeden gidilen mesafe. Sonuçlar bir tabloya.
 - **Bitti sayılır:** tripod'un her zemindeki ölçümü tablo olarak depoda; RL için aynı komutla çalışıyor.
 - **Görkem'den not (2026-09-26):** ölçümün çekirdeği hazır, üstüne kurulabilir: `hexapod_rl.evaluate.evaluate(model, seconds, vx, seed, noise, task)` hız, yön sapması, adım başı ödül, ortalama mekanik güç (W, Σ|τ·ω|), devrilme, ritim uyumu veriyor; `model` bir SB3 modeli ya da `hexapod_rl.baseline.TripodPolicy()` (senin tripod'un, aynı arayüzle). Eksik olan: zemin seçimi (S5'in `terrain_sdf`'i `HexapodEnv`'e geçirilmeli), N tekrar ve tablo. Politikayı ROS'suz koşturduğu için hızlı (~10x gerçek zaman).
