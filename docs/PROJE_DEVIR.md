@@ -10,7 +10,7 @@
 > modeller **§3.1**; bu oturumun işleri §3.3–3.7 (her yöne politika, zeminli
 > eğitim, öğrenilmiş kaldırma, müfredat, mesafe sensörlü kaldırma refleksi,
 > robota geçiş dayanıklılığı), dersler 26–41, açık işler §13.2, plan §14.
-> · Testler: **Linux 286/286**, Windows 235 geçti + 9 atlandı (Gazebo/ROS/SB3
+> · Testler: **Linux 396/396**, Windows 345 geçti + 13 atlandı (Gazebo/ROS/SB3
 > testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -96,12 +96,12 @@ girme (§1).
      Gymnasium 1.3).
 5. **Doğrula:**
    - Windows: `python -m pip install pytest numpy pyyaml matplotlib`, sonra
-     depo kökünde `python -m pytest -q`. Beklenen: 235 geçti, 9 atlandı
+     depo kökünde `python -m pytest -q`. Beklenen: 345 geçti, 13 atlandı
      (kurulum günü 178 idi; sonra test eklendi, bkz. başlıktaki sayılar).
      Eski PC'de Python 3.11.
    - WSL: `source /opt/ros/lyrical/setup.bash; source ~/hexapod_ws/install/setup.bash;
      source ~/hexapod_venv/bin/activate`, sonra `python -m pytest -q`.
-     Beklenen: 286 geçti, ~40 s (kurulum günü 208).
+     Beklenen: 396 geçti, ~65 s (kurulum günü 208).
    - Model: `python -m hexapod_rl.evaluate models/ppo_omni_250k/model.zip --vx 0.1`
      (görev ayarı modelin `gorev.json`'ından). Beklenen: 0.100 m/s, yön
      −3.5°, güç 2.00 W, devrildi False (yeni PC'de ölçüldü, 2026-09-27).
@@ -1174,8 +1174,10 @@ Aktarma: `python -m hexapod_rl.export models/<ad>/model.zip` (görev ayarı
 python -m pytest -q          # depo kökünden
 ```
 
-- Windows: 235 geçti, 9 atlandı, ~3 s.
-- WSL (ROS + venv kaynaklı): 286 geçti, ~40 s (yeni PC).
+- Windows: 345 geçti, 13 atlandı, ~7 s.
+- WSL (ROS + venv kaynaklı): 396 geçti, ~65 s (yeni PC).
+  DİKKAT: WSL'de `~/hexapod_ws/install/setup.bash` de kaynaklanmalı; biri
+  alt süreç açıp paketleri import ediyor, yoksa o test patlar.
 
 Öne çıkanlar:
 - Eksik değerde `MissingValue`.

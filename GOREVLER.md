@@ -211,7 +211,7 @@ Mavi Görkem'in, sarı Samet'in, yeşil bitmiş görevler. Oklar "önce bu biter
 
 #### S1 — Geliştirme ortamı ✅
 - **Bekler:** — · **Açar:** S3, S4, S5
-- Depoyu klonla; `python -m pytest -q` ile 73 testin geçtiğini gör. ROS 2 + Gazebo: Windows'ta WSL2 + Ubuntu 26.04 kur, sonra `bash tools/wsl/ros_kurulum.sh` (Görkem'in kullandığı betiğin aynısı). Linux'ta aynı betik doğrudan çalışır.
+- Depoyu klonla; `python -m pytest -q` ile testlerin geçtiğini gör (güncel sayı: docs/PROJE_DEVIR.md başlığı). ROS 2 + Gazebo: Windows'ta WSL2 + Ubuntu 26.04 kur, sonra `bash tools/wsl/ros_kurulum.sh` (Görkem'in kullandığı betiğin aynısı). Linux'ta aynı betik doğrudan çalışır.
 - Kuruldu (2026-09-25): WSL2 Ubuntu 26.04, ROS 2 Lyrical + Gazebo 10.5 (`ros_kurulum.sh`), 6 paket derlendi (`derle.sh`), RL ortamı (`rl_kurulum.sh`: torch 2.14 CPU, SB3 2.9.0, gymnasium 1.3.0). `python -m pytest -q`: 124 test geçiyor (gz.sim testleri dahil, 0 atlanan).
 - **Bitti sayılır:** testler geçiyor; betik "KURULUM TAMAM" diyor. ✅
 

@@ -1,3 +1,6 @@
+<!-- ÜRETİLDİ: python -m hexapod_rl.olcum tripod tripod:50 models/ppo_omni_250k/model.zip models/ppo_lift50_3750k/model.zip models/ppo_kaldirma35_250k/model.zip -->
+zemin kaynağı: hexapod_terrain (S5) · komut vx=0.1 vy=0 wz=0 · 10 s · 3 tohum, rastgeleleştirme açık · temiz ölçüm ayrıca alındı
+
 | Zemin | tripod | tripod:50 | models/ppo_omni_250k/model.zip | models/ppo_lift50_3750k/model.zip | models/ppo_kaldirma35_250k/model.zip |
 |---|---|---|---|---|---|
 | düz | 0.098 m/s · 39.2 J/m · 3/3 | 0.100 m/s · 27.2 J/m · 3/3 | 0.102 m/s · 38.6 J/m · 3/3 | 0.114 m/s · 45.5 J/m · 3/3 | 0.103 m/s · 42.5 J/m · 3/3 |

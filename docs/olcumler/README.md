@@ -82,6 +82,28 @@ engebe, kaygan ayrı ayrı ölçüldü); düz zeminde enerjide karşılanmıyor.
 | `tablo.md` | karşılaştırma tablosu (zemin satır, denetleyici sütun) |
 | `tripod_vs_politika.csv` | ham veri, her koşu bir satır (grafik çizmek için) |
 
+## DİKKAT: bu tablo Görkem'in eski tablolarıyla karşılaştırılamaz
+
+Şu an depoda **iki ayrı zemin tanımı** var ve aynı adı taşıyan zeminler
+aslında farklı:
+
+| | Görkem (`hexapod_rl.terrain_probe`) | S5 (`hexapod_terrain`) |
+|---|---|---|
+| basamak yeri | x = 0.30 m | x = 0.40 m |
+| engebe alanı | 3 x 3 m kare, hücre 12 cm | 5 x 2 m koridor, hücre 15 cm |
+| engebe girişi | düzlükten ani | 0.5 m rampa |
+| engebe x=2 m'de | düz (alan bitmiş) | hâlâ engebeli |
+
+Bu tablo (`docs/olcumler/`) **S5 zeminlerinde**, `models/README.md`'deki
+tablolar ise **Görkem'in deneme zeminlerinde** ölçüldü. "engebe 60 mm"
+satırları aynı adı taşısa da aynı zemin değil; iki tablodaki sayıları yan
+yana koyup yorum çıkarmayın.
+
+Kalıcı çözüm: G7 eğitimi ve ölçümü S5 zeminlerine geçtiğinde
+`terrain_probe`'un kendi zemin fonksiyonları kaldırılmalı (Görkem'in planı,
+GOREVLER.md S5). O zamana kadar hangi tablonun hangi zeminle ölçüldüğü
+başlıkta yazmalı.
+
 ## Ölçümün sınırları
 
 - Yol, gidilen **düz mesafe**; robot daire çizerse gerçek patikadan kısa

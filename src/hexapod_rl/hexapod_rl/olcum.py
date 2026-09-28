@@ -274,8 +274,18 @@ def main(argv: list[str] | None = None) -> int:
     metin = tablo(ozetler)
     print(metin)
     if args.out:
+        # Başlık: tablo tek başına okunduğunda hangi koşullarda ölçüldüğü belli
+        # olsun. Özellikle ZEMİN KAYNAĞI: depoda iki ayrı zemin tanımı var
+        # (hexapod_terrain ve hexapod_rl.terrain_probe), aynı adlı zeminler
+        # farklı; iki tablodaki sayılar karşılaştırılamaz (docs/olcumler/).
+        baslik = (f"<!-- ÜRETİLDİ: python -m hexapod_rl.olcum "
+                  f"{' '.join(args.denetleyiciler)} -->\n"
+                  f"zemin kaynağı: hexapod_terrain (S5) · "
+                  f"komut vx={komut[0]:g} vy={komut[1]:g} wz={komut[2]:g} · "
+                  f"{args.saniye:g} s · {len(tohumlar)} tohum, rastgeleleştirme açık"
+                  f"{' · temiz ölçüm ayrıca alındı' if args.temiz else ''}\n\n")
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(metin + "\n", encoding="utf-8", newline="\n")
+        args.out.write_text(baslik + metin + "\n", encoding="utf-8", newline="\n")
     if args.csv:
         csv_yaz(ozetler, args.csv)
     return 0
