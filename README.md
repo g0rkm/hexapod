@@ -19,18 +19,18 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Gazebo simülasyonu | ✅ robot doğuyor, ayağa kalkıyor; sensörler yayında |
 | Gait motoru (tripod) | ✅ çekirdek ([hexapod_gait](src/hexapod_gait)) + ROS düğümü ([hexapod_teleop](src/hexapod_teleop)); Gazebo'da 65 sn devrilmeden yürüdü, yana ve yerinde dönüş çalışıyor |
 | Gerçek robot sürücü düğümü | ✅ dry-run'da çalışıyor ([hexapod_hardware](src/hexapod_hardware)); gerçek donanımda denenmedi, kablolama bekliyor |
-| RL (PPO) | 🔄 en iyi: tripod + öğrenilmiş düzeltme, her yöne ([models/ppo_omni_250k](models/README.md)); düz zeminde tripod'la başa baş, eğim/basamakta ve gürültüde önde; zeminli eğitim S5'i bekliyor |
-| Politika düğümü | ✅ [hexapod_policy](src/hexapod_policy): torch'suz (numpy), ROS'lu Gazebo'da yürüdü |
+| RL (PPO) | ✅ robota aday: `ppo_kaldirma35_250k` + mesafe sensörlü kaldırma refleksi ([models/](models/README.md)); ölçümde tripod'u her zemin türünde hızda geçiyor ya da eşit, engellerde 2–4 kat verimli ([tablo](docs/olcumler/)) |
+| Politika düğümü | ✅ [hexapod_policy](src/hexapod_policy): torch'suz (numpy), ROS'lu Gazebo'da yürüdü; kaldırma refleksi `-p reflex:=true` (sensör yerleşimi D8'i bekliyor) |
 | Zeminler (eğim, basamak, engebe...) | ✅ [hexapod_terrain](src/hexapod_terrain): parametreli ve tohumlu, Gazebo'da doğrulandı ([örnekler](docs/zeminler/)) |
 | Yürüyüş ölçümü | ✅ `hexapod_rl.olcum`: tripod ve politikalar 15 zeminde karşılaştırıldı ([tablo](docs/olcumler/)) |
 | Sensör sürücüleri | ✅ [hexapod_sensors](src/hexapod_sensors): VL53L0X x3 + BNO055, yazmaç düzeyinde testli; **donanımda denenmedi** (D8) |
-| Pi 4'e aktarma | ⛔ |
+| Pi 4'e aktarma | ⏸ donanım vardiyası (D11) |
 
-Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştiriliyor.
-Yazılım işi Görkem ve Samet arasında bölüşüldü; kablolama, kalibrasyon ve
-gerçek robotta denemeler şimdilik durduruldu, ayrı bir donanım vardiyasında
-yapılacak ([GOREVLER.md](GOREVLER.md)). Yazılımın önünde engel değiller,
-sadece config'e sonradan girilecek değerler.
+Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştirildi.
+**Yazılım aşamasının bütün görevleri 2026-09-28'de bitti** (Görkem G1–G8,
+Samet S1–S7). Kablolama, kalibrasyon ve gerçek robotta denemeler ayrı bir
+donanım vardiyasında yapılacak ([GOREVLER.md](GOREVLER.md), D1–D12);
+yazılımın beklediği şey config'e girilecek değerler.
 
 ## Kurulum
 
@@ -328,6 +328,23 @@ Her yöne model geri (`x: -0.1`), yana (`linear: {y: 0.06}`) ve dönüş (`angul
 Politika yalnızca eğitildiği komutları yürür (hangi model ne için: `models/README.md`). Komut kesilirse,
 IMU gelmezse ya da robot devrilirse ayakta duruşa geçer.
 
+Robota aday model, mesafe sensörlü kaldırma refleksiyle (engel görünce ayağı
+yükseltir; `/range0..2` dinlenir):
+
+```bash
+ros2 run hexapod_policy policy --ros-args -p policy:=models/ppo_kaldirma35_250k/policy.npz -p reflex:=true
+```
+
+Sensörlerin gövdedeki yeri ve bakış açısı `config/robot.yaml` →
+`sensors.range_finders`'ta girilmeden (D8) düğüm bu seçenekle **bilerek**
+başlamaz ve eksik alanı söyler. ROS'lu simde sensör yok; uçtan uca denemek
+için ölçüm betiği mesafeyi simden hesaplayıp yayınlar (DENEYSEL yerleşim
+geçici bir config kopyasında, robot.yaml'a dokunmaz):
+
+```bash
+REFLEKS=1 ZEMIN=basamak:3 KOMUTLAR="0.1,0,0" SURE=12 bash tools/wsl/politika_ros_olcum.sh models/ppo_kaldirma35_250k/policy.npz
+```
+
 ## Sensörler (S7)
 
 Üç VL53L0X mesafe sensörü ve BNO055 IMU. Düğüm `/range0..2` (sensor_msgs/Range)
@@ -340,7 +357,10 @@ ros2 run hexapod_sensors sensors --ros-args -p dry_run:=true
 
 Robotta `dry_run` verilmez. Kablolama (`xshut_gpio`, `address`) ve IMU montajı
 (`mount_rotation_deg`) `config/robot.yaml`'da girilmeden düğüm **bilerek**
-başlamaz ve eksik alanı söyler — bunlar D8'in kararı.
+başlamaz ve eksik alanı söyler — bunlar D8'in kararı. Kaldırma refleksi
+ayrıca her mesafe sensörünün bakış yönünü (`direction_deg`), gövdedeki yerini
+(`position_m`) ve aşağı bakış açısını (`pitch_deg`) ister; alanların tanımı
+dosyada.
 
 Üç sensör de fabrika adresinde (0x29) doğduğu için XSHUT pinleriyle teker teker
 uyandırılıp ayrı adres verilir. BNO055 de 0x29'da olabilir; çakışma kurulumda
@@ -370,8 +390,8 @@ python -m hexapod_rl.train --steps 1000000 --envs 8 --name deneme
 Zeminli eğitim ve ölçüm araçları (ayrıntı: `docs/PROJE_DEVIR.md` §7.8, tablolar `models/README.md`):
 
 ```bash
-python -m hexapod_rl.train --steps 3000000 --envs 16 --name z1 --residual --omni --randomize --terrains deneme --init-from models/ppo_omni_250k/model.zip      # sabit zemin seti
-python -m hexapod_rl.train --steps 3000000 --envs 16 --name m1 --residual --omni --randomize --curriculum deneme --init-from models/ppo_omni_250k/model.zip    # kolaydan zora müfredat
+python -m hexapod_rl.train --steps 3000000 --envs 16 --name z1 --residual --omni --randomize --terrains s5 --init-from models/ppo_omni_250k/model.zip      # S5 zemin seti (eski deneme zeminleri: --terrains deneme)
+python -m hexapod_rl.train --steps 3000000 --envs 16 --name m1 --residual --omni --randomize --curriculum s5 --init-from models/ppo_omni_250k/model.zip    # kolaydan zora müfredat
 python -m hexapod_rl.terrain_probe tripod models/ppo_lift50_3750k/model.zip   # deneme zeminlerinde karşılaştırma
 python -m hexapod_rl.robustness tripod models/ppo_omni_250k/model.zip         # kalibrasyon ofseti, eğik IMU, gecikme, zayıf servo
 python -m hexapod_rl.reflex_probe --pitch 20 25                               # mesafe sensörlü kaldırma refleksi (DENEYSEL yerleşim)
@@ -384,8 +404,13 @@ karşılaştırma tablosu çıkarır: hız, metre başına enerji, devrilme, dü
 gidilen mesafe.
 
 ```bash
-python -m hexapod_rl.olcum tripod:50 models/ppo_refleks_1500k/model.zip --tohum 3
+python -m hexapod_rl.olcum tripod models/ppo_kaldirma35_250k/model.zip+refleks --tohum 3 --temiz --paralel 8
 ```
+
+`+refleks`: mesafe sensörlü kaldırma refleksi açık (DENEYSEL yerleşim).
+`--paralel N`: N süreçte (eski PC'de 8). Enerji, güç kontrol adımı boyunca
+ortalanarak ölçülüyor; 2026-09-28 öncesi tablolar karşılaştırılamaz
+(PROJE_DEVIR ders 48).
 
 ```bash
 python -m hexapod_rl.olcum tripod --zemin basamak --saniye 20 --csv o.csv -o tablo.md
