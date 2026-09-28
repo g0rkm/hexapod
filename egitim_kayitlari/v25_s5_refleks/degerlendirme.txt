@@ -1,0 +1,5 @@
+Durduruldu: 1M adımda (plan 3M), eski PC, 8 ortam, ~602 adım/s.
+Sebep: ara kayıt skoru her ölçümde düştü (250k 2.492, 500k 2.458, 750k 2.397, 1M 2.293);
+eğitim ödülü yatay (1550-1750). Aynı ölçütle başlangıç modeli ppo_refleks_1500k 2.438,
+ppo_kaldirma35_250k 2.543 (refleksle): v25 eldeki en iyi modeli geçmedi, depoya alınmadı.
+Güç 2026-09-28 düzeltmesiyle (kontrol adımı ortalaması) ölçülüyor; eski eğitimlerin skorlarıyla karşılaştırılamaz.

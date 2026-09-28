@@ -1,0 +1,13 @@
+learning_rate: 0.0001
+target_kl: 0.03
+use_sde: False
+randomize: True
+std: 0.1
+power_weight: -0.05
+action_mode: residual
+omni: True
+envs: 8
+body_mass_scales: [0.944, 1.381, 1.119, 1.556, 1.294, 1.031, 1.469, 1.206]
+terrains: ['düz', 'çukur 55 mm', 'basamak 55 mm', 'merdiven 6x45 mm', 'yokuş yukarı 25°', 'kaygan yokuş 12° μ0.3', 'yayla 55 mm', 'yan eğim 15°']
+curriculum: None
+reflex: 20.0, range_noise: 5.0 %, range_drop: 10.0 %
