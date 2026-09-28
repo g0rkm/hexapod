@@ -266,10 +266,28 @@ sensors:
     count: 3
     interface: i2c
     i2c_bus: 1
+    # Bu mesafede bir şey yoksa ölçüm "görmüyor" sayılır (sürücü bunu yayınlar,
+    # kaldırma refleksi bu mesafedeki okumayı engel saymaz).
+    max_range_m:
+      value: 1.2
+      source: "VL53L0X varsayılan zamanlamayla ~1.2 m (veri sayfası); hexapod_sensors bununla ölçüyor"
+      measured: false
+    # Cihaz başına (D8 doldurur; hepsi bilinmiyor, kod varsayılan koymaz):
+    #   xshut_gpio    XSHUT pininin bağlı olduğu GPIO (BCM numarası)
+    #   address       sensöre verilecek yeni I2C adresi (0x29 olamaz)
+    #   direction_deg bakış yönü, gövde çerçevesinde yukarıdan: 0 ileri, + sola
+    #   position_m    [x, y, z] sensörün gövdedeki yeri, m. Gövde çerçevesi
+    #                 (PROJE_DEVIR §5.4): orijin coxa eksenlerinin geçtiği
+    #                 çemberin merkezi, bacak montaj referans düzleminin
+    #                 yüksekliğinde; +x ileri, +y sol, +z yukarı.
+    #   pitch_deg     aşağı bakış açısı (+ aşağı). Simde refleks 20-25° ile
+    #                 çalışıyor, 45° engeli çok geç görüyor (GOREVLER D8).
+    # position_m ve pitch_deg yalnız kaldırma refleksi için (hexapod_policy,
+    # -p reflex:=true); sürücü düğümü onlarsız da çalışır.
     devices:
-      - {id: 0, xshut_gpio: null, address: null, direction_deg: null}
-      - {id: 1, xshut_gpio: null, address: null, direction_deg: null}
-      - {id: 2, xshut_gpio: null, address: null, direction_deg: null}
+      - {id: 0, xshut_gpio: null, address: null, direction_deg: null, position_m: null, pitch_deg: null}
+      - {id: 1, xshut_gpio: null, address: null, direction_deg: null, position_m: null, pitch_deg: null}
+      - {id: 2, xshut_gpio: null, address: null, direction_deg: null, position_m: null, pitch_deg: null}
 
   camera:
     model: "Raspberry Pi Camera Module V2"

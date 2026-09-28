@@ -77,6 +77,11 @@ def main(argv: list[str] | None = None) -> int:
                                           "sensors.imu.address").require()
                 matrix = mount_from_config(config)
                 bus = int(imu_raw.get("i2c_bus", 1))
+                # "görmüyor" eşiği robot.yaml'dan: politika düğümünün refleksi de
+                # aynı değeri kullanıyor (hexapod_policy.ranges).
+                rf_raw = ((config.raw.get("sensors") or {}).get("range_finders") or {})
+                max_range = float(Value.parse(rf_raw.get("max_range_m"),
+                                              "sensors.range_finders.max_range_m").require())
 
                 if dry_run:
                     from .fake import FakeBno055, FakeI2CBus, FakeVl53l0x, FakeXshutGpio
@@ -86,7 +91,8 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     i2c, gpio = SMBusBackend(bus), LgpioBackend()
 
-                finders = RangeFinders(specs, i2c, gpio, imu_address=int(imu_address))
+                finders = RangeFinders(specs, i2c, gpio, imu_address=int(imu_address),
+                                       max_range_m=max_range)
                 finders.begin()
                 imu = Bno055(i2c, int(imu_address))
                 imu.begin()
