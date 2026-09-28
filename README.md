@@ -24,7 +24,7 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Zeminler (eğim, basamak, engebe...) | ✅ [hexapod_terrain](src/hexapod_terrain): parametreli ve tohumlu, Gazebo'da doğrulandı ([örnekler](docs/zeminler/)) |
 | Yürüyüş ölçümü | ✅ `hexapod_rl.olcum`: tripod ve politikalar 15 zeminde karşılaştırıldı ([tablo](docs/olcumler/)) |
 | Sensör sürücüleri | ✅ [hexapod_sensors](src/hexapod_sensors): VL53L0X x3 + BNO055, yazmaç düzeyinde testli; **donanımda denenmedi** (D8) |
-| Pi 4'e aktarma | ⏸ donanım vardiyası (D11) |
+| Pi 4'e aktarma | ⏸ donanım vardiyası (D11); Pi kurulum betiği ve robotu başlatma dosyası hazır, robotsuz test edildi |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştirildi.
 **Yazılım aşamasının bütün görevleri 2026-09-28'de bitti** (Görkem G1–G8,
@@ -72,6 +72,8 @@ src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
     mlp.py            #   numpy MLP + politikanın eğitim sözleşmesi (.npz)
     controller.py     #   ROS'suz çekirdek: IMU + hız komutu -> gözlem -> eklem hedefi, güvenlik
     node.py           #   ince rclpy kabuğu (ros2 run hexapod_policy policy)
+  hexapod_bringup/    # gerçek robotu tek komutla başlatır: sensör + servo sürücü + politika
+    launch/robot.launch.py  # ros2 launch hexapod_bringup robot.launch.py [dry_run:=true] [reflex:=true]
   hexapod_description/  # simülasyon modeli (URDF'in girdisi)
     model.py          #   kütle/atalet/çarpışma/limitler, SI birimlerinde
     urdf.py           #   RobotModel -> URDF
@@ -86,6 +88,7 @@ tools/                # komut satırı araçları
   make_urdf.py        # robot.yaml -> URDF (ROS'suz)
   preview_urdf.py     # URDF'i PNG'ye çizer (ROS'suz önizleme)
   wsl/ros_kurulum.sh  # WSL'e ROS 2 Lyrical + Gazebo kurulumu
+  pi/pi_kurulum.sh    # Raspberry Pi'ye robotta gerekenler (hafif ROS 2, I2C/GPIO) + test
   cadlib/             # iki CAD aracının ortak kütüphanesi (STEP, STL, çerçeveler)
 tests/
 docs/
@@ -344,6 +347,40 @@ geçici bir config kopyasında, robot.yaml'a dokunmaz):
 ```bash
 REFLEKS=1 ZEMIN=basamak:3 KOMUTLAR="0.1,0,0" SURE=12 bash tools/wsl/politika_ros_olcum.sh models/ppo_kaldirma35_250k/policy.npz
 ```
+
+## Raspberry Pi kurulumu ve robotu başlatma
+
+Pi'de (Ubuntu Server 26.04 arm64), depo klonlandıktan sonra, depo klasöründen:
+
+```bash
+bash tools/pi/pi_kurulum.sh
+```
+
+ROS 2'nin hafif sürümünü (Gazebo ve masaüstü yok), I2C/GPIO kütüphanelerini
+(smbus2, lgpio) ve izinlerini kurar, robot paketlerini derler ve robot
+testlerini servoya yazmadan koşar. Sonunda "KURULUM TAMAM" der; I2C ayarı
+yeni açıldıysa bir kez `sudo reboot`. Sonraki adım: `python3 tools/hwcheck.py`
+(GOREVLER.md D3).
+
+Kablolama, kalibrasyon ve IMU montajı config'e girildikten sonra robotu tek
+komutla başlatmak (sensörler + servo sürücü + politika):
+
+```bash
+ros2 launch hexapod_bringup robot.launch.py
+```
+
+`reflex:=true`: mesafe sensörlü kaldırma refleksi (sensör yerleşimi girilince).
+`dry_run:=true`: servoya yazmaz, sensörleri taklit eder (robotsuz deneme).
+Bir düğüm çıkarsa (ör. config'te eksik alan) bütün sistem kapanır ve eksik
+alan yazılır. Yürütmek için başka bir terminalden:
+
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+**İlk açılışta 18 servo aynı anda ayakta duruşa gider:** ilk denemeyi robot
+havadayken ve güç kaynağı akım sınırlıyken yapın (GOREVLER.md, S4'ten
+devredilenler).
 
 ## Sensörler (S7)
 

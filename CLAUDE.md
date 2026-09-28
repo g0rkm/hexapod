@@ -112,6 +112,7 @@ src/hexapod_policy/       politika düğümü: torch'suz (numpy) MLP, /imu + /cm
                           + mesafe sensörlü ayak kaldırma refleksi (lift_reflex)
 src/hexapod_terrain/      RL/ölçüm zeminleri: eğim, basamak, merdiven, engebe, çukur (SDF + yükseklik), saf Python
 src/hexapod_sensors/      VL53L0X x3 + BNO055 sürücüleri ve düğümü (/range*, /imu); donanımda denenmedi
+src/hexapod_bringup/      gerçek robotu tek komutla başlatır (sensör + sürücü + politika; dry_run ile robotsuz)
                           ölçüm aracı: hexapod_rl.olcum (zeminlerde hız/enerji/devrilme tablosu)
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
@@ -124,6 +125,7 @@ tools/wsl/ros_kurulum.sh  WSL'e ROS 2 Lyrical + Gazebo kurulumu
 tools/wsl/derle.sh        ROS paketlerini ~/hexapod_ws'te derler
 tools/wsl/rl_kurulum.sh   ~/hexapod_venv: torch (CPU), SB3, Gymnasium
 tools/wsl/politika_ros_olcum.sh  ROS'lu simde politika düğümünü komut komut ölçer
+tools/pi/pi_kurulum.sh    Raspberry Pi'ye robotta gerekenler (hafif ROS 2, I2C/GPIO) + derleme + test
 tools/cadlib/             CAD araçlarının ortak kütüphanesi
 tests/
 docs/                     PROJE_DEVIR.md, ARAYUZ.md (eklem arayüzü), brif, malzeme/

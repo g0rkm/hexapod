@@ -9,9 +9,11 @@
 > Son güncelleme: **2026-09-28** (5. oturum, eski PC). Şu anki durum ve
 > depodaki modeller **§3.1**; bu oturumun işi **§3.8–3.9** (S5 + S6 ile
 > "bitti" ölçümü, güç ve tripod:50 ölçüm hataları, eğimde refleks, G7 kapandı,
-> refleks robot düğümünde, engebede refleks denemeleri), dersler 48–52; önceki oturum §3.3–3.7, dersler
-> 26–47. **Yazılım aşamasının bütün görevleri bitti.** Açık işler §13.2, plan
-> §14. · Testler: **Linux 468 geçti + 4 atlandı**, Windows 413 geçti + 13
+> refleks robot düğümünde, engebede refleks denemeleri; 09-29: robotu
+> başlatma dosyası ve Pi kurulum betiği), dersler 48–54; önceki oturum
+> §3.3–3.7, dersler 26–47. **Yazılım aşamasının bütün görevleri bitti; robot
+> beklenmeden yapılabilecek yazılım işi kalmadı.** Açık işler §13.2, plan
+> §14. · Testler: **Linux 472 geçti + 4 atlandı**, Windows 413 geçti + 16
 > atlandı (Gazebo/ROS/SB3 testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
@@ -610,6 +612,25 @@ Bu oturum eski PC'de (i5-10300H, 8 ortam) geçti. Tablo ve yorum:
   Düzde yedi komutta refleksle %98–107 (kör %100–107), sıfır komutta 0.0 mm.
   Geri yürürken "refleks: yön görülmüyor" (arkada sensör yok), kör davranış.
 - **Görkem'in ve Samet'in yazılım görevlerinin hepsi bitti** (G1–G8, S1–S7).
+- **2026-09-29: robota geçişin iki yazılım parçası** (görev listesinde
+  yoktu; kullanıcı "yaz, test et" dedi):
+  - `hexapod_bringup` (`ros2 launch hexapod_bringup robot.launch.py
+    [dry_run:=true] [reflex:=true]`): sensör + servo sürücü + politika
+    düğümleri; biri çıkarsa hepsi kapanır. Robotsuz uçtan uca testli
+    (`tests/test_bringup.py`: taklit sensörler, uydurma config kopyası;
+    komutla yürüme sürücüye ulaşıyor, refleks "görüyor", Ctrl+C'de üç düğüm
+    temiz kapanıyor; eksik config'te sistem eksik alanı yazıp kapanıyor).
+  - `tools/pi/pi_kurulum.sh`: Pi'ye hafif ROS 2 (ros-base), smbus2, lgpio,
+    teleop_twist_keyboard, i2c-tools; I2C/GPIO izinleri (udev + gruplar,
+    config.txt'te i2c_arm); robot paketlerini derler; ROS mesajlaşması ve
+    robot testleri (başlatma testi dahil). **Boş bir Ubuntu 26.04.1'de (x86,
+    ubuntu-base imajından geçici WSL dağıtımı, sıradan kullanıcı) sıfırdan
+    denendi: "KURULUM TAMAM", robot testleri 159/159; ikinci çalıştırmada
+    yapılmış adımları atlıyor.** Gerçek Pi'de (arm64, gerçek I2C/GPIO,
+    config.txt) denenmedi; paket adları resolute deposunda doğrulandı.
+  - Bu sırada bulunan iki hata: Ctrl+C'de düğümler sinyalle ölüyordu (ders
+    53, dört düğüm düzeltildi); ROS'un launch_testing pytest eklentisi
+    temiz ortamda testlerin toplanmasını bozuyordu (ders 54, pytest.ini).
 - **Sonrasında (kullanıcı "dene" dedi): engebede refleksin enerjisi.** Sebep
   bulundu (refleks geniş tepeleri engel sanıyor; 25 mm yetiyor), üç kural
   denendi, hiçbiri engelde kayıpsız değil; varsayılan değişmedi (ders 51).
@@ -2045,6 +2066,27 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     (`hexapod_rl.paralel.job_pool`). Belirti: uzun süredir sürmesi gereken bir
     deneyde işlemci kullanımı sıfıra düşmüşse süreç listesine bak
     (`ps -eo pid,etime,pcpu,args`); takılan tek bir işçi kalmıştır.
+53. **Kapanışı gerçek kullanımdaki gibi test et: terminalde Ctrl+C iki sinyal
+    demek.** `ros2 launch` altında düğümler, sinyal yalnız launch'a
+    gönderilince temiz kapanıyordu; terminaldeki gibi bütün gruba
+    gönderilince (düğüm iki SIGINT alır: terminalden ve launch'tan) üçü de
+    sinyalle öldü (çıkış −2). rclpy'nin işleyicisi ilk sinyalde çekiliyor,
+    ikincisi süreci öldürüyor; sürücünün servoları bırakan kapanışı yarıda
+    kalabilir. Ayrıca launch bir düğüm çıkınca ötekileri kapatırken, düğüm
+    daha modül yüklüyorsa hata izi basılıyordu. Düzeltme:
+    `hexapod_driver.stop_signals.run_node` (rclpy işleyicisi kapalı, ilk
+    sinyal kapanışı başlatır, sonrakiler ve kurulum sırasındaki kapanış
+    sessiz). `tests/test_bringup.py` sinyali bütün gruba gönderiyor.
+54. **Kurulum betiğini dolu makinede değil boş makinede dene.** Pi kurulum
+    betiği boş bir Ubuntu 26.04'te koşunca her şey kuruldu ama robot testleri
+    hiç toplanmadı ("found no collectors", 12 atlandı). Sebep ROS'un
+    launch_testing pytest eklentisi (pytest 9): bir dosyanın modül düzeyindeki
+    atlaması (SB3 yok) başka dosyaların toplanmasını da engelliyordu.
+    Geliştirme ortamında aynı eklenti ve aynı pytest vardı ama SB3 kurulu
+    olduğu için hata gizliydi; Pi'de ilk gün çıkacaktı. Düzeltme: pytest.ini
+    `-p no:launch_ros -p no:launch_testing` (projede kullanılmıyor). Deneme
+    yolu: `ubuntu-base` imajından `wsl --import` ile geçici dağıtım, sudo'lu
+    sıradan kullanıcı, deponun kopyası; bitince `wsl --unregister`.
 ---
 
 ## 13. Açık kalan işler
@@ -2172,9 +2214,10 @@ aşamasının bütün görevleri bitti.**
 
 **Sıradaki (öneri sırası):**
 1. Donanım vardiyası (GOREVLER D1–D12; başlama kararı ekibin). Yazılım
-   tarafında hazır olanlar: D5 için `map_channels.py` → robot.yaml, D6
-   `calibrate.py`, D8 için sensör düğümü + `-p reflex:=true`, D9 için sürücü
-   düğümü, D11 için torch'suz politika düğümü.
+   tarafında hazır olanlar: D3 için `tools/pi/pi_kurulum.sh`, D5 için
+   `map_channels.py` → robot.yaml, D6 `calibrate.py`, D8 için sensör düğümü +
+   `-p reflex:=true`, D9/D11 için `ros2 launch hexapod_bringup
+   robot.launch.py` (sensör + sürücü + torch'suz politika).
 2. D8 gelince: yerleşim değerleri robot.yaml'a; `olcum`/`train --reflex`'in
    DENEYSEL yerleşim yerine robot.yaml'ı okuması (§13.2-1); `reflex_probe` ve
    S6 tablosu gerçek yerleşimle.
