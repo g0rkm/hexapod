@@ -101,7 +101,8 @@ config/calibration.yaml   servo merkez/yön/limit — calibrate.py üretir
 src/hexapod_driver/       ROS 2 (ament_python) paketi, çekirdeği saf Python
 src/hexapod_kinematics/   ters/düz kinematik + gövde pozu, saf Python
 src/hexapod_gait/         tripod yürüyüş çekirdeği (gövde hızı -> eklem açısı), saf Python
-src/hexapod_teleop/       /cmd_vel -> hexapod_gait -> eklem komut arayüzü, ROS 2 düğümü
+src/hexapod_teleop/       /cmd_vel -> hexapod_gait -> eklem komut arayüzü, ROS 2 düğümü;
+                          + WASD klavye kumandası (`ros2 run hexapod_teleop wasd` -> /cmd_vel)
 src/hexapod_hardware/     gerçek robot sürücü düğümü: eklem komutu -> ServoBus (dry-run destekli)
 src/hexapod_description/  simülasyon modeli, URDF, eklem arayüzü (interface.py)
 src/hexapod_gazebo/       Gazebo dünyaları, sim.launch.py, stand komutu
@@ -112,7 +113,10 @@ src/hexapod_policy/       politika düğümü: torch'suz (numpy) MLP, /imu + /cm
                           + mesafe sensörlü ayak kaldırma refleksi (lift_reflex)
 src/hexapod_terrain/      RL/ölçüm zeminleri: eğim, basamak, merdiven, engebe, çukur (SDF + yükseklik), saf Python
 src/hexapod_sensors/      VL53L0X x3 + BNO055 sürücüleri ve düğümü (/range*, /imu); donanımda denenmedi
-src/hexapod_bringup/      gerçek robotu tek komutla başlatır (sensör + sürücü + politika; dry_run ile robotsuz)
+src/hexapod_bringup/      gerçek robotu tek komutla başlatır (sensör + sürücü + politika; dry_run ile robotsuz;
+                          camera:=true ile kamera yayını, kamera çökse de robot çalışır)
+src/hexapod_camera/       Pi kamerası (camera_ros) -> tarayıcıda canlı görüntü http://<IP>:8080; yalnız izleme,
+                          politika görüntü kullanmaz; deneme:=true kamerasız; gerçek kamerada denenmedi
                           ölçüm aracı: hexapod_rl.olcum (zeminlerde hız/enerji/devrilme tablosu)
 tools/map_channels.py     hangi servo hangi kanalda — kıpırdatıp sorar
 tools/calibrate.py        etkileşimli servo kalibrasyonu
@@ -198,7 +202,7 @@ zorluklarda kendi çözümünü üreten (RL ile öğrenilmiş) bir sistem.
 
 Önce yazılım, sonra donanım. Yazılım görevleri Görkem (G) ve Samet (S)
 arasında bölüşüldü; donanım işleri **durduruldu**, ayrı bir vardiyada
-(D1–D12) yapılacak — bkz. GOREVLER.md. Görkem robotu kurmadı; ondan
+(D1–D13) yapılacak — bkz. GOREVLER.md. Görkem robotu kurmadı; ondan
 donanım işi isteme. Yazılım CAD geometrisiyle simülasyonda ilerler;
 donanım bilgileri config'e sonradan girilir.
 
@@ -225,7 +229,9 @@ donanım bilgileri config'e sonradan girilir.
    refleks `-p reflex:=true`, yerleşim robot.yaml'da null, D8), sensör
    düğümü (`hexapod_sensors`) ve sürücü düğümü (`hexapod_hardware`)
    yazıldı, simde çalışıyor; Pi'de denenmedi. **Yazılım aşamasının bütün
-   görevleri bitti (2026-09-28); sırada donanım vardiyası.**
+   görevleri bitti (2026-09-28); sırada donanım vardiyası.** 2026-09-29:
+   WASD kumandası ve kamera yayını (`hexapod_camera`) eklendi; simülasyon
+   baştan doğrulandı (60 mm basamak sınırda, PROJE_DEVIR §3.10)
 
 Gerçekçi beklenti: RL politikası eğitimde gördüğü zorluk türlerine karşı
 sağlam olur, "her koşula" değil. Eğitim senaryoları neyi kapsarsa sistem

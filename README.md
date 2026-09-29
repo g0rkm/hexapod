@@ -24,12 +24,14 @@ adaptif yürüyüş. Bu depo o mimarinin en alt katmanıyla başlıyor.
 | Zeminler (eğim, basamak, engebe...) | ✅ [hexapod_terrain](src/hexapod_terrain): parametreli ve tohumlu, Gazebo'da doğrulandı ([örnekler](docs/zeminler/)) |
 | Yürüyüş ölçümü | ✅ `hexapod_rl.olcum`: tripod ve politikalar 15 zeminde karşılaştırıldı ([tablo](docs/olcumler/)) |
 | Sensör sürücüleri | ✅ [hexapod_sensors](src/hexapod_sensors): VL53L0X x3 + BNO055, yazmaç düzeyinde testli; **donanımda denenmedi** (D8) |
+| Klavye kumandası | ✅ WASD ([hexapod_teleop](src/hexapod_teleop) `wasd`): W ileri, S geri, A/D dön, K dur, Q/E hız; simde ve robotta aynı |
+| Kamera | ✅ [hexapod_camera](src/hexapod_camera): Pi kamerasından tarayıcıda canlı görüntü (yalnız izleme); deneme deseniyle testli, **gerçek kamerada denenmedi** |
 | Pi 4'e aktarma | ⏸ donanım vardiyası (D11); Pi kurulum betiği ve robotu başlatma dosyası hazır, robotsuz test edildi |
 
 Önce yazılım: her şey CAD geometrisiyle simülasyonda geliştirildi.
 **Yazılım aşamasının bütün görevleri 2026-09-28'de bitti** (Görkem G1–G8,
 Samet S1–S7). Kablolama, kalibrasyon ve gerçek robotta denemeler ayrı bir
-donanım vardiyasında yapılacak ([GOREVLER.md](GOREVLER.md), D1–D12);
+donanım vardiyasında yapılacak ([GOREVLER.md](GOREVLER.md), D1–D13);
 yazılımın beklediği şey config'e girilecek değerler.
 
 ## Kurulum
@@ -59,9 +61,15 @@ src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
     body.py           #   altı bacak, gövde çerçevesi, gövde pozu
   hexapod_gait/       # tripod yürüyüş çekirdeği (gövde hızı -> eklem açısı)
     tripod.py         #   iki üçlü grup, çapa tabanlı destek/salınım yörüngesi
-  hexapod_teleop/     # /cmd_vel -> hexapod_gait -> eklem komut arayüzü (ROS 2 düğümü)
+  hexapod_teleop/     # /cmd_vel -> hexapod_gait -> eklem komut arayüzü (ROS 2 düğümü) + WASD kumandası
     controller.py     #   ROS'suz çekirdek: hız sınırlama, zaman aşımı, ReachError yakalama
     node.py           #   ince rclpy kabuğu (ros2 run hexapod_teleop teleop)
+    wasd.py           #   WASD çekirdeği: tuş -> hız komutu (ROS'suz)
+    wasd_node.py      #   terminalden tuş okur, /cmd_vel yayınlar (ros2 run hexapod_teleop wasd)
+  hexapod_camera/     # Pi kamerasından tarayıcıda canlı görüntü (yalnız izleme)
+    mjpeg.py          #   ROS'suz: son kare tamponu + MJPEG web sunucusu
+    node.py           #   /camera/image_raw/compressed -> http://<IP>:8080 (ros2 run hexapod_camera stream)
+    launch/kamera.launch.py  # camera_ros (kamera sürücüsü) + yayın; deneme:=true kamerasız
   hexapod_hardware/   # gerçek robot sürücü düğümü: eklem komutu -> servo darbesi (dry-run destekli)
     controller.py     #   ROS'suz çekirdek: komutu doğrular, ServoBus.set_angles ile hep-ya-da-hiç gönderir
     node.py           #   ince rclpy kabuğu (ros2 run hexapod_hardware driver)
@@ -72,8 +80,8 @@ src/                  # ROS 2 (ament_python) paketleri; çekirdekleri saf Python
     mlp.py            #   numpy MLP + politikanın eğitim sözleşmesi (.npz)
     controller.py     #   ROS'suz çekirdek: IMU + hız komutu -> gözlem -> eklem hedefi, güvenlik
     node.py           #   ince rclpy kabuğu (ros2 run hexapod_policy policy)
-  hexapod_bringup/    # gerçek robotu tek komutla başlatır: sensör + servo sürücü + politika
-    launch/robot.launch.py  # ros2 launch hexapod_bringup robot.launch.py [dry_run:=true] [reflex:=true]
+  hexapod_bringup/    # gerçek robotu tek komutla başlatır: sensör + servo sürücü + politika (+ kamera)
+    launch/robot.launch.py  # ros2 launch hexapod_bringup robot.launch.py [dry_run:=true] [reflex:=true] [camera:=true]
   hexapod_description/  # simülasyon modeli (URDF'in girdisi)
     model.py          #   kütle/atalet/çarpışma/limitler, SI birimlerinde
     urdf.py           #   RobotModel -> URDF
@@ -263,6 +271,15 @@ bash tools/wsl/rl_kurulum.sh
    | Yerinde dön | `"{angular: {z: 0.4}}"` |
    | Dur | `Ctrl+C` (komut kesilince 0.5 sn içinde kendisi durur) |
 
+   Daha kolayı klavyeyle sürmek (bu terminalde, tuşa bir kez basmak yeter):
+
+   ```bash
+   ros2 run hexapod_teleop wasd
+   ```
+
+   W ileri, S geri, A sola dön, D sağa dön, K dur, Q hızı artır, E hızı azalt,
+   Ctrl+C çıkış (çıkarken dur komutu gönderir).
+
    Hızlar `vx ±0.15`, `vy ±0.08` m/s ve `wz ±0.5` rad/s'ye kırpılır. Yürüyüş
    ayarları: `ros2 run hexapod_teleop teleop --ros-args -p cycle_hz:=1.5 -p cmd_timeout_s:=0.5`.
 
@@ -320,11 +337,13 @@ Simülasyon açıkken (ayrı terminalde `ros2 launch hexapod_gazebo sim.launch.p
 ros2 run hexapod_policy policy --ros-args -p policy:=models/ppo_omni_250k/policy.npz -p use_sim_time:=true
 ```
 
-Yürütmek için:
+Yürütmek için (klavyeyle, ayrı terminalde):
 
 ```bash
-ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.1}}"
+ros2 run hexapod_teleop wasd
 ```
+
+ya da tek bir komutu tekrar ederek: `ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.1}}"`.
 
 Her yöne model geri (`x: -0.1`), yana (`linear: {y: 0.06}`) ve dönüş (`angular: {z: 0.4}`) komutlarında da yürür; sıfıra yakın komutta ayakta bekler.
 
@@ -371,12 +390,19 @@ ros2 launch hexapod_bringup robot.launch.py
 
 `reflex:=true`: mesafe sensörlü kaldırma refleksi (sensör yerleşimi girilince).
 `dry_run:=true`: servoya yazmaz, sensörleri taklit eder (robotsuz deneme).
+`camera:=true`: kamera yayınını da açar (aşağıda "Kamera").
 Bir düğüm çıkarsa (ör. config'te eksik alan) bütün sistem kapanır ve eksik
-alan yazılır. Yürütmek için başka bir terminalden:
+alan yazılır; kamera bunun dışında (kamera çökse de robot çalışır). Yürütmek
+için başka bir terminalden (Pi'ye SSH ile ya da aynı ağdaki ROS kurulu
+bilgisayardan):
 
 ```bash
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
+ros2 run hexapod_teleop wasd
 ```
+
+W ileri, S geri, A sola dön, D sağa dön, K dur, Q/E hızı artır/azalt. Yön
+tuşuna bir kez basmak yeter, robot K'ye basılana kadar gider. Kumanda
+kapanır ya da Wi-Fi koparsa robot 0.5 s içinde kendiliğinden durur.
 
 **İlk açılışta 18 servo aynı anda ayakta duruşa gider:** ilk denemeyi robot
 havadayken ve güç kaynağı akım sınırlıyken yapın (GOREVLER.md, S4'ten
@@ -405,6 +431,35 @@ reddedilir.
 
 **Donanımda denenmedi:** sürücüler taklit cihazlarla yazmaç düzeyinde
 doğrulandı. Bilinenler ve ilk çalıştırmada bakılacaklar: GOREVLER.md S7.
+
+## Kamera (canlı görüntü)
+
+Raspberry Pi Camera Module V2 yalnız izlemek için (robotun yürüyüşü
+görüntüyü kullanmaz). Kamera sürücüsü `camera_ros` (Pi kurulum betiği kurar)
+görüntüyü yayınlar, `hexapod_camera` aynı Wi-Fi'deki tarayıcılara akıtır.
+İzlemek için program gerekmez: telefonda ya da bilgisayarda tarayıcı yeter.
+
+```bash
+ros2 launch hexapod_camera kamera.launch.py
+```
+
+Sonra tarayıcıda `http://<Pi'nin IP'si>:8080` (adres düğümün çıktısında yazar;
+Pi'de `hostname -I` de gösterir). Sayfada canlı görüntü ve durum satırı
+("canlı · 15 kare/s" ya da "görüntü gelmiyor: kamera bağlı mı?") var.
+
+- Kamerasız deneme (görüntü yolunu, Wi-Fi'yi ve tarayıcıyı denemek için):
+  `ros2 launch hexapod_camera kamera.launch.py deneme:=true` hareketli bir
+  deneme deseni yayınlar.
+- Robotla birlikte: `ros2 launch hexapod_bringup robot.launch.py camera:=true`.
+- Seçenekler: `port:=8081`, `width:=1280 height:=720`, `jpeg_quality:=60`
+  (Wi-Fi zayıfsa düşürün).
+
+**Gerçek kamerada denenmedi.** `camera_ros`'un kullandığı libcamera'da Pi 4
+ve Camera V2'nin sensörü (IMX219) için destek var (paket içinden doğrulandı);
+Pi kurulum betiği `config.txt`'de kamera algılamayı açar ve kullanıcıyı
+`video` grubuna ekler. İlk denemede kamera görünmezse: Pi kapalıyken şerit
+kablonun yönüne bakın (Pi 4'te kamera soketinde mavi yüz Ethernet/USB
+tarafına bakar), sonra `sudo reboot` ve yeniden `kamera.launch.py`.
 
 ## RL eğitimi (WSL)
 

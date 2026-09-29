@@ -25,6 +25,15 @@ Sözleşmenin kodu: [`hexapod_description/interface.py`](../src/hexapod_descript
 
 Komut hızı **50 Hz** (`COMMAND_RATE_HZ`). MG996R 50 Hz PWM ile sürülür, daha sık komutun anlamı yok.
 
+### Eklem arayüzü dışındaki konular
+
+Bunlar `interface.py`'nin parçası değil (standart ROS konuları); kim ne yayınlıyor bilinsin diye burada.
+
+| Konu | Mesaj | Kim yayınlar → kim dinler | Not |
+|---|---|---|---|
+| `/cmd_vel` | `geometry_msgs/msg/Twist` | kumanda (`hexapod_teleop wasd`, `teleop_twist_keyboard`, `ros2 topic pub`) → politika ya da tripod düğümü | `linear.x` ileri m/s, `linear.y` sola m/s, `angular.z` sola dönüş rad/s. 0.5 s gelmezse robot durur; WASD dururken de sürekli (10 Hz) yayınlar |
+| `/camera/image_raw/compressed` | `sensor_msgs/msg/CompressedImage` | `camera_ros` (Pi kamerası) → `hexapod_camera` | JPEG; tarayıcıda `http://<IP>:8080`. Yalnız izleme, politika kullanmaz (2026-09-29) |
+
 ## Eklem sırası
 
 Bacak bacak, her bacakta coxa, femur, tibia (`interface.joint_names()`):

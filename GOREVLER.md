@@ -11,7 +11,7 @@ Proje bağlamı: [docs/PROJE_DEVIR.md](docs/PROJE_DEVIR.md). Kurulum ve araçlar
 > 2026-09-24'te yeniden düzenlendi. İlk dağılımdaki (commit `a2348a7`) numaralar geçersiz: o planda Samet donanıma ayrılmıştı, artık yazılım görevleri alıyor.
 
 > [!IMPORTANT]
-> **2026-09-28: yazılım aşamasının bütün görevleri bitti** (G1–G8, S1–S7). Robota aday: `ppo_kaldirma35_250k` + mesafe sensörlü kaldırma refleksi. Sıradaki adım donanım vardiyası (D1–D12); başlama kararı ekibin. Vardiyada yazılım tarafının işleri: D5 (kablolamayı config'e işle), D8'de refleksin gerçek yerleşimle denenmesi, D10 (gerçek limit ve kütleyle yeniden eğitim), D11 (Pi'ye aktarma).
+> **2026-09-28: yazılım aşamasının bütün görevleri bitti** (G1–G8, S1–S7). Robota aday: `ppo_kaldirma35_250k` + mesafe sensörlü kaldırma refleksi. Sıradaki adım donanım vardiyası (D1–D13); başlama kararı ekibin. Vardiyada yazılım tarafının işleri: D5 (kablolamayı config'e işle), D8'de refleksin gerçek yerleşimle denenmesi, D10 (gerçek limit ve kütleyle yeniden eğitim), D11 (Pi'ye aktarma).
 
 ## Nasıl okunur
 
@@ -387,6 +387,7 @@ flowchart LR
     D8 --> D11
     D9 --> D11
     D11 --> D12[D12 Saha denemesi]:::hw
+    D3 --> D13[D13 Kamera canlı görüntü]:::hw
 ```
 
 | Kimlik | Görev | Bekler | Bitti sayılır |
@@ -401,8 +402,9 @@ flowchart LR
 | D8 | Sensör montaj bilgisi + S7'nin donanım testi | D3, S7 | IMU adresi ve montaj yönü, üç VL53L0X'in XSHUT GPIO'ları ve bakış yönleri robot.yaml → `sensors`'ta. Üç mesafe sensörü ve IMU aynı anda okunuyor. **Yerleşim önerisi (G7 simi, 2026-09-27):** ayak kaldırma refleksi için üç sensör gövde kenarında, yerin ~12 cm üstünde, **20–25° aşağı** bakmalı (45° engeli çok geç görüyor); **biri tam ileri, ikisi yanlara (±90°)**. Böylece ileri, yana ve çapraz yürüyüşte engel görülüyor; geride sensör yok, orada politika kör kaldırmasıyla (~35 mm) geçiyor. Önde üç sensör (±25°) yana yürüyüşü kapsamıyor. Doldurulacak alanlar (2026-09-28'den beri robot.yaml'da, null): her cihazda `xshut_gpio`, `address`, `direction_deg`, `position_m` [x, y, z] (gövde çerçevesi, tanımı dosyada), `pitch_deg`. Girince: sensör düğümü `/range0..2` yayınlar; politika düğümü `-p reflex:=true` ile refleksi açar ve günlükte "refleks: görüyor" der (yerleşim eksikse eksik alanı söyleyip çıkar). Sonra `python -m hexapod_rl.reflex_probe --pitch <açı>` ve S6 tablosu gerçek yerleşimle yeniden koşulur. |
 | D9 | Gerçek robotta tripod | D6, S3, S4 | Önce havada, sonra yerde yürüyor. Simülasyondan farklar raporlandı: ayak sapması, servo ısınması, besleme çökmesi (Pi resetlenirse brownout'tur, yazılım hatası değil). Ayrıca aşağıdaki "S4'ten devredilen, robotta doğrulanacaklar" listesi tamamlandı. **Servo beslemesinin yük altındaki gerilimi ölçülmeli:** simde durma torku katalog değerinin (1.08 N·m @6 V) yarısının altına inince zemin modelleri engelde, 50 mm'lik model ×0.4'te düzde de devriliyor; 25 mm'likler ×0.4'te yürüyor. Robotta ilk politika denemesi 25 mm'lik modelle (`ppo_omni_250k`). |
 | D10 | Gerçek limit ve kütleyle yeniden eğitim | D6, D7, G7 | G7 gerçek eklem limitleri ve ölçülen kütleyle tekrarlandı; D9'daki farklar rastgeleleştirme aralıklarına yansıtıldı. |
-| D11 | Pi 4'e aktarma | D10, G8, D8, D9 | Politika + ROS 2 düğümleri Pi'de, gerçek IMU ve servolarla kapalı döngü; robot düz zeminde yürüyor. Tek komut: `ros2 launch hexapod_bringup robot.launch.py [reflex:=true]` (sensör + sürücü + politika; biri çıkarsa hepsi kapanır; robotsuz `dry_run:=true` ile testli). Sürmek: `ros2 run teleop_twist_keyboard teleop_twist_keyboard`. |
+| D11 | Pi 4'e aktarma | D10, G8, D8, D9 | Politika + ROS 2 düğümleri Pi'de, gerçek IMU ve servolarla kapalı döngü; robot düz zeminde yürüyor. Tek komut: `ros2 launch hexapod_bringup robot.launch.py [reflex:=true] [camera:=true]` (sensör + sürücü + politika; biri çıkarsa hepsi kapanır, kamera hariç; robotsuz `dry_run:=true` ile testli). Sürmek: `ros2 run hexapod_teleop wasd` (W ileri, S geri, A/D dön, K dur, Q/E hız). |
 | D12 | Saha denemesi | D11 | TÜBİTAK planındaki gerçek arazi denemesi: eğim, engebe, kum, kaygan zemin. Her zemin için video, hız ve devrilme sayısı. |
+| D13 | Kamerada canlı görüntü | D3 | Pi Camera V2 takılı (Pi kapalıyken; şerit kablonun mavi yüzü Ethernet/USB tarafına). `ros2 launch hexapod_camera kamera.launch.py` açıkken aynı Wi-Fi'deki telefonda `http://<Pi IP>:8080` canlı görüntü veriyor ("canlı · N kare/s"). Kamerasız ön deneme: `deneme:=true` (deneme deseni). Yazılım 2026-09-29'da yazıldı, deneme deseniyle testli; **gerçek kamerada denenmedi**. Kamera yalnız izleme (başvuruda kamera yok, politika görüntü kullanmıyor). |
 
 ### S4'ten devredilen, robotta doğrulanacaklar (D9 ile birlikte yapılır)
 

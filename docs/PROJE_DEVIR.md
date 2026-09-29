@@ -6,15 +6,16 @@
 > yapmadan önce bu belgenin tamamını oku. `CLAUDE.md` bunun kısa özetidir;
 > çelişki görürsen bu belge + koddaki güncel durum esastır.
 >
-> Son güncelleme: **2026-09-28** (5. oturum, eski PC). Şu anki durum ve
-> depodaki modeller **§3.1**; bu oturumun işi **§3.8–3.9** (S5 + S6 ile
-> "bitti" ölçümü, güç ve tripod:50 ölçüm hataları, eğimde refleks, G7 kapandı,
-> refleks robot düğümünde, engebede refleks denemeleri; 09-29: robotu
-> başlatma dosyası ve Pi kurulum betiği), dersler 48–54; önceki oturum
-> §3.3–3.7, dersler 26–47. **Yazılım aşamasının bütün görevleri bitti; robot
-> beklenmeden yapılabilecek yazılım işi kalmadı.** Açık işler §13.2, plan
-> §14. · Testler: **Linux 472 geçti + 4 atlandı**, Windows 413 geçti + 16
-> atlandı (Gazebo/ROS/SB3 testleri Windows'ta atlanır)
+> Son güncelleme: **2026-09-29** (6. oturum, eski PC). Şu anki durum ve
+> depodaki modeller **§3.1**; bu oturumun işi **§3.10** (simülasyonun baştan
+> doğrulanması ve videolar, 60 mm basamağın sınırda olduğu, WASD kumandası,
+> kamera yayını, TÜBİTAK formunun kontrolü), ders 55. Önceki oturum §3.8–3.9
+> (S5 + S6 ile "bitti" ölçümü, G7 kapandı, robotu başlatma dosyası, Pi
+> kurulum betiği), dersler 48–54; daha önce §3.3–3.7, dersler 26–47.
+> **Yazılım aşamasının bütün görevleri bitti; robot beklenmeden yapılabilecek
+> yazılım işi kalmadı.** Açık işler §13.2, plan §14. · Testler: **Linux 503
+> geçti + 4 atlandı**, Windows 437 geçti + 22 atlandı (Gazebo/ROS/SB3 ve düğüm
+> testleri Windows'ta atlanır)
 >
 > Bu belgeyi güncel tut: önemli bir karar, bulunan bir hata ya da biten bir
 > aşama olduğunda ilgili bölümü güncelle ve "Son güncelleme"yi değiştir.
@@ -327,7 +328,7 @@ artık geçersiz ya da güncellendi:
 
 **Görev dağılımı:** [GOREVLER.md](../GOREVLER.md).
 - Yazılım aşaması: G = Görkem, S = Samet.
-- Durdurulmuş donanım vardiyası: D1–D12.
+- Durdurulmuş donanım vardiyası: D1–D13 (D13 kamera, 2026-09-29).
 - Her görev hangi görevi beklediğini ve hangisini açtığını söyler.
 - Bitenler: G1–G6, G8; S1–S4.
 - Sürenler: G7 (Görkem), S5 (zemin üreteci), S6 (ölçüm aracı), S7 (sensör
@@ -606,7 +607,7 @@ Bu oturum eski PC'de (i5-10300H, 8 ortam) geçti. Tablo ve yorum:
   | Zemin | kör | refleksli |
   |---|---|---|
   | 45 mm basamak | 0.93 m (%71) | 1.06 m (%85) |
-  | 60 mm basamak | 0.18 m, takıldı | 0.95 m, üstünde (gövde z 100 → 159 mm) |
+  | 60 mm basamak | 0.18 m, takıldı | 0.95 m, üstünde (gövde z 100 → 159 mm) — **tek koşu; 2026-09-29 tekrarında 0.45 m, yarı yolda (§3.10)** |
   | merdiven 6×35 | 0.91 m (%74) | 1.09 m (%89) |
 
   Düzde yedi komutta refleksle %98–107 (kör %100–107), sıfır komutta 0.0 mm.
@@ -636,6 +637,67 @@ Bu oturum eski PC'de (i5-10300H, 8 ortam) geçti. Tablo ve yorum:
   denendi, hiçbiri engelde kayıpsız değil; varsayılan değişmedi (ders 51).
   Bu deneylerde ölçüm havuzunun rastgele takılması bulundu ve giderildi
   (`forkserver`, ders 52).
+
+### 3.10 Simülasyon doğrulaması, WASD kumandası, kamera (2026-09-29, eski PC)
+
+Kullanıcı "yazılım bitmişti, simde gerçekten çalışıyor mu, görsel at" diye
+sordu; sonra donanımı yapacak arkadaşın soruları üzerine WASD kumandası ve
+kamera yayını istendi.
+
+- **Doğrulama (değişiklikten önce):** testler Linux 472 + 4 atlandı, Windows
+  413 + 16 atlandı (belgeyle aynı). ROS'lu sim, gerçek politika düğümü,
+  `ppo_kaldirma35_250k`, düz zemin: yedi komutun hepsi %100–110, sıfır
+  komutta 0.1 mm. Süreç içi Gazebo + robottaki denetleyici (numpy politika +
+  refleks, DENEYSEL yerleşim): her yön (6 s ileri 0.58 m, 4 s sola 0.24 m, 4 s
+  dönüş 92°; hedefler 0.60 / 0.24 / 92°), 45 mm basamak 11 s'de 1.04 m ve
+  üstünde, merdiven 6×35 14 s'de dört basamak.
+- **Videolar:** Gazebo'nun kendi kamerası başsız (ogre2) WSL'de çalışıyor:
+  `HexapodSim` alt sınıfı dünyaya Sensors sistemi, ışık ve kamera ekler, robot
+  CAD mesh'leriyle; kareler gz.transport ile alınır, her kontrol adımında
+  kare beklenir (fizik render'ı geçmesin). Fizik aynı. Eski PC'de işlemciyle
+  çiziyor: 960×540 gölgeli kare ~1 s. Betikler depoda değil; kullanıcıya dört
+  video (düz her yön, 45 mm, 60 mm, merdiven) gönderildi.
+- **60 mm basamak sınırda (bulgu):** §3.9'daki "refleksle 0.95 m, üstünde"
+  tek bir ROS koşusuydu. Bugün aynı komut (`REFLEKS=1 ZEMIN=basamak:3`)
+  **0.45 m**, gövde z 99 → 140 mm (ön yarısı üstte). ROS'lu sim gerçek zamanlı,
+  koşudan koşuya değişiyor. Süreç içi simde (deterministik, 10 s):
+  - robottaki denetleyici yolu: basamak 0.3 / 0.4 / 0.5 m'deyken 0.47 / 0.18 /
+    0.27 m; 0.4'te kaldırma 60 mm'de ama ön bacaklar kenarda takılı kalıyor;
+  - eğitim ortamı yolu (`evaluate`, temiz): basamak 0.4'te 0.50 m (12 s'de 0.63);
+  - 45 mm'de iki yol aynı (0.94 / 0.93 m).
+  S6 tablosunun "60 mm: 0.089 m/s" satırı rastgeleleştirmeli tekrarların
+  ortalaması; "3/3" devrilmedi demek, çıktı değil. 60 mm'yi güvenilir
+  çıkmıyor; güvenilir sınır 45 mm. 60 mm'de iki yolun farkı açıklanmadı
+  (§13.2-11). Ders 55.
+- **TÜBİTAK formu** (PDF, `docs/BASVURU_FORMU_CIKTISI_millitekonolojikuluplerbirligi.pdf`;
+  git dışı, ekip üyelerinin telefon ve e-postaları var): 18 sayfanın hiçbirinde
+  kamera yok. Yöntem: Gazebo'da sanal IMU + temas sensörü, PPO. Bütçe: kablo ve
+  bağlantı elemanları, filament, geliştirme kartı, batarya, 24 servo. Formdaki
+  "otonom" yürüyüşü deneme-yanılmayla kendi öğrenmesi, yol bulma değil. Kamera
+  faturada var, formda yok; kullanıcı kararı: **kamera yalnız görüntü
+  aktarımı** (canlı izleme).
+- **WASD kumandası** (`ros2 run hexapod_teleop wasd`; `hexapod_teleop.wasd`
+  çekirdek + `wasd_node`): W ileri, S geri, A sola dön, D sağa dön, K dur, Q/E
+  hız (kullanıcının düzeni; "S: geri dön" geri yürüme olarak alındı). Yön
+  tuşu kalıcı: bir kez basmak yeter (terminal tuş bırakmayı bildirmez, tuş
+  tekrarının ilk ~0.5 s boşluğu politikanın 0.5 s zaman aşımına takılırdı).
+  `/cmd_vel` 10 Hz sürekli, dururken sıfır: kumanda kapanırsa ya da ağ
+  koparsa robot 0.5 s'de durur. 5 hız kademesi, en yüksek `TeleopLimits`
+  (0.15 m/s, 0.5 rad/s), başlangıç 0.10 m/s, en düşük ölü bölgenin iki katı.
+  Test sahte terminalde (pty) gerçek süreçle.
+- **Kamera yayını** (`hexapod_camera`, D13): `camera_ros` (libcamera) JPEG
+  yayınlar (`/camera/image_raw/compressed`), `hexapod_camera` son kareyi aynı
+  ağdaki tarayıcılara MJPEG olarak akıtır: `http://<Pi IP>:8080` (sayfa + durum
+  satırı "canlı · N kare/s" / "görüntü gelmiyor"). Kareler çözülmez, her
+  izleyici en son kareyi alır (zayıf Wi-Fi'de gecikme birikmez).
+  `ros2 launch hexapod_camera kamera.launch.py [deneme:=true]`; robotla
+  `robot.launch.py camera:=true|deneme`. Kamera "biri çıkarsa hepsi kapansın"
+  kuralının dışında: yayın düğümü öldürülünce robotun yürümeye devam ettiği
+  test edildi. `ros-lyrical-camera-ros` ve `ros-lyrical-libcamera` arm64
+  paketlerinin içine bakıldı: Pi 4 (rpi/vc4) boru hattı ve IMX219 (Camera V2)
+  ayar dosyası var. Pi kurulum betiği kamera paketlerini, `video` grubunu ve
+  `config.txt`'de `camera_auto_detect=1`'i ekler. **Gerçek kamerada
+  denenmedi**; deneme deseni tarayıcıda görüldü (15 kare/s).
 
 ---
 
@@ -916,12 +978,13 @@ hexapod/
 │   │                        launch/display.launch.py, meshes/
 │   ├── hexapod_gazebo/     worlds/flat.sdf, launch/sim.launch.py, pose.py, stand.py (G5)
 │   ├── hexapod_gait/       tripod çekirdeği, TripodGait (S2, Samet)
-│   ├── hexapod_teleop/     /cmd_vel -> TripodGait -> komut (S3, Samet)
+│   ├── hexapod_teleop/     /cmd_vel -> TripodGait -> komut (S3, Samet); wasd: klavye -> /cmd_vel (09-29)
 │   ├── hexapod_hardware/   gerçek sürücü düğümü, komut -> ServoBus (S4, Samet)
 │   ├── hexapod_rl/         RL (G6, G7): sim, state, task, env, demo, pretrain, train,
 │   │                        evaluate, export, baseline, math3d, terrain_probe, widen,
 │   │                        robustness, rangefinder, reflex_probe
-│   └── hexapod_policy/     politika düğümü (G8): mlp, controller, tripod, lift_reflex, node
+│   ├── hexapod_policy/     politika düğümü (G8): mlp, controller, tripod, lift_reflex, node
+│   └── hexapod_camera/     kamera -> tarayıcıda canlı görüntü: mjpeg, pattern, node, launch/kamera.launch.py (09-29)
 ├── models/                 kayda değer modeller: model.zip (SB3) + policy.npz (torch'suz) + README (tablolar)
 ├── egitim_kayitlari/       bütün eğitimlerin progress.csv/ayarlar/değerlendirmeleri (hafif)
 ├── tools/
@@ -1631,6 +1694,10 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
 | 09-28 | **Refleks robot düğümüne bağlandı; yerleşim alanları robot.yaml'da null** (`position_m`, `pitch_deg`, ortak `max_range_m` 1.2) | Yazılım D8'i beklemesin; değer uydurulmaz, düğüm eksik alanı söyleyip çıkar. Simde uçtan uca deneme DENEYSEL yerleşimli config KOPYASIYLA (`hexapod_rl.deneysel_yerlesim`) |
 | 09-28 | Refleks varsayılan kapalı (`-p reflex:=true` ile açılır) | Mevcut kullanım değişmesin; sensör yoksa ya da yerleşim bilinmiyorsa düğüm yine çalışsın |
 | 09-28 | Eksik mesafe seti eski değerle doldurulmuyor (`RangeCollector`) | Bir sensör susarsa ölçüm bayatlar, refleks kör davranışa döner; eski değerle çalışmak engeli yanlış yerde görmek olur |
+| 09-29 | **Kamera yalnız görüntü aktarımı** (canlı izleme); görüntü işleme / görüntüyle hareket yok | Kullanıcı kararı. TÜBİTAK formunda kamera yok (yöntem: IMU + temas, PPO); engeli mesafe sensörleri görüyor |
+| 09-29 | Kamera yayını kendi küçük MJPEG sunucumuzla (`hexapod_camera`), `web_video_server` değil | Kareler camera_ros'tan JPEG geliyor, yalnız iletmek yetiyor; saf Python, kamerasız test edilebilir (deneme deseni), Türkçe durum sayfası. web_video_server Lyrical'da var ama C++ ve WSL'de sudo'suz denenemezdi |
+| 09-29 | Kamera düğümleri robot.launch.py'de "biri çıkarsa hepsi kapansın" kuralının dışında; varsayılan kapalı (`camera:=true`) | Kamera yürüyüş için gerekmiyor; kamera arızası robotu durdurmamalı. Varsayılan kapalı: camera_ros kurulu olmayan makinede (geliştirme PC'si) başlatma bozulmasın |
+| 09-29 | **WASD kumandası, yön tuşu kalıcı** (K durdurur), `/cmd_vel` 10 Hz sürekli | Kullanıcının tuş düzeni. Basılı tutma düzeni terminalde tuş tekrarının ilk ~0.5 s boşluğunda politikanın zaman aşımına takılırdı; sürekli yayın sayesinde kumanda kapanınca robot durur |
 
 ---
 
@@ -2087,6 +2154,15 @@ try { wsl -e bash $Script } finally { [void][W.P]::SetThreadExecutionState([uint
     `-p no:launch_ros -p no:launch_testing` (projede kullanılmıyor). Deneme
     yolu: `ubuntu-base` imajından `wsl --import` ile geçici dağıtım, sudo'lu
     sıradan kullanıcı, deponun kopyası; bitince `wsl --unregister`.
+55. **Sınırdaki bir sonucu tek koşuyla belgeye yazma.** §3.9'da "60 mm
+    basamak, refleksle 0.95 m, üstünde" tek bir ROS'lu sim koşusundan
+    yazıldı; 2026-09-29'da aynı komut 0.45 m verdi. ROS'lu sim gerçek
+    zamanlı, koşudan koşuya değişiyor; süreç içi simde de basamağın yerini
+    10 cm kaydırmak 0.18 ile 0.47 m arasında oynatıyor. 45 mm'de ise her
+    koşu aynı yere varıyor. Bir yetenek eşiğin kenarındaysa (geç/geçeme)
+    birkaç başlangıç koşuluyla ölç ve aralığı yaz; tek koşu yalnız "bazen
+    oluyor"u gösterir. S6 tablosundaki "3/3" de çıktı değil, devrilmedi demek;
+    tabloyu okurken ölçütün ne dediğine bak (ders 45).
 ---
 
 ## 13. Açık kalan işler
@@ -2145,6 +2221,12 @@ Bu oturumda bitenler §14'te. Açık kalanlar:
 9. **Kalibrasyon ofseti rastgeleleştirmesiyle eğitim:** ölçülen aralıkla D10'da.
 10. **Robot düğümünde model seçimi** (düz / zemin; operatör seçer): küçük iş,
     değeri düşük.
+11. **60 mm basamakta eğitim ortamı ile robottaki denetleyici farklı yere
+    varıyor** (2026-09-29, §3.10): basamak 0.4 m'deyken `evaluate` 0.50 m,
+    denetleyici yolu 0.18 m; 45 mm'de aynılar. Gözlem sözleşmesi testle
+    eşit; fark başlangıç zamanlamasından (yerleşme, adım saatinin başlangıcı)
+    ya da refleksin ilk ölçümlerinden olabilir. 60 mm zaten sınırda (ders 55);
+    robotta 45 mm hedeflenirken önemsiz, 60 mm istenirse önce bu.
 
 ### 13.3 Yazılım (Samet)
 
@@ -2152,7 +2234,7 @@ S1–S7'nin hepsi bitti (S5 `hexapod_terrain`, S6 `hexapod_rl.olcum`, S7
 `hexapod_sensors`; ayrıntı GOREVLER.md). Samet'in şu an açık yazılım görevi
 yok.
 
-### 13.4 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D12)
+### 13.4 Donanım tarafı (⏸ durduruldu; GOREVLER.md D1–D13)
 
 1. Bacaklara "ÖN" + 1–6 bandı (§5.5).
 2. Kartlardan birinin A0'ını lehimle.
@@ -2213,7 +2295,7 @@ düğümüne bağlandı ve G8 son adayla ROS'lu simde tekrarlandı. **Yazılım
 aşamasının bütün görevleri bitti.**
 
 **Sıradaki (öneri sırası):**
-1. Donanım vardiyası (GOREVLER D1–D12; başlama kararı ekibin). Yazılım
+1. Donanım vardiyası (GOREVLER D1–D13; başlama kararı ekibin). Yazılım
    tarafında hazır olanlar: D3 için `tools/pi/pi_kurulum.sh`, D5 için
    `map_channels.py` → robot.yaml, D6 `calibrate.py`, D8 için sensör düğümü +
    `-p reflex:=true`, D9/D11 için `ros2 launch hexapod_bringup
@@ -2248,7 +2330,10 @@ aşamasının bütün görevleri bitti.**
 ## 15. Depoda olmayan kaynakların özeti
 
 **TÜBİTAK başvurusu** (Milli Teknoloji Kulüpler Birliği, Kulüp Geliştirme
-Desteği Başvuru Formu; ekran görüntüsü olarak vardı, depoda değil):
+Desteği Başvuru Formu; önce ekran görüntüsü olarak vardı. 2026-09-29'dan beri
+PDF'i `docs/BASVURU_FORMU_CIKTISI_millitekonolojikuluplerbirligi.pdf`'te ama
+**git dışı**: ekip üyelerinin telefon ve e-postaları var, `*.pdf` kuralı
+dışarıda tutuyor. Formda kamera yok; bütçe kalemleri §3.10):
 - Konu: altı bacaklı robotların karmaşık ve değişken zeminlerde (engebeli,
   kumlu, eğimli) stabil ve verimli hareketi.
 - Sorun: geleneksel kontrol önceden programlanmış sabit desenlere (CPG)
