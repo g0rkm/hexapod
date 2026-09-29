@@ -6,7 +6,8 @@
   <description>
     Gerçek robotu tek komutla başlatır: sensör düğümü (hexapod_sensors),
     servo sürücü düğümü (hexapod_hardware) ve politika düğümü
-    (hexapod_policy). Robot olmadan dry_run:=true ile denenir.
+    (hexapod_policy); isteğe bağlı kamera yayını (hexapod_camera, camera:=true).
+    Robot olmadan dry_run:=true ile denenir.
   </description>
   <maintainer email="gorkemmutlu227@gmail.com">hexapod takımı</maintainer>
   <license>Apache-2.0</license>
@@ -14,6 +15,7 @@
   <exec_depend>hexapod_sensors</exec_depend>
   <exec_depend>hexapod_hardware</exec_depend>
   <exec_depend>hexapod_policy</exec_depend>
+  <exec_depend>hexapod_camera</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 

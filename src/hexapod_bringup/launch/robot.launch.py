@@ -2,6 +2,7 @@
 
     ros2 launch hexapod_bringup robot.launch.py                      # robotta
     ros2 launch hexapod_bringup robot.launch.py reflex:=true         # + kaldırma refleksi (D8 sonrası)
+    ros2 launch hexapod_bringup robot.launch.py camera:=true         # + kamera, tarayıcıda canlı görüntü
     ros2 launch hexapod_bringup robot.launch.py dry_run:=true \\
         config:=/yol/robot.yaml calibration:=/yol/calibration.yaml   # robotsuz deneme
 
@@ -11,9 +12,15 @@ Açılan düğümler (konular: docs/ARAYUZ.md):
   hexapod_hardware  /leg_controller/commands -> servolar (PCA9685), /joint_states
 
 Yürütmek için /cmd_vel gerekir: aynı ağda başka bir terminalden
-`ros2 run teleop_twist_keyboard teleop_twist_keyboard` (ya da
-`ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.1}}"`).
-Komut yokken politika ayakta duruş yayınlar.
+`ros2 run hexapod_teleop wasd` (W ileri, S geri, A/D dön, K dur, Q/E hız; ya da
+`ros2 run teleop_twist_keyboard teleop_twist_keyboard`). Komut yokken politika
+ayakta duruş yayınlar.
+
+camera:=true: kamera sürücüsü (camera_ros) + tarayıcı yayını (hexapod_camera,
+http://<Pi'nin IP'si>:8080). camera:=deneme kamerasız deneme deseni yayınlar.
+Kamera yalnız izlemek için: bu iki düğüm aşağıdaki "biri çıkarsa hepsi
+kapansın" kuralının DIŞINDA; kamera yoksa ya da çökerse robot çalışmaya devam
+eder.
 
 Değer uydurulmaz: kablolama, kalibrasyon, IMU montajı ve (reflex:=true ise)
 mesafe sensörü yerleşimi robot.yaml / calibration.yaml'da yoksa ilgili düğüm
@@ -39,11 +46,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, Shutdown
-from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Shutdown
+from launch.conditions import IfCondition, LaunchConfigurationNotEquals
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
 
 #: Robota aday model (PROJE_DEVIR §3.8), depo köküne göre.
 DEFAULT_POLICY = Path("models") / "ppo_kaldirma35_250k" / "policy.npz"
@@ -73,6 +82,10 @@ def generate_launch_description() -> LaunchDescription:
                               description="robot.yaml (boş: config/robot.yaml aranır)"),
         DeclareLaunchArgument("calibration", default_value="",
                               description="calibration.yaml (boş: config/calibration.yaml)"),
+        DeclareLaunchArgument("camera", default_value="false",
+                              description="kamera yayını: false | true | deneme (kamerasız desen)"),
+        DeclareLaunchArgument("camera_port", default_value="8080",
+                              description="kamera sayfası: http://<Pi'nin IP'si>:<camera_port>"),
     ]
 
     def flag(name: str) -> ParameterValue:
@@ -96,4 +109,13 @@ def generate_launch_description() -> LaunchDescription:
              parameters=[{"policy": text("policy"), "config": text("config"),
                           "reflex": flag("reflex")}]),
     ]
-    return LaunchDescription(args + nodes)
+    # Kamera: on_exit YOK, yani kamera çıkarsa robot kapanmaz (docstring).
+    camera = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(PathJoinSubstitution(
+            [FindPackageShare("hexapod_camera"), "launch", "kamera.launch.py"])),
+        launch_arguments={"deneme": PythonExpression(
+                              ["'", LaunchConfiguration("camera"), "' == 'deneme'"]),
+                          "port": LaunchConfiguration("camera_port")}.items(),
+        condition=LaunchConfigurationNotEquals("camera", "false"),
+    )
+    return LaunchDescription(args + nodes + [camera])

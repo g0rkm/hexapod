@@ -6,8 +6,10 @@
 #   - ROS 2 Lyrical'ın HAFİF sürümü (ros-base; Gazebo, RViz, masaüstü YOK —
 #     bilgisayardaki tools/wsl/ros_kurulum.sh simülasyon için, Pi'ye ağır)
 #   - robotun Python kütüphaneleri: numpy, yaml, smbus2 (I2C), lgpio (GPIO)
-#   - klavyeyle sürmek için teleop_twist_keyboard, i2c-tools
-#   - I2C ve GPIO izinleri (kullanıcı sudo'suz erişsin)
+#   - klavyeyle sürmek için teleop_twist_keyboard, i2c-tools (WASD kumandası
+#     depoda: ros2 run hexapod_teleop wasd)
+#   - kamera: camera_ros (libcamera, Pi Camera V2) + Pillow (deneme deseni)
+#   - I2C, GPIO ve kamera izinleri (kullanıcı sudo'suz erişsin)
 #   - depodaki robot paketlerini ~/hexapod_ws'te derler
 #   - test: ROS mesajlaşması + robot testleri (servoya/sensöre YAZMADAN,
 #     deneme modunda; robot.launch.py'nin uçtan uca testi dahil)
@@ -95,6 +97,8 @@ PAKETLER=(
     "ros-$DISTRO-ros-base"                    # ROS 2 çekirdeği (rclpy, mesajlar, launch)
     ros-dev-tools                              # colcon (paketleri derlemek için)
     "ros-$DISTRO-teleop-twist-keyboard"       # klavyeyle /cmd_vel
+    "ros-$DISTRO-camera-ros"                  # Pi kamerası -> /camera/image_raw/compressed
+    python3-pil                                # kamera deneme deseni (hexapod_camera)
     python3-numpy python3-yaml python3-pytest
     python3-smbus2                             # I2C (PCA9685, VL53L0X, BNO055)
     python3-lgpio                              # GPIO (VL53L0X XSHUT pinleri)
@@ -104,8 +108,8 @@ PAKETLER=(
 calistir sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "${PAKETLER[@]}"
 tamam
 
-# --- 5. I2C ve GPIO izinleri ---------------------------------------------------------
-adim 5/8 "I2C ve GPIO izinleri"
+# --- 5. I2C, GPIO ve kamera izinleri --------------------------------------------------
+adim 5/8 "I2C, GPIO ve kamera izinleri"
 calistir sudo groupadd -f i2c
 calistir sudo groupadd -f gpio
 KURAL=/etc/udev/rules.d/99-hexapod-i2c-gpio.rules
@@ -119,7 +123,7 @@ if [ ! -f "$KURAL" ]; then
     sudo udevadm control --reload-rules >>"$LOG" 2>&1 && sudo udevadm trigger >>"$LOG" 2>&1 || true
     YENIDEN_BASLAT=1
 fi
-for grup in i2c gpio dialout; do
+for grup in i2c gpio dialout video; do    # video: kamera (/dev/video*, /dev/media*)
     if ! id -nG "$KULLANICI" | tr ' ' '\n' | grep -qx "$grup"; then
         calistir sudo usermod -aG "$grup" "$KULLANICI"
         YENIDEN_BASLAT=1
@@ -134,8 +138,18 @@ if [ -f "$CONFIG_TXT" ]; then
         echo "    I2C açıldı ($CONFIG_TXT); yeniden başlatma gerekecek"
         YENIDEN_BASLAT=1
     fi
+    # Kamera: açılışta takılı kamerayı tanı (Pi Camera V2 = IMX219). Ayar
+    # yoksa ya da kapalıysa (=0) açılır; açıksa dokunulmaz.
+    if grep -qE '^\s*camera_auto_detect=1' "$CONFIG_TXT"; then
+        echo "    kamera algılama zaten açık"
+    else
+        sudo sed -i -E 's/^\s*camera_auto_detect=0/# hexapod kapattı: &/' "$CONFIG_TXT"
+        echo 'camera_auto_detect=1' | sudo tee -a "$CONFIG_TXT" >/dev/null
+        echo "    kamera algılama açıldı ($CONFIG_TXT); yeniden başlatma gerekecek"
+        YENIDEN_BASLAT=1
+    fi
 else
-    echo "    $CONFIG_TXT yok (Pi değil); I2C ayarı atlandı"
+    echo "    $CONFIG_TXT yok (Pi değil); I2C ve kamera ayarı atlandı"
 fi
 tamam
 
@@ -170,13 +184,15 @@ fi
 kill "$YAYIN" 2>/dev/null || true
 timeout 10 ros2 daemon stop >/dev/null 2>&1 || true
 calistir python3 -c "import numpy, yaml, smbus2, lgpio, rclpy
-import hexapod_policy.node, hexapod_sensors.node, hexapod_hardware.node, hexapod_teleop.node"
+import hexapod_policy.node, hexapod_sensors.node, hexapod_hardware.node, hexapod_teleop.node
+import hexapod_teleop.wasd_node, hexapod_camera.node, PIL"
 echo "    kütüphaneler ve robot paketleri yükleniyor"
 TESTLER=(
     tests/test_servo_layer.py tests/test_driver_controller.py tests/test_sensors.py
     tests/test_kinematics.py tests/test_tripod_gait.py tests/test_teleop_controller.py
     tests/test_policy_mlp.py tests/test_policy_lift_reflex.py tests/test_policy_ranges.py
     tests/test_stop_signals.py tests/test_ros_nodes.py tests/test_bringup.py
+    tests/test_wasd.py tests/test_camera.py
 )
 ( cd "$REPO" && python3 -m pytest -q -p no:cacheprovider "${TESTLER[@]}" ) >>"$LOG" 2>&1 \
     || hata "robot testleri geçmedi (günlük: $LOG)"
@@ -193,4 +209,7 @@ if [ "$YENIDEN_BASLAT" = 1 ]; then
 fi
 printf 'Sonraki adım (D3):  python3 tools/hwcheck.py\n'
 printf 'Robotu başlatmak (kablolama ve kalibrasyon girildikten sonra):\n'
-printf '    ros2 launch hexapod_bringup robot.launch.py\n'
+printf '    ros2 launch hexapod_bringup robot.launch.py camera:=true\n'
+printf 'Sürmek (ayrı terminalde):  ros2 run hexapod_teleop wasd\n'
+printf 'Yalnız kamerayı denemek:   ros2 launch hexapod_camera kamera.launch.py\n'
+printf '    sonra tarayıcıda http://<Pi IP>:8080  (IP: hostname -I)\n'

@@ -139,6 +139,56 @@ def test_robot_tek_komutla_kalkar_komutla_yurur_temiz_kapanir(ros, tmp_path):
         assert f"[{proc_name}]: process has finished cleanly" in out, out[-3000:]
 
 
+def test_kamera_yayini_acilir_kamera_cokse_de_robot_calisir(ros, tmp_path):
+    """camera:=deneme: kamera yayını (deneme deseni) robotla birlikte açılır.
+    Kamera yalnız izlemek için; yayın düğümü ölünce (kamera arızası gibi)
+    robotun geri kalanı "biri çıkarsa hepsi kapansın" kuralıyla KAPANMAMALI."""
+    pytest.importorskip("PIL", reason="deneme deseni Pillow ister")
+    import http.client
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    config, calibration = full_fake_config(tmp_path)
+    proc = launch("dry_run:=true", f"config:={config}", f"calibration:={calibration}",
+                  "camera:=deneme", f"camera_port:={port}")
+    try:
+        states = []
+        ros.create_subscription(JointState, STATE_TOPIC, lambda m: states.append(1), 10)
+        assert spin_until(ros, lambda: len(states) >= 20, STARTUP_S), "robot kalkmadı"
+
+        def camera_pids() -> list[int]:
+            out = subprocess.run(["pgrep", "-g", str(proc.pid), "-f", "hexapod_camera/stream"],
+                                 capture_output=True, text=True).stdout
+            return [int(p) for p in out.split()]
+
+        assert spin_until(ros, lambda: bool(camera_pids()), 10.0), "kamera yayını açılmadı"
+        end = time.monotonic() + 15
+        status = 0
+        while time.monotonic() < end and status != 200:
+            try:
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+                conn.request("GET", "/kare.jpg")
+                r = conn.getresponse()
+                status, body = r.status, r.read()
+                conn.close()
+            except OSError:
+                time.sleep(0.2)
+        assert status == 200 and body[:2] == b"\xff\xd8", "tarayıcı yayını kare vermiyor"
+
+        for pid in camera_pids():                   # kamera arızası: yayın düğümü ölür
+            os.kill(pid, signal.SIGKILL)
+        n = len(states)
+        assert spin_until(ros, lambda: len(states) > n + 100, 10.0), "robot durdu"
+        assert proc.poll() is None, "kamera ölünce bütün sistem kapandı"
+    finally:
+        code, out = stop(proc)
+    assert "hexapod_camera hazır: kaynak deneme deseni" in out, out[-3000:]
+    for proc_name in ("sensors-1", "driver-2", "policy-3"):
+        assert f"[{proc_name}]: process has finished cleanly" in out, out[-3000:]
+
+
 def test_eksik_configte_eksigi_soyleyip_sistemi_kapatir(tmp_path):
     """Depodaki robot.yaml'da kablolama boş: sürücü çıkış 2 verir, launch
     bütün sistemi kapatır (yarım çalışan robot bırakmaz)."""
