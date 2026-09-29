@@ -14,8 +14,9 @@ setup(
     zip_safe=True,
     maintainer="hexapod takimi",
     maintainer_email="sametoruc74@gmail.com",
-    description="Hiz komutundan (Twist) tripod yuruyusune ROS 2 dugumu",
+    description="Hiz komutundan (Twist) tripod yuruyusune ROS 2 dugumu + WASD klavye kumandasi",
     license="Apache-2.0",
     tests_require=["pytest"],
-    entry_points={"console_scripts": ["teleop = hexapod_teleop.node:main"]},
+    entry_points={"console_scripts": ["teleop = hexapod_teleop.node:main",
+                                    "wasd = hexapod_teleop.wasd_node:main"]},
 )

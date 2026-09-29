@@ -6,6 +6,7 @@
   <description>
     Hız komutunu (geometry_msgs/Twist) hexapod_gait.TripodGait ile eklem
     açısına çevirip komut arayüzüne yayınlayan ROS 2 düğümü (GOREVLER.md S3).
+    Ayrıca WASD klavye kumandası (wasd): terminalden /cmd_vel yayınlar.
   </description>
   <maintainer email="sametoruc74@gmail.com">hexapod takımı</maintainer>
   <license>Apache-2.0</license>
